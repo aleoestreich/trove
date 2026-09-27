@@ -12,8 +12,10 @@ roadmap and `README.md` for how to run it.
   - `chore/`: tooling, dependencies, docs, config (`chore/update-deps`)
   - `refactor/`: code changes with no behaviour change (`refactor/split-dashboard`)
 
-  Create a new branch from `main` for each piece of work. Don't reuse a
-  branch whose PR is merged.
+- **One branch per feature:** start each new feature (or fix) on its own
+  branch from the latest `main`. Open a PR into `main` and merge it there. Don't
+  stack new work on another feature's branch, and never reuse a branch whose PR
+  is merged.
 - **PRs:** fill in every section of `pull_request_template.md`, keeping its
   headings.
 
