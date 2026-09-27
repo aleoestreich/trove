@@ -1,2 +1,75 @@
-# trove
-Personal Finance Control App
+# Trove
+
+See all your bank accounts, credit cards, income and expenses in one place.
+It's built mobile-first and can be installed on an Android phone.
+
+**Status:** Phase 1. It runs entirely in the browser on hardcoded demo data.
+There is no backend or login yet. See [PLAN.md](PLAN.md).
+
+## Run it
+
+```bash
+npm install
+npm run dev
+```
+
+Open the URL Vite prints (http://localhost:5173).
+
+### On your Android phone
+
+1. Connect your computer and phone to the same Wi-Fi.
+2. Run `npm run dev`. Vite prints a **Network** URL, such as
+   `http://192.168.0.12:5173`.
+3. Open that URL in Chrome on the phone.
+4. To add it to your home screen, open Chrome's ⋮ menu and choose
+   **Add to Home screen**.
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Starts the dev server, reachable on your LAN |
+| `npm test` | Runs the unit tests (money math, summaries, demo data) |
+| `npm run build` | Typechecks and builds to `dist/` |
+| `npm run preview` | Serves the production build, reachable on your LAN |
+
+## Demo data
+
+The data is in `src/data/seed.ts`. It is generated relative to today, so the
+current month always has transactions.
+
+| Institution | Accounts |
+|---|---|
+| Nubank | Checking account + credit card |
+| Itaú | Checking account + credit card |
+| Inter | Checking account + credit card |
+| Wise | BRL balance + USD balance, shown in USD and converted to BRL |
+
+It covers salary, freelance income paid in USD, rent, bills, card purchases,
+installment purchases (parcelas), transfers and Pix between accounts, and
+card bill payments.
+
+## How the numbers work
+
+- Money is stored as integer cents in BRL. Foreign-currency balances and
+  transactions also keep their original amount, e.g. `US$ 1.800,00` next to
+  `R$ 9.810,00`.
+- **Transfers between your own accounts and card bill payments are not income
+  or expenses.** This way a card purchase is counted once, when it happens,
+  and not again when the bill is paid.
+- Net balance = money in accounts − open credit card bills.
+- If you change a transaction's category, the change is saved in the
+  browser's localStorage.
+
+## Project layout
+
+```
+src/
+  data/types.ts           domain model (mirrors Pluggy's Item/Account/Transaction)
+  data/seed.ts            hardcoded demo data
+  data/repository.ts      data-access interface the UI uses
+  data/mockRepository.ts  Phase 1 implementation (demo data + localStorage)
+  lib/                    money, dates, income/expense summaries
+  pages/                  Overview, Transactions, Accounts
+  components/             shared UI
+```

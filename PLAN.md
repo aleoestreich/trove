@@ -3,104 +3,81 @@
 A simple app that aggregates transactions from several bank accounts and shows
 expenses and income in one place.
 
-**Approach:** build a frontend-only app first, running entirely in the browser
-on mock data plus CSV import, so it can be tested right away. All data access
-goes through one interface, so the backend and authentication can replace the
-local implementation later without changing the UI.
+**Decisions so far**
+- Home currency is **BRL**. Foreign balances (e.g. USD on Wise) are shown in
+  their own currency *and* converted to BRL. All totals are in BRL.
+- Bank data will come from **Meu Pluggy** (Pluggy, Brazilian Open Finance). It
+  already converts foreign balances to BRL.
+- **Mobile-first**: it must work well on an Android phone and can be installed
+  to the home screen.
+- Stack: React + TypeScript + Tailwind (Vite). Recharts for charts.
 
 ---
 
-## Phase 1 — Testable frontend MVP (no backend, no auth)
+## Phase 1 — Testable frontend on demo data ✅ (current)
 
-### Stack
-| Concern | Choice | Why |
-|---|---|---|
-| Build / dev server | Vite | Fast, zero-config |
-| UI | React + TypeScript | Typed data model shared with a future backend |
-| Styling | Tailwind CSS | Quick, consistent UI without a component library |
-| Charts | Recharts | Simple bar/pie charts for spend by category and month |
-| Persistence | `localStorage` (behind a repository interface) | Data survives reloads; swapped for an API later |
-| CSV parsing | Papa Parse | Robust parsing of bank export files |
-| Tests | Vitest + React Testing Library | Unit tests for parsing, categorisation, totals |
+No backend, no auth. It runs in the browser on hardcoded data.
 
-### Data model
-```ts
-Account      { id, name, institution, type: 'checking'|'savings'|'credit', currency, balance }
-Transaction  { id, accountId, date, description, amount, currency, categoryId, source: 'mock'|'csv'|'api' }
-Category     { id, name, kind: 'income'|'expense', color }
-```
-- `amount` is signed: positive = income, negative = expense. Stored in minor
-  units (cents) to avoid floating-point errors.
-- Transfers between your own accounts get a `transfer` category and are
-  excluded from income/expense totals, so they don't count twice.
+- **Demo data:** 4 institutions (`src/data/seed.ts`):
+  - Nubank, Itaú, Inter: each has a checking account and a credit card.
+  - Wise: a BRL balance and a USD balance (the USD balance is shown as USD and
+    as BRL).
+  - About 6 months of transactions: salary, USD freelance income, rent, bills,
+    card purchases, installments, Pix transfers, card bill payments.
+- **Data model** (`src/data/types.ts`) mirrors Pluggy's Item → Account →
+  Transaction. Account `type` is BANK/CREDIT, credit cards carry `creditData`
+  (limit, available limit, close and due dates), and transactions keep the
+  original foreign amount next to the BRL amount.
+- **Money:** integer cents. Transfers and card bill payments are excluded from
+  income and expenses, so nothing is counted twice.
+- **Screens:**
+  - **Overview:** net balance across all accounts (with the USD breakdown),
+    month switcher, income / expenses / net, spending by category, 6-month
+    trend, latest transactions.
+  - **Transactions:** search, filters (month, type, account, category), list
+    grouped by day. Tap a transaction to see details and change its category.
+  - **Accounts:** grouped by institution. Bank balances, USD balance with its
+    BRL value and rate, card bill with limit usage and close/due dates.
+- **Mobile:** bottom tab bar, touch-sized targets, native selects, bottom
+  sheet, dark mode, safe-area insets, and a web app manifest + icons for "Add
+  to Home screen".
+- **Tests:** Vitest covering summaries, money formatting/conversion, dates,
+  filters, and the consistency of the demo data.
 
-### Data layer
-```
-src/data/
-  repository.ts       # interface: getAccounts, getTransactions(filters), addTransactions, ...
-  localRepository.ts  # Phase 1: localStorage implementation
-  seed.ts             # mock accounts + ~6 months of realistic transactions
-  csvImport.ts        # parse a CSV, map columns, dedupe, assign to an account
-  categorize.ts       # keyword rules, e.g. "UBER" -> Transport
-```
-Phase 2 adds `apiRepository.ts` behind the same interface.
-
-### Screens
-1. **Dashboard**: total balance across accounts, income vs. expenses for the
-   selected month, net cash flow, spend by category (chart), 6-month trend.
-2. **Transactions**: one list across all accounts; filter by account, date
-   range, category, and income/expense; search by description; edit a
-   transaction's category.
-3. **Accounts**: list of accounts with balances; add or edit an account by
-   hand; import a CSV into an account.
-4. **CSV import dialog**: upload a file, map its columns (date, description,
-   amount or debit/credit), preview, confirm. Duplicates are skipped.
-5. **Settings**: manage categories and rules, reset to demo data, export all
-   data as JSON.
-
-### Milestones
-1. Scaffold (Vite, TS, Tailwind, routing, lint) and data model.
-2. Seed data, `localRepository`, and the Transactions page.
-3. Dashboard with totals and charts.
-4. Accounts page and CSV import with column mapping.
-5. Categorisation rules and category editing.
-6. Tests for money math, CSV parsing, dedupe, and categorisation. Add a README
-   with the run instructions (`npm install && npm run dev`).
-
-**How you test it:** run it locally and click through the demo data, then
-import real CSV exports from your banks to see actual numbers. No bank
-credentials are needed at this stage.
+### Possible next steps within Phase 1
+- Budgets per category (monthly limit + progress).
+- Editable categories and auto-categorisation rules.
+- Show bills by due date ("what's due this month").
+- Deploy a preview (e.g. GitHub Pages) so the phone doesn't need to be on the
+  same Wi-Fi.
 
 ---
 
-## Phase 2 — Backend (later)
-- API: Node (Fastify) + TypeScript, reusing the shared types; PostgreSQL via
+## Phase 2 — Backend + Meu Pluggy
+
+- API: Node (Fastify) + TypeScript, reusing `src/data/types.ts`. PostgreSQL via
   Prisma.
-- Endpoints for accounts, transactions, categories, and imports.
-  `apiRepository.ts` replaces `localRepository.ts` in the frontend.
-- **Bank aggregation** through a provider instead of scraping. Which one
-  depends on where your banks are:
-  - EU/UK: GoCardless Bank Account Data (PSD2 open banking; free tier)
-  - US/Canada: Plaid
-  - Other options: TrueLayer, Tink, SaltEdge
-- Background job to sync transactions, with dedupe by provider transaction ID.
-- Migration step: import existing localStorage data through the JSON export.
+- Pluggy integration:
+  - The user connects their Meu Pluggy items. Store the item IDs; the backend
+    fetches accounts and transactions with the Pluggy API key (server-side
+    only).
+  - Map Pluggy's `Account.balance` (already BRL) → `balance`, and keep the
+    original currency and amount in `foreign`. Map `Transaction.amount` and
+    `currencyCode` / `amountInAccountCurrency` the same way. Map
+    `creditCardMetadata` → `installment`.
+  - Map Pluggy categories to ours, and detect transfers between the user's own
+    accounts.
+  - Sync through Pluggy webhooks (`item/updated`, `transactions/created`)
+    plus a daily fallback job. Dedupe by Pluggy transaction ID.
+- Frontend: add `apiRepository.ts` implementing the same `Repository`
+  interface and swap it in for `mockRepository`.
 
-## Phase 3 — Authentication & security (later)
-- User accounts (Auth.js, Clerk, or Supabase Auth); every record is scoped to
-  a user.
-- Encrypt the provider access tokens at rest; never store bank credentials.
-- HTTPS, secure cookies, rate limiting.
+## Phase 3 — Authentication & security
 
-## Later ideas
-Budgets per category, recurring-transaction detection, multi-currency
-conversion, alerts, and a mobile-friendly PWA.
-
----
-
-## Open questions
-1. Which country/countries are your banks in? This decides the aggregation
-   provider in Phase 2, plus the default currency and CSV date formats.
-2. Single currency, or several?
-3. Is the proposed stack (React + TypeScript + Tailwind) OK, or do you prefer
-   something else?
+- User accounts (e.g. Supabase Auth or Clerk); every record is scoped to a
+  user.
+- Pluggy API credentials live only on the server; never store bank passwords.
+- HTTPS, secure cookies, rate limiting. Optionally lock the app with a PIN or
+  biometrics on the phone.
+- Turn the app into a full PWA (service worker, offline cache of the last
+  sync).
