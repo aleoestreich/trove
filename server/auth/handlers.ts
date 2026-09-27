@@ -4,10 +4,10 @@
 
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose'
 import { next } from '@vercel/functions'
-import { issuerOf, NOT_CONFIGURED, type AuthConfig } from './config'
-import { clearCookie, LOCALE_COOKIE, LOGIN_COOKIE, readCookie, SESSION_COOKIE, setCookie } from './cookies'
-import { LOGIN_MAX_AGE, seal, SESSION_MAX_AGE, unseal, type LoginClaims, type SessionClaims } from './session'
-import { messagePage, signOutLink, tryAgain } from './pages'
+import { issuerOf, NOT_CONFIGURED, type AuthConfig } from './config.js'
+import { clearCookie, LOCALE_COOKIE, LOGIN_COOKIE, readCookie, SESSION_COOKIE, setCookie } from './cookies.js'
+import { LOGIN_MAX_AGE, seal, SESSION_MAX_AGE, unseal, type LoginClaims, type SessionClaims } from './session.js'
+import { messagePage, signOutLink, tryAgain } from './pages.js'
 
 const CALLBACK_PATH = '/api/auth/callback'
 
