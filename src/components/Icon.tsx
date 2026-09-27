@@ -7,6 +7,7 @@ const paths = {
   search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3',
   close: 'M18 6 6 18M6 6l12 12',
   card: 'M3 6h18v12H3zM3 10h18',
+  installments: 'M4 5h16v15H4zM4 10h16M8 3v4M16 3v4M8 14h2M12 14h2M16 14h.01M8 17h2',
 } as const
 
 export type IconName = keyof typeof paths

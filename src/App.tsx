@@ -4,6 +4,7 @@ import { createMockRepository } from './data/mockRepository'
 import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { Accounts } from './pages/Accounts'
+import { Installments } from './pages/Installments'
 import { Icon, type IconName } from './components/Icon'
 
 const repository = createMockRepository()
@@ -11,6 +12,7 @@ const repository = createMockRepository()
 const tabs: { to: string; label: string; icon: IconName }[] = [
   { to: '/', label: 'Overview', icon: 'home' },
   { to: '/transactions', label: 'Transactions', icon: 'list' },
+  { to: '/installments', label: 'Installments', icon: 'installments' },
   { to: '/accounts', label: 'Accounts', icon: 'bank' },
 ]
 
@@ -44,13 +46,14 @@ export function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/transactions" element={<Transactions />} />
+              <Route path="/installments" element={<Installments />} />
               <Route path="/accounts" element={<Accounts />} />
             </Routes>
           </main>
 
           {/* Bottom tab bar on phones */}
           <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
-            <div className="grid h-16 grid-cols-3">
+            <div className="grid h-16 grid-cols-4">
               {tabs.map((t) => (
                 <NavLink
                   key={t.to}

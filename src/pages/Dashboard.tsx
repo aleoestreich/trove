@@ -5,7 +5,8 @@ import { useData } from '../state'
 import { MONTHS_OF_HISTORY } from '../data/seed'
 import type { Transaction } from '../data/types'
 import { balances, expensesByCategory, inMonth, totals } from '../lib/summary'
-import { formatMonthShort, lastMonths, monthKey, toISO } from '../lib/dates'
+import { installmentPlans, upcomingByMonth } from '../lib/installments'
+import { dayOfMonth, formatMonthShort, lastMonths, monthKey, toISO } from '../lib/dates'
 import { formatMoney, formatRate } from '../lib/money'
 import { Card, MonthSwitcher, SectionTitle } from '../components/ui'
 import { TransactionRow } from '../components/TransactionRow'
@@ -26,6 +27,12 @@ export function Dashboard() {
   const monthTotals = totals(monthTxs, categoriesById)
   const byCategory = expensesByCategory(monthTxs, categoriesById)
   const maxCategory = byCategory[0]?.amount ?? 0
+
+  const plans = useMemo(() => installmentPlans(transactions), [transactions])
+  const installmentsLeft = plans.reduce((s, p) => s + p.remaining, 0)
+  const activePlans = plans.filter((p) => p.remaining > 0).length
+  const nextMonthKey = monthKey(dayOfMonth(new Date(), 1, 1))
+  const nextMonth = upcomingByMonth(plans).find((m) => m.month === nextMonthKey)
 
   const trend = useMemo(
     () =>
@@ -98,6 +105,31 @@ export function Dashboard() {
           ))}
         </ul>
       </Card>
+
+      {/* Installments (parcelas) already committed */}
+      {installmentsLeft > 0 && (
+        <Link to="/installments" className="block">
+          <Card className="active:bg-track">
+            <SectionTitle action={<span className="text-sm text-accent">Details</span>}>Installments</SectionTitle>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-muted">Still to pay</p>
+                <p className="tabular font-medium">{formatMoney(installmentsLeft)}</p>
+                <p className="text-xs text-muted">
+                  {activePlans} active {activePlans === 1 ? 'purchase' : 'purchases'}
+                </p>
+              </div>
+              {nextMonth && (
+                <div>
+                  <p className="text-muted">Next month</p>
+                  <p className="tabular font-medium">{formatMoney(nextMonth.amount)}</p>
+                  <p className="text-xs text-muted">already in your bills</p>
+                </div>
+              )}
+            </div>
+          </Card>
+        </Link>
+      )}
 
       {/* 6-month trend */}
       <Card>

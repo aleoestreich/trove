@@ -169,22 +169,36 @@ export function buildSeed(today: Date = new Date()): Snapshot {
     }
   }
 
-  // Installment purchases ("parcelado"): one charge per month on the card.
-  const installments = [
+  // Installment purchases ("parcelado"): the purchase is split into equal
+  // monthly charges, one per bill. The first installment absorbs rounding.
+  // Installments not charged yet still use up the card's credit limit.
+  const installmentPlans = [
+    { accountId: 'itau-card', startOffset: -5, day: 14, description: 'Magazine Luiza', total: 4_299_90, count: 12, categoryId: 'shopping' },
+    { accountId: 'nubank-card', startOffset: -5, day: 9, description: 'Decathlon', total: 389_70, count: 3, categoryId: 'shopping' },
     { accountId: 'itau-card', startOffset: -4, day: 18, description: 'LATAM Airlines', total: 2_400_00, count: 6, categoryId: 'travel' },
+    { accountId: 'inter-card', startOffset: -3, day: 25, description: 'Mobly', total: 1_890_00, count: 5, categoryId: 'housing' },
     { accountId: 'nubank-card', startOffset: -2, day: 22, description: 'Dell Computadores', total: 6_000_00, count: 10, categoryId: 'shopping' },
     { accountId: 'inter-card', startOffset: -1, day: 4, description: 'Alura Cursos', total: 900_00, count: 3, categoryId: 'education' },
+    { accountId: 'nubank-card', startOffset: 0, day: 5, description: 'Zara', total: 459_80, count: 2, categoryId: 'shopping' },
   ]
-  for (const p of installments) {
-    const each = Math.round(p.total / p.count)
+  const futureInstallments = new Map<string, Cents>() // card -> installments not yet charged
+  for (const p of installmentPlans) {
+    const each = Math.floor(p.total / p.count)
+    const purchaseDate = dayOfMonth(today, p.startOffset, p.day)
     for (let n = 1; n <= p.count; n++) {
+      const amount = n === 1 ? p.total - each * (p.count - 1) : each
+      const date = dayOfMonth(today, p.startOffset + n - 1, p.day)
+      if (date > todayISO) {
+        futureInstallments.set(p.accountId, (futureInstallments.get(p.accountId) ?? 0) + amount)
+        continue
+      }
       add({
         accountId: p.accountId,
-        date: dayOfMonth(today, p.startOffset + n - 1, p.day),
+        date,
         description: p.description,
-        amount: -each,
+        amount: -amount,
         categoryId: p.categoryId,
-        installment: { number: n, total: p.count },
+        installment: { number: n, total: p.count, totalAmount: p.total, purchaseDate },
       })
     }
   }
@@ -230,7 +244,7 @@ export function buildSeed(today: Date = new Date()): Snapshot {
       balance: owed,
       creditData: {
         creditLimit: card.limit,
-        availableCreditLimit: card.limit - owed,
+        availableCreditLimit: card.limit - owed - (futureInstallments.get(card.id) ?? 0),
         balanceCloseDate: nextClose,
         balanceDueDate: dayOfMonth(new Date(y, m - 1, 1), 0, card.dueDay),
       },

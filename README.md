@@ -50,7 +50,7 @@ current month always has transactions.
 | Wise | BRL balance + USD balance, shown in USD and converted to BRL |
 
 It covers salary, freelance income paid in USD, rent, bills, card purchases,
-installment purchases (parcelas), transfers and Pix between accounts, and
+installment purchases (parcelas, active and paid off), transfers and Pix between accounts, and
 card bill payments.
 
 ## How the numbers work
@@ -62,6 +62,12 @@ card bill payments.
   or expenses.** This way a card purchase is counted once, when it happens,
   and not again when the bill is paid.
 - Net balance = money in accounts − open credit card bills.
+- **Installments (parcelas):** each installment is charged in its own bill and
+  counts as an expense in the month it's charged, the same way the bank bills
+  it. Installments not charged yet still reduce the card's available limit
+  (available = limit − open bill − future installments). The Installments tab
+  shows every purchase's progress (e.g. 3/10) and how much is already
+  committed in each future bill.
 - If you change a transaction's category, the change is saved in the
   browser's localStorage.
 
@@ -73,7 +79,7 @@ src/
   data/seed.ts            hardcoded demo data
   data/repository.ts      data-access interface the UI uses
   data/mockRepository.ts  Phase 1 implementation (demo data + localStorage)
-  lib/                    money, dates, income/expense summaries
-  pages/                  Overview, Transactions, Accounts
+  lib/                    money, dates, income/expense summaries, installment plans
+  pages/                  Overview, Transactions, Installments, Accounts
   components/             shared UI
 ```

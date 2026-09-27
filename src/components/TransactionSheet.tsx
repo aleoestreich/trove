@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { Transaction } from '../data/types'
 import { useData } from '../state'
-import { formatDay } from '../lib/dates'
+import { formatDay, formatShortDate } from '../lib/dates'
 import { formatMoney, formatRate } from '../lib/money'
 import { Icon } from './Icon'
 
@@ -57,7 +57,8 @@ export function TransactionSheet({ tx, onClose }: { tx: Transaction; onClose(): 
         <div className="mt-2 flex flex-wrap gap-2 text-xs text-ink-2">
           {current.installment && (
             <span className="rounded bg-track px-2 py-0.5">
-              Installment {current.installment.number} of {current.installment.total}
+              Installment {current.installment.number} of {current.installment.total} · total{' '}
+              {formatMoney(current.installment.totalAmount)} · bought {formatShortDate(current.installment.purchaseDate)}
             </span>
           )}
           {current.status === 'PENDING' && <span className="rounded bg-track px-2 py-0.5">Pending</span>}

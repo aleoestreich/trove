@@ -20,6 +20,7 @@ export type AccountSubtype = 'CHECKING_ACCOUNT' | 'SAVINGS_ACCOUNT' | 'CREDIT_CA
 
 export interface CreditData {
   creditLimit: Cents
+  /** Limit minus the open bill minus installments still to be charged. */
   availableCreditLimit: Cents
   /** Day the current bill closes (ISO date). */
   balanceCloseDate: string
@@ -68,6 +69,18 @@ export interface Transaction {
   foreign?: { currency: CurrencyCode; amount: Cents }
   categoryId: string
   status: 'POSTED' | 'PENDING'
-  /** Credit-card installment purchase ("parcela 3/10"). */
-  installment?: { number: number; total: number }
+  /**
+   * Credit-card installment purchase ("parcelado"), mirroring Pluggy's
+   * `creditCardMetadata`. Each installment is its own transaction, charged in
+   * a later bill; `amount` is this installment only.
+   */
+  installment?: {
+    /** 1-based: this is installment `number` of `total`. */
+    number: number
+    total: number
+    /** Full purchase amount across all installments (positive). */
+    totalAmount: Cents
+    /** Date of the original purchase. */
+    purchaseDate: string
+  }
 }

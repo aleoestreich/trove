@@ -98,7 +98,7 @@ describe('demo data', () => {
     for (const card of seed.accounts.filter((a) => a.type === 'CREDIT')) {
       const all = seed.transactions.filter((t) => t.accountId === card.id)
       expect(card.balance).toBe(-all.reduce((s, t) => s + t.amount, 0))
-      expect(card.creditData!.availableCreditLimit).toBe(card.creditData!.creditLimit - card.balance)
+      expect(card.creditData!.availableCreditLimit).toBeLessThanOrEqual(card.creditData!.creditLimit - card.balance)
       expect(card.balance).toBeGreaterThan(0)
     }
   })

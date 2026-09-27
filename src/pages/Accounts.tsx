@@ -1,14 +1,17 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useData } from '../state'
 import type { Account } from '../data/types'
 import { balances } from '../lib/summary'
+import { installmentPlans, remainingByAccount } from '../lib/installments'
 import { formatShortDate } from '../lib/dates'
 import { formatMoney, formatRate } from '../lib/money'
 import { Card, InstitutionBadge } from '../components/ui'
 
 export function Accounts() {
-  const { institutions, accounts } = useData()
+  const { institutions, accounts, transactions } = useData()
   const bal = balances(accounts)
+  const futureInstallments = useMemo(() => remainingByAccount(installmentPlans(transactions)), [transactions])
 
   return (
     <div className="space-y-4">
@@ -34,7 +37,7 @@ export function Accounts() {
               <p className="tabular font-semibold">{formatMoney(total.net)}</p>
             </div>
             <div className="divide-y divide-line">
-              {own.map((a) => (a.type === 'CREDIT' ? <CreditCardRow key={a.id} account={a} /> : <BankRow key={a.id} account={a} />))}
+              {own.map((a) => (a.type === 'CREDIT' ? <CreditCardRow key={a.id} account={a} futureInstallments={futureInstallments.get(a.id) ?? 0} /> : <BankRow key={a.id} account={a} />))}
             </div>
           </Card>
         )
@@ -81,9 +84,10 @@ function BankRow({ account }: { account: Account }) {
   )
 }
 
-function CreditCardRow({ account }: { account: Account }) {
+function CreditCardRow({ account, futureInstallments }: { account: Account; futureInstallments: number }) {
   const credit = account.creditData!
-  const used = Math.min(1, account.balance / credit.creditLimit)
+  const pct = (cents: number) => `${Math.min(100, (cents / credit.creditLimit) * 100)}%`
+  const used = credit.creditLimit - credit.availableCreditLimit
   return (
     <Link to={`/transactions?m=all&a=${account.id}`} className="block p-4 active:bg-track">
       <div className="flex items-start justify-between gap-3">
@@ -98,20 +102,37 @@ function CreditCardRow({ account }: { account: Account }) {
           <p className="tabular font-semibold">{formatMoney(account.balance)}</p>
         </div>
       </div>
+      {/* Limit usage: open bill + future installments (both reduce the available limit) */}
       <div
-        className="mt-3 h-2 overflow-hidden rounded-full bg-track"
+        className="mt-3 flex h-2 gap-0.5 overflow-hidden rounded-full bg-track"
         role="meter"
         aria-label="Credit limit used"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={Math.round(used * 100)}
+        aria-valuenow={Math.round((used / credit.creditLimit) * 100)}
       >
-        <div className="h-full rounded-full bg-accent" style={{ width: `${used * 100}%` }} />
+        <span className="h-full rounded-l-full bg-accent" style={{ width: pct(account.balance) }} />
+        {futureInstallments > 0 && <span className="h-full bg-accent/40" style={{ width: pct(futureInstallments) }} />}
       </div>
-      <p className="tabular mt-1.5 flex justify-between text-xs text-muted">
-        <span>Available {formatMoney(credit.availableCreditLimit)}</span>
-        <span>Limit {formatMoney(credit.creditLimit)}</span>
-      </p>
+      <div className="tabular mt-2 space-y-0.5 text-xs text-ink-2">
+        {futureInstallments > 0 && (
+          <p className="flex justify-between gap-2">
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-accent/40" aria-hidden />
+              Future installments
+            </span>
+            <span>{formatMoney(futureInstallments)}</span>
+          </p>
+        )}
+        <p className="flex justify-between gap-2">
+          <span>Available</span>
+          <span className="font-medium text-ink">{formatMoney(credit.availableCreditLimit)}</span>
+        </p>
+        <p className="flex justify-between gap-2 text-muted">
+          <span>Limit</span>
+          <span>{formatMoney(credit.creditLimit)}</span>
+        </p>
+      </div>
     </Link>
   )
 }

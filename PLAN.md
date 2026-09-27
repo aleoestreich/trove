@@ -38,6 +38,14 @@ No backend, no auth. It runs in the browser on hardcoded data.
     grouped by day. Tap a transaction to see details and change its category.
   - **Accounts:** grouped by institution. Bank balances, USD balance with its
     BRL value and rate, card bill with limit usage and close/due dates.
+  - **Installments:** total still to pay, amount already committed in each
+    future month's bills, and each purchase with its progress (3/10), amount
+    per installment, amount left and end month.
+- **Installments (parcelas):** each installment is a transaction with
+  number/total/total amount/purchase date (Pluggy's `creditCardMetadata`).
+  It counts as an expense in the month it's charged. Future installments are
+  projected from what has been charged so far, and they reduce the card's
+  available limit.
 - **Mobile:** bottom tab bar, touch-sized targets, native selects, bottom
   sheet, dark mode, safe-area insets, and a web app manifest + icons for "Add
   to Home screen".
@@ -46,6 +54,8 @@ No backend, no auth. It runs in the browser on hardcoded data.
 
 ### Possible next steps within Phase 1
 - Budgets per category (monthly limit + progress).
+- Option to count an installment purchase as a full expense in the month it
+  was bought, instead of spread over the months it's charged.
 - Editable categories and auto-categorisation rules.
 - Show bills by due date ("what's due this month").
 - Deploy a preview (e.g. GitHub Pages) so the phone doesn't need to be on the
@@ -64,7 +74,8 @@ No backend, no auth. It runs in the browser on hardcoded data.
   - Map Pluggy's `Account.balance` (already BRL) → `balance`, and keep the
     original currency and amount in `foreign`. Map `Transaction.amount` and
     `currencyCode` / `amountInAccountCurrency` the same way. Map
-    `creditCardMetadata` → `installment`.
+    `creditCardMetadata` (installmentNumber, totalInstallments, totalAmount,
+    purchaseDate) → `installment`.
   - Map Pluggy categories to ours, and detect transfers between the user's own
     accounts.
   - Sync through Pluggy webhooks (`item/updated`, `transactions/created`)
