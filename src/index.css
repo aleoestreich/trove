@@ -18,8 +18,10 @@
   --track: #f0efec;
 }
 
+/* Dark palette: follows the OS setting unless light is forced with
+   data-theme="light", and always applies with data-theme="dark". */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     color-scheme: dark;
     --page: #0d0d0d;
     --surface: #1a1a19;
@@ -35,6 +37,23 @@
     --bar: #3987e5;
     --track: #2c2c2a;
   }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #9a988f;
+  --line: #2c2c2a;
+  --accent: #3987e5;
+  --income: #0ca30c;
+  --critical: #e66767;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --bar: #3987e5;
+  --track: #2c2c2a;
 }
 
 @theme inline {
