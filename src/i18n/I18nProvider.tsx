@@ -5,6 +5,18 @@ import { setActiveLocale, type Locale } from './locale'
 
 const STORAGE_KEY = 'trove.locale'
 
+/**
+ * Also saved as a cookie so the server can show Auth0's login page in the same
+ * language (see server/auth). Not secret.
+ */
+function saveLocaleCookie(l: Locale) {
+  try {
+    document.cookie = `trove_locale=${l}; Path=/; Max-Age=31536000; SameSite=Lax`
+  } catch {
+    // cookies unavailable
+  }
+}
+
 interface I18n {
   locale: Locale
   setLocale(locale: Locale): void
@@ -30,12 +42,14 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
     const l = initialLocale()
     setActiveLocale(l)
+    saveLocaleCookie(l)
     document.documentElement.lang = l
     return l
   })
 
   const setLocale = useCallback((l: Locale) => {
     setActiveLocale(l)
+    saveLocaleCookie(l)
     document.documentElement.lang = l
     try {
       localStorage.setItem(STORAGE_KEY, l)

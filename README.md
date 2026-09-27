@@ -37,6 +37,14 @@ first launch it follows the phone's language. Text, category names, money
 descriptions and account names come from the banks and are shown as-is.
 Strings live in `src/i18n/messages.ts`.
 
+## Login (deployed site only)
+
+The site on Vercel is private: every request goes through `middleware.ts`,
+and only users in the Auth0 tenant (just the owner, with sign-ups disabled)
+can sign in. Local development
+(`npm run dev`) has no login. Setup and troubleshooting:
+[docs/auth0-setup.md](docs/auth0-setup.md).
+
 ## Scripts
 
 | Command | What it does |
@@ -93,4 +101,7 @@ src/
   lib/                    money, dates, income/expense summaries, installment plans
   pages/                  Overview, Transactions, Installments, Accounts
   components/             shared UI
+middleware.ts             Vercel middleware: only the signed-in owner gets the app
+api/auth/                 login, callback and logout (Vercel Functions)
+server/auth/              login logic, encrypted cookies, tests
 ```

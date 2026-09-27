@@ -94,8 +94,12 @@ No backend, no auth. It runs in the browser on hardcoded data.
 
 ## Phase 3 — Authentication & security
 
-- User accounts (e.g. Supabase Auth or Clerk); every record is scoped to a
-  user.
+- ✅ **Single-user login** (done): Auth0 via the Vercel integration. Vercel
+  Routing Middleware checks an encrypted session on every request. Who can
+  sign in is managed only in Auth0 (one user, sign-ups disabled); the code has
+  no email list. See `docs/auth0-setup.md`.
+- Optional: passkeys (fingerprint) and MFA in Auth0.
+- Every record scoped to the owner once there is a database.
 - Pluggy API credentials live only on the server; never store bank passwords.
 - HTTPS, secure cookies, rate limiting. Optionally lock the app with a PIN or
   biometrics on the phone.

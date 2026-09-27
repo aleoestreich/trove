@@ -88,6 +88,7 @@ const en = {
   accounts: {
     count: (n: number) => `${n} ${n === 1 ? 'account' : 'accounts'}`,
     footer: 'Demo data. Real accounts will be connected through Meu Pluggy once the backend is added.',
+    signOut: 'Sign out',
     cardDates: (close: string, due: string) => `Closes ${close} · Due ${due}`,
     openBill: 'Open bill',
     limitUsed: 'Credit limit used',
@@ -204,6 +205,7 @@ const ptBR: Messages = {
   accounts: {
     count: (n) => `${n} ${n === 1 ? 'conta' : 'contas'}`,
     footer: 'Dados de exemplo. As contas reais serão conectadas pelo Meu Pluggy quando o backend for adicionado.',
+    signOut: 'Sair',
     cardDates: (close, due) => `Fecha ${close} · Vence ${due}`,
     openBill: 'Fatura aberta',
     limitUsed: 'Limite utilizado',
