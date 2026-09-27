@@ -31,7 +31,7 @@ blocks the connection, allow Node.js on private networks.
 ## Languages
 
 The app is in English and Brazilian Portuguese (PT-BR). Switch with the
-**EN | PT-BR** control in the header; the choice is saved on the device. On
+🇺🇸 | 🇧🇷 flag switch in the header; the choice is saved on the device. On
 first launch it follows the phone's language. Text, category names, money
 (`R$ 1.234,56` / `R$1,234.56`) and dates follow the language. Transaction
 descriptions and account names come from the banks and are shown as-is.
