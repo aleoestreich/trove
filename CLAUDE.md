@@ -44,5 +44,7 @@ Run `npm test` and `npm run build` before pushing.
 - **Login:** the deployed site is private (Auth0 + `middleware.ts`, see
   `docs/auth0-setup.md`). Server code lives in `middleware.ts`, `api/` and
   `server/` and is typechecked with `tsconfig.server.json`. It must fail
-  closed: if a setting is missing, refuse the request. Never put secrets or the
-  owner's email in the repo; they are Vercel environment variables.
+  closed: if a setting is missing, refuse the request. Who may sign in is
+  managed only in Auth0 (its user list, sign-ups disabled). Never hardcode
+  emails, user IDs or secrets in code, docs or config; secrets are Vercel
+  environment variables.

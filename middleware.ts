@@ -1,5 +1,5 @@
 // Vercel Routing Middleware: runs before every request to the deployed site.
-// Only a signed-in session for ALLOWED_EMAIL gets the app; see server/auth.
+// Only a signed-in session (via Auth0) gets the app; see server/auth.
 // Not used by `npm run dev` (local development has no login).
 
 import { readConfig } from './server/auth/config'

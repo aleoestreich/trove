@@ -34,7 +34,8 @@ export async function unseal<T extends JWTPayload>(purpose: Purpose, value: stri
 }
 
 export interface SessionClaims extends JWTPayload {
-  email: string
+  /** Auth0 user ID of the signed-in user. */
+  sub: string
 }
 
 export interface LoginClaims extends JWTPayload {

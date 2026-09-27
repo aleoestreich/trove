@@ -95,8 +95,9 @@ No backend, no auth. It runs in the browser on hardcoded data.
 ## Phase 3 — Authentication & security
 
 - ✅ **Single-user login** (done): Auth0 via the Vercel integration. Vercel
-  Routing Middleware checks an encrypted session on every request, and only
-  `ALLOWED_EMAIL` can sign in. See `docs/auth0-setup.md`.
+  Routing Middleware checks an encrypted session on every request. Who can
+  sign in is managed only in Auth0 (one user, sign-ups disabled); the code has
+  no email list. See `docs/auth0-setup.md`.
 - Optional: passkeys (fingerprint) and MFA in Auth0.
 - Every record scoped to the owner once there is a database.
 - Pluggy API credentials live only on the server; never store bank passwords.

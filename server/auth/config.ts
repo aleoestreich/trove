@@ -1,5 +1,8 @@
-// Auth settings, read from environment variables set in Vercel.
-// AUTH0_* come from the Auth0 integration; ALLOWED_EMAIL is added by hand.
+// Auth settings, read from environment variables set in Vercel by the Auth0
+// integration.
+//
+// Who may sign in is decided only in Auth0 (its user list, with sign-ups
+// disabled). The code keeps no list of emails or users.
 
 export interface AuthConfig {
   /** Auth0 tenant host, e.g. "trove-xyz.us.auth0.com". */
@@ -8,8 +11,6 @@ export interface AuthConfig {
   clientSecret: string
   /** Secret used to encrypt Trove's cookies. */
   secret: string
-  /** The only email allowed in (lower-case). */
-  allowedEmail: string
 }
 
 type Env = Record<string, string | undefined>
@@ -20,9 +21,8 @@ export function readConfig(env: Env): AuthConfig | null {
   const clientId = env.AUTH0_CLIENT_ID?.trim()
   const clientSecret = env.AUTH0_CLIENT_SECRET?.trim()
   const secret = env.AUTH0_SECRET?.trim()
-  const allowedEmail = env.ALLOWED_EMAIL?.trim().toLowerCase()
-  if (!domain || !clientId || !clientSecret || !secret || !allowedEmail) return null
-  return { domain, clientId, clientSecret, secret, allowedEmail }
+  if (!domain || !clientId || !clientSecret || !secret) return null
+  return { domain, clientId, clientSecret, secret }
 }
 
 /** Token issuer for the tenant: "https://<domain>/". */
@@ -31,4 +31,4 @@ export function issuerOf(config: Pick<AuthConfig, 'domain'>): string {
 }
 
 export const NOT_CONFIGURED =
-  'Login is not configured. Set AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_SECRET and ALLOWED_EMAIL in Vercel.'
+  'Login is not configured. Set AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET and AUTH0_SECRET in Vercel.'

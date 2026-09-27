@@ -40,7 +40,8 @@ Strings live in `src/i18n/messages.ts`.
 ## Login (deployed site only)
 
 The site on Vercel is private: every request goes through `middleware.ts`,
-and only one email can sign in, through Auth0. Local development
+and only users in the Auth0 tenant (just the owner, with sign-ups disabled)
+can sign in. Local development
 (`npm run dev`) has no login. Setup and troubleshooting:
 [docs/auth0-setup.md](docs/auth0-setup.md).
 

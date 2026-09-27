@@ -59,8 +59,8 @@ export function loginLocale(request: Request): 'pt-BR' | 'en' {
 
 /**
  * Routing Middleware: runs before every request. Serves the app only with a
- * valid session for the allowed email; otherwise sends pages to the login and
- * refuses everything else (JS, CSS, data).
+ * valid session; otherwise sends pages to the login and refuses everything
+ * else (JS, CSS, data).
  */
 export async function guard(request: Request, config: AuthConfig | null): Promise<Response> {
   const url = new URL(request.url)
@@ -68,7 +68,7 @@ export async function guard(request: Request, config: AuthConfig | null): Promis
   if (!config) return notConfigured()
 
   const session = await unseal<SessionClaims>('session', readCookie(request, SESSION_COOKIE), config.secret)
-  if (session && session.email === config.allowedEmail) return next({ headers: securityHeaders })
+  if (session?.sub) return next({ headers: securityHeaders })
 
   const isPage = request.method === 'GET' && (request.headers.get('Sec-Fetch-Mode') === 'navigate' || (request.headers.get('Accept') ?? '').includes('text/html'))
   if (isPage) return redirect(`/api/auth/login?returnTo=${encodeURIComponent(url.pathname + url.search)}`)
@@ -118,7 +118,9 @@ function remoteKeys(issuer: string): JWTVerifyGetKey {
 
 /**
  * GET /api/auth/callback: Auth0 sends the browser back here. Exchanges the
- * code for an ID token, verifies it, checks the email, and starts a session.
+ * code for an ID token, verifies it, and starts a session. Auth0 only issues
+ * a token to users in its user list (sign-ups are disabled there), so a
+ * verified token for this application is what grants access.
  */
 export async function callback(request: Request, config: AuthConfig | null, deps?: Partial<CallbackDeps>): Promise<Response> {
   if (!config) return notConfigured()
@@ -156,21 +158,18 @@ export async function callback(request: Request, config: AuthConfig | null, deps
   }
   const { id_token } = (await tokenResponse.json()) as { id_token?: string }
 
-  let email: string
+  let sub: string
   try {
     if (!id_token) throw new Error('no id_token')
     const { payload } = await jwtVerify(id_token, deps?.keys ?? remoteKeys(issuer), { issuer, audience: config.clientId })
     if (payload.nonce !== saved.nonce) throw new Error('nonce mismatch')
-    email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : ''
+    if (!payload.sub) throw new Error('no subject')
+    sub = payload.sub
   } catch {
     return messagePage(400, 'Login failed / Falha no login', 'The login could not be verified. / Não foi possível verificar o login.', tryAgain)
   }
 
-  if (email !== config.allowedEmail) {
-    return messagePage(403, 'Not allowed / Sem acesso', 'This account cannot use Trove. / Esta conta não pode usar o Trove.', signOutLink)
-  }
-
-  const session = await seal('session', { email }, config.secret, SESSION_MAX_AGE)
+  const session = await seal('session', { sub }, config.secret, SESSION_MAX_AGE)
   return redirect(saved.returnTo, [setCookie(SESSION_COOKIE, session, SESSION_MAX_AGE), clearLogin])
 }
 

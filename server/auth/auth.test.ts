@@ -10,27 +10,27 @@ const config: AuthConfig = {
   clientId: 'client-123',
   clientSecret: 'client-secret',
   secret: 'a-long-random-cookie-secret',
-  allowedEmail: 'owner@example.com',
 }
 const ISSUER = 'https://trove-test.us.auth0.com/'
 const SITE = 'https://trove.vercel.app'
 
 // A simulated Auth0: signs ID tokens with a local key.
 let keys: JWTVerifyGetKey
-let signIdToken: (claims: Record<string, unknown>, opts?: { iss?: string; aud?: string }) => Promise<string>
+let signIdToken: (claims: Record<string, unknown>, opts?: { iss?: string; aud?: string; sub?: string | null }) => Promise<string>
 
 beforeAll(async () => {
   const { publicKey, privateKey } = await generateKeyPair('RS256')
   keys = createLocalJWKSet({ keys: [{ ...(await exportJWK(publicKey)), kid: 'k1', alg: 'RS256' }] })
-  signIdToken = (claims, opts = {}) =>
-    new SignJWT(claims)
+  signIdToken = (claims, opts = {}) => {
+    const jwt = new SignJWT(claims)
       .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
       .setIssuer(opts.iss ?? ISSUER)
       .setAudience(opts.aud ?? config.clientId)
-      .setSubject('auth0|owner')
       .setIssuedAt()
       .setExpirationTime('5m')
-      .sign(privateKey)
+    if (opts.sub !== null) jwt.setSubject(opts.sub ?? 'auth0|owner')
+    return jwt.sign(privateKey)
+  }
 })
 
 afterEach(() => vi.useRealTimers())
@@ -67,10 +67,10 @@ function tokenEndpoint(authorize: URL, idToken: () => Promise<string>) {
   })
 }
 
-async function completeLogin(opts: { email?: string; nonce?: string; iss?: string; aud?: string; state?: string } = {}) {
+async function completeLogin(opts: { nonce?: string; iss?: string; aud?: string; sub?: string | null; state?: string } = {}) {
   const { authorize, loginCookie } = await startLogin()
   const nonce = opts.nonce ?? authorize.searchParams.get('nonce')!
-  const fetch = tokenEndpoint(authorize, () => signIdToken({ email: opts.email ?? 'Owner@Example.com', nonce }, opts))
+  const fetch = tokenEndpoint(authorize, () => signIdToken({ email: 'owner@example.com', nonce }, opts))
   const state = opts.state ?? authorize.searchParams.get('state')!
   const res = await callback(get(`/api/auth/callback?code=abc&state=${state}`, { Cookie: `${LOGIN_COOKIE}=${encodeURIComponent(loginCookie)}` }), config, { fetch, keys })
   return { res, fetch }
@@ -80,21 +80,21 @@ async function completeLogin(opts: { email?: string; nonce?: string; iss?: strin
 
 describe('config', () => {
   it('is null (fail closed) when any setting is missing', () => {
-    const env = { AUTH0_DOMAIN: 'x.auth0.com', AUTH0_CLIENT_ID: 'id', AUTH0_CLIENT_SECRET: 's', AUTH0_SECRET: 'k', ALLOWED_EMAIL: 'a@b.com' }
+    const env = { AUTH0_DOMAIN: 'x.auth0.com', AUTH0_CLIENT_ID: 'id', AUTH0_CLIENT_SECRET: 's', AUTH0_SECRET: 'k' }
     expect(readConfig(env)).not.toBeNull()
     for (const key of Object.keys(env)) expect(readConfig({ ...env, [key]: undefined }), key).toBeNull()
   })
 
-  it('normalises the domain and the email', () => {
-    const c = readConfig({ AUTH0_DOMAIN: 'https://x.us.auth0.com/', AUTH0_CLIENT_ID: 'id', AUTH0_CLIENT_SECRET: 's', AUTH0_SECRET: 'k', ALLOWED_EMAIL: ' Me@Gmail.com ' })
-    expect(c).toMatchObject({ domain: 'x.us.auth0.com', allowedEmail: 'me@gmail.com' })
+  it('normalises the domain and keeps no user or email list', () => {
+    const c = readConfig({ AUTH0_DOMAIN: 'https://x.us.auth0.com/', AUTH0_CLIENT_ID: 'id', AUTH0_CLIENT_SECRET: 's', AUTH0_SECRET: 'k' })
+    expect(c).toEqual({ domain: 'x.us.auth0.com', clientId: 'id', clientSecret: 's', secret: 'k' })
   })
 })
 
 describe('encrypted cookies', () => {
   it('round-trip, and reject tampering, another secret, another purpose and expiry', async () => {
-    const v = await seal('session', { email: 'owner@example.com' }, config.secret, 60)
-    expect(await unseal('session', v, config.secret)).toMatchObject({ email: 'owner@example.com' })
+    const v = await seal('session', { sub: 'auth0|owner' }, config.secret, 60)
+    expect(await unseal('session', v, config.secret)).toMatchObject({ sub: 'auth0|owner' })
     expect(await unseal('session', v.slice(0, -2) + 'xx', config.secret)).toBeNull()
     expect(await unseal('session', v, 'another-secret')).toBeNull()
     expect(await unseal('login', v, config.secret)).toBeNull()
@@ -104,7 +104,7 @@ describe('encrypted cookies', () => {
 })
 
 describe('middleware (guard)', () => {
-  const sessionFor = async (email: string) => `${SESSION_COOKIE}=${encodeURIComponent(await seal('session', { email }, config.secret, 60))}`
+  const sessionWith = async (claims: Record<string, string>) => `${SESSION_COOKIE}=${encodeURIComponent(await seal('session', claims, config.secret, 60))}`
 
   it('fails closed when not configured', async () => {
     expect((await guard(page('/'), null)).status).toBe(500)
@@ -125,16 +125,17 @@ describe('middleware (guard)', () => {
   })
 
   it('serves the app with a valid session, adding security headers', async () => {
-    const res = await guard(get('/assets/index-abc.js', { Cookie: await sessionFor('owner@example.com') }), config)
+    const res = await guard(get('/assets/index-abc.js', { Cookie: await sessionWith({ sub: 'auth0|owner' }) }), config)
     expect(passedThrough(res)).toBe(true)
     expect(res.headers.get('X-Frame-Options')).toBe('DENY')
   })
 
-  it('refuses a session for another email, a login-state cookie, and a forged cookie', async () => {
-    const other = await sessionFor('someone@gmail.com')
-    const loginState = `${SESSION_COOKIE}=${encodeURIComponent(await seal('login', { email: 'owner@example.com' }, config.secret, 60))}`
+  it('refuses a session without a user, a login-state cookie, a forged cookie, and one made with another secret', async () => {
+    const noUser = await sessionWith({ email: 'owner@example.com' })
+    const loginState = `${SESSION_COOKIE}=${encodeURIComponent(await seal('login', { sub: 'auth0|owner' }, config.secret, 60))}`
     const forged = `${SESSION_COOKIE}=not-a-real-session`
-    for (const cookie of [other, loginState, forged]) {
+    const otherSecret = `${SESSION_COOKIE}=${encodeURIComponent(await seal('session', { sub: 'auth0|owner' }, 'attacker-secret', 60))}`
+    for (const cookie of [noUser, loginState, forged, otherSecret]) {
       expect(passedThrough(await guard(get('/assets/index-abc.js', { Cookie: cookie }), config))).toBe(false)
     }
   })
@@ -179,19 +180,13 @@ describe('callback', () => {
     expect(res.status).toBe(302)
     expect(res.headers.get('Location')).toBe('/transactions')
     const session = cookieFrom(res, SESSION_COOKIE)!
-    expect(await unseal('session', session, config.secret)).toMatchObject({ email: 'owner@example.com' })
+    expect(await unseal('session', session, config.secret)).toMatchObject({ sub: 'auth0|owner' })
     // ...and the middleware now lets you in.
     expect(passedThrough(await guard(get('/', { Cookie: `${SESSION_COOKIE}=${encodeURIComponent(session)}` }), config))).toBe(true)
   })
 
-  it('refuses any other email, even when Auth0 authenticated it', async () => {
-    const { res } = await completeLogin({ email: 'someone@gmail.com' })
-    expect(res.status).toBe(403)
-    expect(cookieFrom(res, SESSION_COOKIE)).toBeNull()
-  })
-
-  it('refuses a wrong state, nonce, issuer or audience', async () => {
-    for (const opts of [{ state: 'forged' }, { nonce: 'replayed' }, { iss: 'https://evil.auth0.com/' }, { aud: 'another-app' }]) {
+  it('refuses a wrong state, nonce, issuer (another Auth0 tenant) or audience (another app), and a token without a user', async () => {
+    for (const opts of [{ state: 'forged' }, { nonce: 'replayed' }, { iss: 'https://evil.auth0.com/' }, { aud: 'another-app' }, { sub: null }]) {
       const { res } = await completeLogin(opts)
       expect(res.status, JSON.stringify(opts)).toBe(400)
       expect(cookieFrom(res, SESSION_COOKIE)).toBeNull()
@@ -203,7 +198,7 @@ describe('callback', () => {
     expect(res.status).toBe(400)
   })
 
-  it('shows an error when Auth0 refuses the login (e.g. the email rule)', async () => {
+  it('shows an error when Auth0 refuses the login', async () => {
     const res = await callback(get('/api/auth/callback?error=access_denied&error_description=Not%20allowed'), config, { fetch: vi.fn(), keys })
     expect(res.status).toBe(403)
     expect(await res.text()).toContain('Not allowed')
