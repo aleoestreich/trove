@@ -43,7 +43,8 @@ No backend, no auth. It runs in the browser on hardcoded data.
     per installment, amount left and end month.
 - **Installments (parcelas):** each installment is a transaction with
   number/total/total amount/purchase date (Pluggy's `creditCardMetadata`).
-  It counts as an expense in the month it's charged. Future installments are
+  It counts as an expense in the month it's charged (decided: no option to
+  count the full purchase up front). Future installments are
   projected from what has been charged so far, and they reduce the card's
   available limit.
 - **Mobile:** bottom tab bar, touch-sized targets, native selects, bottom
@@ -54,8 +55,6 @@ No backend, no auth. It runs in the browser on hardcoded data.
 
 ### Possible next steps within Phase 1
 - Budgets per category (monthly limit + progress).
-- Option to count an installment purchase as a full expense in the month it
-  was bought, instead of spread over the months it's charged.
 - Editable categories and auto-categorisation rules.
 - Show bills by due date ("what's due this month").
 - Deploy a preview (e.g. GitHub Pages) so the phone doesn't need to be on the
