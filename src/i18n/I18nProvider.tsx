@@ -1,4 +1,4 @@
-import { createContext, Fragment, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { Category } from '../data/types'
 import { messages, type Messages } from './messages'
 import { setActiveLocale, type Locale } from './locale'
@@ -54,14 +54,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Remounts its children when the language changes, so every formatted value
- * (money, dates, memoised chart data) is recomputed in the new language.
+ * Current language, strings and setter. Components that call this re-render
+ * when the language changes; memoised values that hold formatted text must
+ * list `locale` as a dependency.
  */
-export function RemountOnLocale({ children }: { children: ReactNode }) {
-  const { locale } = useI18n()
-  return <Fragment key={locale}>{children}</Fragment>
-}
-
 export function useI18n(): I18n {
   const ctx = useContext(I18nContext)
   if (!ctx) throw new Error('useI18n outside I18nProvider')

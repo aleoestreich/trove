@@ -101,7 +101,7 @@ function PlanRow({ plan }: { plan: InstallmentPlan }) {
             <span key={i} className={`h-full flex-1 ${i < plan.charged ? 'bg-accent' : 'bg-track'}`} />
           ))}
         </div>
-        <p className="tabular mt-1.5 flex justify-between gap-2 text-xs text-ink-2">
+        <p className="tabular mt-1.5 flex flex-wrap justify-between gap-x-2 text-xs text-ink-2">
           <span className="whitespace-nowrap">
             {plan.charged}/{plan.count}
             {last && ` · ${t.installments.ends(formatMonthYear(last.month))}`}

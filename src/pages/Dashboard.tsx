@@ -19,7 +19,7 @@ const TOP_CATEGORIES = 5
 export function Dashboard() {
   const { accounts, transactions, categoriesById, institutionsById } = useData()
   const [params, setParams] = useSearchParams()
-  const { t, categoryName } = useI18n()
+  const { t, categoryName, locale } = useI18n()
   const latest = monthKey(toISO(new Date()))
   const month = params.get('m') ?? latest
   const months = useMemo(() => lastMonths(latest, MONTHS_OF_HISTORY), [latest])
@@ -43,10 +43,10 @@ export function Dashboard() {
   const byInstitution = cashByInstitution(accounts, institutionNames)
   const byCurrency = cashByCurrency(accounts)
 
-  // Cash flow.
+  // Cash flow. `locale` is a dependency because the labels are formatted text.
   const flow = useMemo(
     () => months.map((m) => ({ month: m, label: formatMonthShort(m), ...totals(inMonth(transactions, m), categoriesById) })),
-    [transactions, categoriesById, months],
+    [transactions, categoriesById, months, locale],
   )
   const flowTotals = flow.reduce((s, f) => ({ income: s.income + f.income, expenses: s.expenses + f.expenses }), { income: 0, expenses: 0 })
   const saved = flowTotals.income - flowTotals.expenses

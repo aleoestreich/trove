@@ -7,7 +7,7 @@ import { Accounts } from './pages/Accounts'
 import { Installments } from './pages/Installments'
 import { Icon, type IconName } from './components/Icon'
 import { LanguageSwitch } from './components/LanguageSwitch'
-import { I18nProvider, RemountOnLocale, useI18n } from './i18n/I18nProvider'
+import { I18nProvider, useI18n } from './i18n/I18nProvider'
 import type { Messages } from './i18n/messages'
 
 const repository = createMockRepository()
@@ -24,9 +24,7 @@ export function App() {
     <HashRouter>
       <I18nProvider>
         <DataProvider repository={repository}>
-          <RemountOnLocale>
-            <Shell />
-          </RemountOnLocale>
+          <Shell />
         </DataProvider>
       </I18nProvider>
     </HashRouter>
@@ -81,11 +79,11 @@ function Shell() {
               to={tab.to}
               end
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center gap-0.5 text-xs ${isActive ? 'font-semibold text-accent' : 'text-muted'}`
+                `flex min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 text-[0.6875rem] ${isActive ? 'font-semibold text-accent' : 'text-muted'}`
               }
             >
               <Icon name={tab.icon} />
-              {t.nav[tab.label]}
+              <span className="max-w-full truncate">{t.nav[tab.label]}</span>
             </NavLink>
           ))}
         </div>
