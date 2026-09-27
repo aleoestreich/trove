@@ -28,6 +28,15 @@ Open the URL Vite prints (http://localhost:5173).
 The app follows the phone's light/dark setting. If Windows Firewall or macOS
 blocks the connection, allow Node.js on private networks.
 
+## Languages
+
+The app is in English and Brazilian Portuguese (PT-BR). Switch with the
+🇺🇸 | 🇧🇷 flag switch in the header; the choice is saved on the device. On
+first launch it follows the phone's language. Text, category names, money
+(`R$ 1.234,56` / `R$1,234.56`) and dates follow the language. Transaction
+descriptions and account names come from the banks and are shown as-is.
+Strings live in `src/i18n/messages.ts`.
+
 ## Scripts
 
 | Command | What it does |
@@ -80,6 +89,7 @@ src/
   data/seed.ts            hardcoded demo data
   data/repository.ts      data-access interface the UI uses
   data/mockRepository.ts  Phase 1 implementation (demo data + localStorage)
+  i18n/                   EN / PT-BR strings and the language switch
   lib/                    money, dates, income/expense summaries, installment plans
   pages/                  Overview, Transactions, Installments, Accounts
   components/             shared UI

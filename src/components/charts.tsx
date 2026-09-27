@@ -10,14 +10,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { formatMoney } from '../lib/money'
+import { formatCompact, formatMoney } from '../lib/money'
+import { useI18n } from '../i18n/I18nProvider'
 
 // Shared chart chrome: recessive grid and axes, text in theme ink.
-// Axis ticks in thousands of reais ("15 mil"); the card titles say the unit is BRL.
-const compactNumber = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 })
+// Axis ticks in compact reais ("15 mil" / "15K"); the card titles say the unit is BRL.
 const axisTick = { fill: 'var(--muted)', fontSize: 12 }
 const xAxisProps = { dataKey: 'label', tickLine: false, axisLine: { stroke: 'var(--line)' }, tick: axisTick } as const
-const yAxisProps = { width: 64, tickLine: false, axisLine: false, tick: axisTick, tickFormatter: (v: number) => compactNumber.format(v) } as const
+const yAxisProps = { width: 64, tickLine: false, axisLine: false, tick: axisTick, tickFormatter: (v: number) => formatCompact(v) } as const
 const tooltipStyle = {
   contentStyle: { background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, color: 'var(--ink)', fontSize: 13 },
   labelStyle: { color: 'var(--ink-2)', marginBottom: 4 },
@@ -40,6 +40,7 @@ export interface NetWorthPoint {
 
 /** Net worth at the end of each month (last point is today). */
 export function NetWorthChart({ points }: { points: NetWorthPoint[] }) {
+  const { t } = useI18n()
   const data = points.map((p) => ({ ...p, net: reais(p.net) }))
   return (
     <div className="h-48">
@@ -52,7 +53,7 @@ export function NetWorthChart({ points }: { points: NetWorthPoint[] }) {
           <Line
             type="monotone"
             dataKey="net"
-            name="Net worth"
+            name={t.overview.netWorthSeries}
             stroke="var(--series-1)"
             strokeWidth={2}
             dot={{ r: 4, fill: 'var(--series-1)', stroke: 'var(--surface)', strokeWidth: 2 }}
@@ -66,6 +67,7 @@ export function NetWorthChart({ points }: { points: NetWorthPoint[] }) {
 }
 
 function NetWorthTooltip({ active, payload, label }: { active?: boolean; payload?: readonly { payload?: unknown }[]; label?: unknown }) {
+  const { t } = useI18n()
   if (!active || !payload?.length) return null
   const p = payload[0].payload as NetWorthPoint
   return (
@@ -73,7 +75,7 @@ function NetWorthTooltip({ active, payload, label }: { active?: boolean; payload
       <p className="text-xs text-ink-2">{String(label)}</p>
       <p className="tabular font-semibold">{formatMoney(Math.round(p.net * 100))}</p>
       <p className="tabular text-xs text-muted">
-        Accounts {formatMoney(p.cash)} · Cards −{formatMoney(p.cardDebt)}
+        {t.overview.chartAccountsCards(formatMoney(p.cash), formatMoney(p.cardDebt))}
       </p>
     </div>
   )
@@ -89,6 +91,7 @@ export interface CashFlowPoint {
 
 /** Income vs expenses per month, side by side. */
 export function CashFlowChart({ data }: { data: CashFlowPoint[] }) {
+  const { t } = useI18n()
   const rows = data.map((d) => ({ label: d.label, income: reais(d.income), expenses: reais(d.expenses) }))
   return (
     <div className="h-56">
@@ -99,8 +102,8 @@ export function CashFlowChart({ data }: { data: CashFlowPoint[] }) {
           <YAxis {...yAxisProps} />
           <Tooltip cursor={{ fill: 'var(--track)' }} formatter={money} {...tooltipStyle} />
           <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} formatter={legendText} />
-          <Bar dataKey="income" name="Income" fill="var(--series-1)" radius={[4, 4, 0, 0]} maxBarSize={22} />
-          <Bar dataKey="expenses" name="Expenses" fill="var(--series-2)" radius={[4, 4, 0, 0]} maxBarSize={22} />
+          <Bar dataKey="income" name={t.income} fill="var(--series-1)" radius={[4, 4, 0, 0]} maxBarSize={22} />
+          <Bar dataKey="expenses" name={t.expenses} fill="var(--series-2)" radius={[4, 4, 0, 0]} maxBarSize={22} />
         </BarChart>
       </ResponsiveContainer>
     </div>

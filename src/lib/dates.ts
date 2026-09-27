@@ -1,4 +1,5 @@
 /** Dates are handled as ISO strings (yyyy-mm-dd) in local time; no time zones. */
+import { getLocale, intlLocale } from '../i18n/locale'
 
 export function toISO(d: Date): string {
   const y = d.getFullYear()
@@ -28,34 +29,52 @@ export function lastMonths(endMonth: string, count: number): string[] {
   })
 }
 
-const monthFmt = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
-const monthShortFmt = new Intl.DateTimeFormat('pt-BR', { month: 'short' })
-const dayFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
+// Display formats follow the active language (see i18n/locale).
+const formatters = new Map<string, Intl.DateTimeFormat>()
+
+function fmt(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const locale = intlLocale()
+  const key = locale + JSON.stringify(options)
+  let f = formatters.get(key)
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale, options)
+    formatters.set(key, f)
+  }
+  return f
+}
 
 function parse(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d ?? 1)
 }
 
-const shortDateFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' })
-
-/** "01/10" */
+/**
+ * Compact date: pt-BR "01/10", en "Oct 1". English spells out the month so
+ * it can't be misread as day/month.
+ */
 export function formatShortDate(iso: string): string {
-  return shortDateFmt.format(parse(iso))
+  return getLocale() === 'pt-BR'
+    ? fmt({ day: '2-digit', month: '2-digit' }).format(parse(iso))
+    : fmt({ day: 'numeric', month: 'short' }).format(parse(iso))
 }
 
-/** "Setembro de 2026" */
+/** pt-BR "Setembro de 2026", en "September 2026" */
 export function formatMonth(key: string): string {
-  const s = monthFmt.format(parse(key))
+  const s = fmt({ month: 'long', year: 'numeric' }).format(parse(key))
   return s[0].toUpperCase() + s.slice(1)
 }
 
-/** "set." */
+/** pt-BR "set.", en "Sep" */
 export function formatMonthShort(key: string): string {
-  return monthShortFmt.format(parse(key))
+  return fmt({ month: 'short' }).format(parse(key))
 }
 
-/** "27 de set." */
+/** pt-BR "27 de set.", en "Sep 27" */
 export function formatDay(iso: string): string {
-  return dayFmt.format(parse(iso))
+  return fmt({ day: '2-digit', month: 'short' }).format(parse(iso))
+}
+
+/** pt-BR "03/2027", en "Mar 2027" */
+export function formatMonthYear(key: string): string {
+  return getLocale() === 'pt-BR' ? `${key.slice(5)}/${key.slice(0, 4)}` : fmt({ month: 'short', year: 'numeric' }).format(parse(key))
 }

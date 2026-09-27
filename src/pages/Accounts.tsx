@@ -7,18 +7,20 @@ import { installmentPlans, remainingByAccount } from '../lib/installments'
 import { formatShortDate } from '../lib/dates'
 import { formatMoney, formatRate } from '../lib/money'
 import { Card, InstitutionBadge } from '../components/ui'
+import { useI18n } from '../i18n/I18nProvider'
 
 export function Accounts() {
   const { institutions, accounts, transactions } = useData()
+  const { t } = useI18n()
   const bal = balances(accounts)
   const futureInstallments = useMemo(() => remainingByAccount(installmentPlans(transactions)), [transactions])
 
   return (
     <div className="space-y-4">
       <Card className="divide-y divide-line !py-1">
-        <SummaryRow label="In accounts" value={formatMoney(bal.cash)} />
-        <SummaryRow label="Open card bills" value={`−${formatMoney(bal.cardDebt)}`} />
-        <SummaryRow label="Net" value={formatMoney(bal.net)} strong />
+        <SummaryRow label={t.overview.inAccounts} value={formatMoney(bal.cash)} />
+        <SummaryRow label={t.overview.openCardBills} value={`−${formatMoney(bal.cardDebt)}`} />
+        <SummaryRow label={t.net} value={formatMoney(bal.net)} strong />
       </Card>
 
       {institutions.map((inst) => {
@@ -30,9 +32,7 @@ export function Accounts() {
               <InstitutionBadge institution={inst} />
               <div className="min-w-0 flex-1">
                 <h2 className="font-semibold">{inst.name}</h2>
-                <p className="text-xs text-muted">
-                  {own.length} {own.length === 1 ? 'account' : 'accounts'}
-                </p>
+                <p className="text-xs text-muted">{t.accounts.count(own.length)}</p>
               </div>
               <p className="tabular font-semibold">{formatMoney(total.net)}</p>
             </div>
@@ -43,9 +43,7 @@ export function Accounts() {
         )
       })}
 
-      <p className="px-2 text-center text-xs text-muted">
-        Demo data. Real accounts will be connected through Meu Pluggy once the backend is added.
-      </p>
+      <p className="px-2 text-center text-xs text-muted">{t.accounts.footer}</p>
     </div>
   )
 }
@@ -60,14 +58,13 @@ function SummaryRow({ label, value, strong = false }: { label: string; value: st
 }
 
 function BankRow({ account }: { account: Account }) {
+  const { t } = useI18n()
   return (
     <Link to={`/transactions?m=all&a=${account.id}`} className="flex items-center justify-between gap-3 p-4 active:bg-track">
       <div className="min-w-0">
         <p className="font-medium">{account.name}</p>
         {account.foreign && (
-          <p className="text-xs text-muted">
-            1 {account.foreign.currency} = R$ {formatRate(account.foreign.rate)}
-          </p>
+          <p className="text-xs text-muted">{t.oneUnitIs(account.foreign.currency, formatRate(account.foreign.rate))}</p>
         )}
       </div>
       <div className="text-right">
@@ -85,6 +82,7 @@ function BankRow({ account }: { account: Account }) {
 }
 
 function CreditCardRow({ account, futureInstallments }: { account: Account; futureInstallments: number }) {
+  const { t } = useI18n()
   const credit = account.creditData!
   const pct = (cents: number) => `${Math.min(100, (cents / credit.creditLimit) * 100)}%`
   const used = credit.creditLimit - credit.availableCreditLimit
@@ -94,11 +92,11 @@ function CreditCardRow({ account, futureInstallments }: { account: Account; futu
         <div className="min-w-0">
           <p className="font-medium">{account.name}</p>
           <p className="text-xs text-muted">
-            Closes {formatShortDate(credit.balanceCloseDate)} · Due {formatShortDate(credit.balanceDueDate)}
+            {t.accounts.cardDates(formatShortDate(credit.balanceCloseDate), formatShortDate(credit.balanceDueDate))}
           </p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-muted">Open bill</p>
+          <p className="text-xs text-muted">{t.accounts.openBill}</p>
           <p className="tabular font-semibold">{formatMoney(account.balance)}</p>
         </div>
       </div>
@@ -106,7 +104,7 @@ function CreditCardRow({ account, futureInstallments }: { account: Account; futu
       <div
         className="mt-3 flex h-2 gap-0.5 overflow-hidden rounded-full bg-track"
         role="meter"
-        aria-label="Credit limit used"
+        aria-label={t.accounts.limitUsed}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round((used / credit.creditLimit) * 100)}
@@ -119,17 +117,17 @@ function CreditCardRow({ account, futureInstallments }: { account: Account; futu
           <p className="flex justify-between gap-2">
             <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-accent/40" aria-hidden />
-              Future installments
+              {t.accounts.futureInstallments}
             </span>
             <span>{formatMoney(futureInstallments)}</span>
           </p>
         )}
         <p className="flex justify-between gap-2">
-          <span>Available</span>
+          <span>{t.accounts.available}</span>
           <span className="font-medium text-ink">{formatMoney(credit.availableCreditLimit)}</span>
         </p>
         <p className="flex justify-between gap-2 text-muted">
-          <span>Limit</span>
+          <span>{t.accounts.limit}</span>
           <span>{formatMoney(credit.creditLimit)}</span>
         </p>
       </div>

@@ -1,9 +1,11 @@
 import type { Transaction } from '../data/types'
 import { useData } from '../state'
 import { Amount, InstitutionBadge } from './ui'
+import { useI18n } from '../i18n/I18nProvider'
 
 export function TransactionRow({ tx, onSelect }: { tx: Transaction; onSelect?(tx: Transaction): void }) {
   const { accountsById, institutionsById, categoriesById } = useData()
+  const { t, categoryName } = useI18n()
   const account = accountsById.get(tx.accountId)!
   const institution = institutionsById.get(account.institutionId)!
   const category = categoriesById.get(tx.categoryId)
@@ -24,10 +26,10 @@ export function TransactionRow({ tx, onSelect }: { tx: Transaction; onSelect?(tx
               {tx.installment.number}/{tx.installment.total}
             </span>
           )}
-          {tx.status === 'PENDING' && <span className="shrink-0 rounded bg-track px-1.5 text-xs text-ink-2">Pending</span>}
+          {tx.status === 'PENDING' && <span className="shrink-0 rounded bg-track px-1.5 text-xs text-ink-2">{t.pending}</span>}
         </span>
         <span className="block truncate text-xs text-muted">
-          {category?.name} · {institution.name} {isCard ? 'card' : account.foreign ? account.foreign.currency : ''}
+          {categoryName(category)} · {isCard ? t.cardOf(institution.name) : `${institution.name}${account.foreign ? ` ${account.foreign.currency}` : ''}`}
         </span>
       </span>
       <Amount cents={tx.amount} foreign={tx.foreign} muted={category?.kind === 'transfer'} />

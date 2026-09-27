@@ -12,12 +12,14 @@ import { Card, MonthSwitcher, SectionTitle } from '../components/ui'
 import { CashFlowChart, NetWorthChart, SpendingTrendChart, seriesColor } from '../components/charts'
 import { TransactionRow } from '../components/TransactionRow'
 import { TransactionSheet } from '../components/TransactionSheet'
+import { useI18n } from '../i18n/I18nProvider'
 
 const TOP_CATEGORIES = 5
 
 export function Dashboard() {
   const { accounts, transactions, categoriesById, institutionsById } = useData()
   const [params, setParams] = useSearchParams()
+  const { t, categoryName, locale } = useI18n()
   const latest = monthKey(toISO(new Date()))
   const month = params.get('m') ?? latest
   const months = useMemo(() => lastMonths(latest, MONTHS_OF_HISTORY), [latest])
@@ -29,7 +31,7 @@ export function Dashboard() {
   // Net worth history (month ends; the last point is today).
   const history = useMemo(() => balanceHistory(accounts, transactions, months), [accounts, transactions, months])
   const netPoints = history.map((h, i) => ({
-    label: i === history.length - 1 ? 'hoje' : formatMonthShort(h.month),
+    label: i === history.length - 1 ? t.today : formatMonthShort(h.month),
     net: h.net,
     cash: h.cash,
     cardDebt: h.cardDebt,
@@ -41,28 +43,28 @@ export function Dashboard() {
   const byInstitution = cashByInstitution(accounts, institutionNames)
   const byCurrency = cashByCurrency(accounts)
 
-  // Cash flow.
+  // Cash flow. `locale` is a dependency because the labels are formatted text.
   const flow = useMemo(
     () => months.map((m) => ({ month: m, label: formatMonthShort(m), ...totals(inMonth(transactions, m), categoriesById) })),
-    [transactions, categoriesById, months],
+    [transactions, categoriesById, months, locale],
   )
   const flowTotals = flow.reduce((s, f) => ({ income: s.income + f.income, expenses: s.expenses + f.expenses }), { income: 0, expenses: 0 })
   const saved = flowTotals.income - flowTotals.expenses
   const savingsRate = flowTotals.income > 0 ? Math.round((saved / flowTotals.income) * 100) : 0
 
   // Spending trend: top categories over the period, the rest folded into "Other".
-  const periodTxs = useMemo(() => transactions.filter((t) => monthKey(t.date) >= months[0]), [transactions, months])
+  const periodTxs = useMemo(() => transactions.filter((tx) => monthKey(tx.date) >= months[0]), [transactions, months])
   const periodByCategory = expensesByCategory(periodTxs, categoriesById)
   const top = periodByCategory.slice(0, TOP_CATEGORIES)
   const otherTotal = periodByCategory.slice(TOP_CATEGORIES).reduce((s, c) => s + c.amount, 0)
   const trendSeries = [
-    ...top.map((c) => ({ key: c.category.id, name: c.category.name, total: c.amount })),
-    ...(otherTotal > 0 ? [{ key: 'other', name: 'Other', total: otherTotal }] : []),
+    ...top.map((c) => ({ key: c.category.id, name: categoryName(c.category), total: c.amount })),
+    ...(otherTotal > 0 ? [{ key: 'other', name: t.other, total: otherTotal }] : []),
   ]
   const trendData = months.map((m) => {
     const row: Record<string, number | string> = { label: formatMonthShort(m) }
     for (const c of expensesByCategory(inMonth(transactions, m), categoriesById)) {
-      const key = top.some((t) => t.category.id === c.category.id) ? c.category.id : 'other'
+      const key = top.some((x) => x.category.id === c.category.id) ? c.category.id : 'other'
       row[key] = Number(row[key] ?? 0) + c.amount
     }
     return row
@@ -85,22 +87,22 @@ export function Dashboard() {
     <div className="space-y-4">
       {/* 1. Net worth now and over time */}
       <Card>
-        <p className="text-sm text-ink-2">Net worth (accounts − card bills)</p>
+        <p className="text-sm text-ink-2">{t.overview.netWorth}</p>
         <p className="tabular mt-1 text-4xl font-semibold tracking-tight">{formatMoney(bal.net)}</p>
         <p className={`tabular mt-1 text-sm font-medium ${change >= 0 ? 'text-income' : 'text-critical'}`}>
           <span aria-hidden>{change >= 0 ? '▲' : '▼'}</span> {formatMoney(change, 'BRL', { signed: true })}{' '}
-          <span className="font-normal text-muted">since end of {formatMonth(months[0]).toLowerCase()}</span>
+          <span className="font-normal text-muted">{t.overview.sinceEndOf(formatMonth(months[0]))}</span>
         </p>
         <div className="mt-3">
           <NetWorthChart points={netPoints} />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 border-t border-line pt-3 text-sm">
           <div>
-            <p className="text-muted">In accounts</p>
+            <p className="text-muted">{t.overview.inAccounts}</p>
             <p className="tabular font-medium">{formatMoney(bal.cash)}</p>
           </div>
           <div>
-            <p className="text-muted">Open card bills</p>
+            <p className="text-muted">{t.overview.openCardBills}</p>
             <p className="tabular font-medium">−{formatMoney(bal.cardDebt)}</p>
           </div>
         </div>
@@ -108,7 +110,7 @@ export function Dashboard() {
 
       {/* 2. Where the money is */}
       <Card>
-        <SectionTitle>Where your money is</SectionTitle>
+        <SectionTitle>{t.overview.whereMoney}</SectionTitle>
         <ShareList rows={byInstitution.map((s) => ({ key: s.id, label: s.label, amount: s.amount }))} total={bal.cash} />
         <div className="my-3 border-t border-line" />
         <ShareList
@@ -116,9 +118,9 @@ export function Dashboard() {
             const foreign = foreignAccounts.find((a) => a.foreign!.currency === s.id)?.foreign
             return {
               key: s.id,
-              label: s.id === 'BRL' ? 'In reais (BRL)' : `In dollars (${s.id})`,
+              label: t.overview.inCurrency(s.id),
               amount: s.amount,
-              note: foreign && `${formatMoney(foreign.balance, foreign.currency)} at R$ ${formatRate(foreign.rate)}`,
+              note: foreign && t.atRate(formatMoney(foreign.balance, foreign.currency), formatRate(foreign.rate)),
             }
           })}
           total={bal.cash}
@@ -127,14 +129,14 @@ export function Dashboard() {
 
       {/* 3. Cash flow */}
       <Card>
-        <SectionTitle>Income vs. expenses (R$)</SectionTitle>
+        <SectionTitle>{t.overview.incomeVsExpenses}</SectionTitle>
         <CashFlowChart data={flow} />
         <p className="mt-2 text-sm text-ink-2">
-          Last {MONTHS_OF_HISTORY} months: you kept{' '}
+          {t.overview.keptPrefix(MONTHS_OF_HISTORY)}{' '}
           <span className={`tabular font-semibold ${saved >= 0 ? 'text-income' : 'text-critical'}`}>{formatMoney(saved)}</span>
           {flowTotals.income > 0 && (
             <>
-              , <span className="font-semibold text-ink">{savingsRate}%</span> of your income
+              , <span className="font-semibold text-ink">{savingsRate}%</span> {t.overview.ofYourIncome}
             </>
           )}
           .
@@ -146,50 +148,50 @@ export function Dashboard() {
         <SectionTitle
           action={
             <Link to="/installments" className="text-sm text-accent">
-              Installments
+              {t.nav.installments}
             </Link>
           }
         >
-          Coming up
+          {t.overview.comingUp}
         </SectionTitle>
         <ul className="divide-y divide-line text-sm">
           {cards.map((c) => (
             <li key={c.id} className="flex items-baseline justify-between gap-3 py-2">
               <span className="min-w-0">
                 <span className="block truncate">{c.name}</span>
-                <span className="text-xs text-muted">Bill due {formatShortDate(c.creditData!.balanceDueDate)}</span>
+                <span className="text-xs text-muted">{t.overview.billDue(formatShortDate(c.creditData!.balanceDueDate))}</span>
               </span>
               <span className="tabular shrink-0 font-medium">{formatMoney(c.balance)}</span>
             </li>
           ))}
           <li className="flex items-baseline justify-between gap-3 py-2">
             <span>
-              <span className="block">Installments charged next month</span>
-              <span className="text-xs text-muted">{formatMoney(installmentsLeft)} left in total</span>
+              <span className="block">{t.overview.installmentsNextMonth}</span>
+              <span className="text-xs text-muted">{t.overview.leftInTotal(formatMoney(installmentsLeft))}</span>
             </span>
             <span className="tabular shrink-0 font-medium">{formatMoney(nextMonthInstallments)}</span>
           </li>
         </ul>
 <p className="mt-1 flex items-baseline justify-between gap-3 border-t border-line pt-2 text-sm">
-          <span className="font-medium">Total already committed</span>
+          <span className="font-medium">{t.overview.totalCommitted}</span>
           <span className="tabular font-semibold">{formatMoney(bal.cardDebt + nextMonthInstallments)}</span>
         </p>
       </Card>
 
       {/* 5. Spending trend */}
       <Card>
-        <SectionTitle>Spending by category per month (R$)</SectionTitle>
+        <SectionTitle>{t.overview.spendingPerMonth}</SectionTitle>
         <SpendingTrendChart data={trendData} series={trendSeries} />
         <ul className="mt-3 grid grid-cols-1 gap-1.5 text-sm">
           {trendSeries.map((s, i) => (
             <li key={s.key} className="flex items-center gap-2">
               <span className="size-2.5 shrink-0 rounded-full" style={{ background: seriesColor(i) }} aria-hidden />
               <span className="min-w-0 flex-1 truncate">{s.name}</span>
-              <span className="tabular text-ink-2">{formatMoney(Math.round(s.total / MONTHS_OF_HISTORY))}/mo</span>
+              <span className="tabular text-ink-2">{formatMoney(Math.round(s.total / MONTHS_OF_HISTORY))}{t.perMonth}</span>
             </li>
           ))}
         </ul>
-        <p className="mt-2 text-xs text-muted">Average per month over the last {MONTHS_OF_HISTORY} months, current month included.</p>
+        <p className="mt-2 text-xs text-muted">{t.overview.averageNote(MONTHS_OF_HISTORY)}</p>
       </Card>
 
       {/* 6. One month in detail */}
@@ -198,28 +200,28 @@ export function Dashboard() {
       </div>
 
       <Card className="divide-y divide-line !py-1">
-        <Stat label="Income" value={formatMoney(monthTotals.income)} tone="income" />
-        <Stat label="Expenses" value={formatMoney(monthTotals.expenses)} />
-        <Stat label="Net" value={formatMoney(monthTotals.net, 'BRL', { signed: true })} tone={monthTotals.net >= 0 ? 'income' : 'critical'} />
+        <Stat label={t.income} value={formatMoney(monthTotals.income)} tone="income" />
+        <Stat label={t.expenses} value={formatMoney(monthTotals.expenses)} />
+        <Stat label={t.net} value={formatMoney(monthTotals.net, 'BRL', { signed: true })} tone={monthTotals.net >= 0 ? 'income' : 'critical'} />
       </Card>
 
       <Card>
         <SectionTitle
           action={
             <Link to={`/transactions?m=${month}&type=expense`} className="text-sm text-accent">
-              See all
+              {t.seeAll}
             </Link>
           }
         >
-          Spending by category
+          {t.overview.spendingByCategory}
         </SectionTitle>
-        {byCategory.length === 0 && <p className="text-sm text-muted">No expenses this month.</p>}
+        {byCategory.length === 0 && <p className="text-sm text-muted">{t.overview.noExpenses}</p>}
         <ul className="space-y-1">
           {byCategory.map(({ category, amount }) => (
             <li key={category.id}>
               <Link to={`/transactions?m=${month}&c=${category.id}`} className="block rounded-lg py-1.5 active:bg-track">
                 <span className="flex items-baseline justify-between gap-2 text-sm">
-                  <span className="truncate">{category.name}</span>
+                  <span className="truncate">{categoryName(category)}</span>
                   <span className="tabular shrink-0 font-medium">{formatMoney(amount)}</span>
                 </span>
                 <span className="mt-1 block h-2 overflow-hidden rounded-full bg-track">
@@ -235,15 +237,15 @@ export function Dashboard() {
         <SectionTitle
           action={
             <Link to={`/transactions?m=${month}`} className="text-sm text-accent">
-              See all
+              {t.seeAll}
             </Link>
           }
         >
-          Latest transactions
+          {t.overview.latestTransactions}
         </SectionTitle>
         <div className="divide-y divide-line">
-          {monthTxs.slice(0, 5).map((t) => (
-            <TransactionRow key={t.id} tx={t} onSelect={setSelected} />
+          {monthTxs.slice(0, 5).map((tx) => (
+            <TransactionRow key={tx.id} tx={tx} onSelect={setSelected} />
           ))}
         </div>
       </Card>
