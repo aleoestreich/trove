@@ -43,7 +43,9 @@ Run `npm test` and `npm run build` before pushing.
   components.
 - **Login:** the deployed site is private (Auth0 + `middleware.ts`, see
   `docs/auth0-setup.md`). Server code lives in `middleware.ts`, `api/` and
-  `server/` and is typechecked with `tsconfig.server.json`. It must fail
+  `server/` and is typechecked with `tsconfig.server.json` (NodeNext). Vercel
+  runs these files unbundled as Node.js ES modules, so relative imports must end
+  in `.js` (e.g. `./config.js`); the typecheck enforces it. It must fail
   closed: if a setting is missing, refuse the request. Who may sign in is
   managed only in Auth0 (its user list, sign-ups disabled). Never hardcode
   emails, user IDs or secrets in code, docs or config; secrets are Vercel
