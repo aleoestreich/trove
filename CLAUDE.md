@@ -23,7 +23,7 @@ roadmap and `README.md` for how to run it.
 
 - `npm run dev`: dev server, reachable from a phone on the same Wi-Fi
 - `npm test`: Vitest
-- `npm run build`: typecheck + production build
+- `npm run build`: typecheck (app and server) + production build
 
 Run `npm test` and `npm run build` before pushing.
 
@@ -41,3 +41,8 @@ Run `npm test` and `npm run build` before pushing.
   360px and 412px wide, in both languages and in light and dark mode.
 - **Colours** come from the tokens in `src/index.css`, never raw hex in
   components.
+- **Login:** the deployed site is private (Auth0 + `middleware.ts`, see
+  `docs/auth0-setup.md`). Server code lives in `middleware.ts`, `api/` and
+  `server/` and is typechecked with `tsconfig.server.json`. It must fail
+  closed: if a setting is missing, refuse the request. Never put secrets or the
+  owner's email in the repo; they are Vercel environment variables.

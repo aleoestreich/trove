@@ -43,9 +43,27 @@ export function Accounts() {
         )
       })}
 
+      {isDeployed() && (
+        <a
+          href="/api/auth/logout"
+          className="flex h-12 items-center justify-center rounded-2xl bg-surface font-medium text-critical ring-1 ring-line active:bg-track"
+        >
+          {t.accounts.signOut}
+        </a>
+      )}
+
       <p className="px-2 text-center text-xs text-muted">{t.accounts.footer}</p>
     </div>
   )
+}
+
+/**
+ * Login only exists on the deployed site (Vercel), not in local development
+ * (localhost or a LAN address), so Sign out is shown only there.
+ */
+function isDeployed(): boolean {
+  const host = window.location.hostname
+  return !/^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/.test(host)
 }
 
 function SummaryRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
