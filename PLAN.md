@@ -38,10 +38,6 @@ No backend, no auth. It runs in the browser on hardcoded data.
     - coming up (open card bills + installments next month);
     - spending by category per month (top 5 + Other);
     - then one month in detail (totals, categories, latest transactions).
-- **Balance history:** rebuilt backwards from today's balances minus later
-  transactions (works the same with Pluggy data). USD balances are converted
-  at the rate of that month's transactions. Demo balances are opening
-  balances + all transactions, so the history is consistent.
   - **Transactions:** search, filters (month, type, account, category), list
     grouped by day. Tap a transaction to see details and change its category.
   - **Accounts:** grouped by institution. Bank balances, USD balance with its
@@ -49,6 +45,10 @@ No backend, no auth. It runs in the browser on hardcoded data.
   - **Installments:** total still to pay, amount already committed in each
     future month's bills, and each purchase with its progress (3/10), amount
     per installment, amount left and end month.
+- **Balance history:** rebuilt backwards from today's balances minus later
+  transactions (works the same with Pluggy data). USD balances are converted
+  at the rate of that month's transactions. Demo balances are opening
+  balances + all transactions, so the history is consistent.
 - **Installments (parcelas):** each installment is a transaction with
   number/total/total amount/purchase date (Pluggy's `creditCardMetadata`).
   It counts as an expense in the month it's charged (decided: no option to
