@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Repository } from './data/repository'
 import type { Snapshot } from './data/seed'
 import type { Account, Category, Institution } from './data/types'
+import { useI18n } from './i18n/I18nProvider'
 
 interface AppData extends Snapshot {
   accountsById: Map<string, Account>
@@ -13,6 +14,7 @@ interface AppData extends Snapshot {
 const DataContext = createContext<AppData | null>(null)
 
 export function DataProvider({ repository, children }: { repository: Repository; children: ReactNode }) {
+  const { t } = useI18n()
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,8 +47,8 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [snapshot, setCategory],
   )
 
-  if (error) return <p className="p-4 text-critical">Could not load data: {error}</p>
-  if (!value) return <p className="p-4 text-muted">Loading…</p>
+  if (error) return <p className="p-4 text-critical">{t.loadError(error)}</p>
+  if (!value) return <p className="p-4 text-muted">{t.loading}</p>
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }
 

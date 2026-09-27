@@ -1,0 +1,69 @@
+import { createContext, Fragment, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import type { Category } from '../data/types'
+import { messages, type Messages } from './messages'
+import { setActiveLocale, type Locale } from './locale'
+
+const STORAGE_KEY = 'trove.locale'
+
+interface I18n {
+  locale: Locale
+  setLocale(locale: Locale): void
+  t: Messages
+  /** Category name in the active language (falls back to the name in the data). */
+  categoryName(category: Category | undefined): string
+}
+
+const I18nContext = createContext<I18n | null>(null)
+
+/** Saved choice, else the device language (pt-BR for any Portuguese device, English otherwise). */
+function initialLocale(): Locale {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved === 'en' || saved === 'pt-BR') return saved
+  } catch {
+    // storage unavailable
+  }
+  return typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('pt') ? 'pt-BR' : 'en'
+}
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    const l = initialLocale()
+    setActiveLocale(l)
+    document.documentElement.lang = l
+    return l
+  })
+
+  const setLocale = useCallback((l: Locale) => {
+    setActiveLocale(l)
+    document.documentElement.lang = l
+    try {
+      localStorage.setItem(STORAGE_KEY, l)
+    } catch {
+      // storage unavailable; the choice lasts until reload
+    }
+    setLocaleState(l)
+  }, [])
+
+  const value = useMemo<I18n>(() => {
+    const t = messages[locale]
+    return { locale, setLocale, t, categoryName: (c) => (c ? (t.categories[c.id] ?? c.name) : '') }
+  }, [locale, setLocale])
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
+}
+
+/**
+ * Remounts its children when the language changes, so every formatted value
+ * (money, dates, memoised chart data) is recomputed in the new language.
+ */
+export function RemountOnLocale({ children }: { children: ReactNode }) {
+  const { locale } = useI18n()
+  return <Fragment key={locale}>{children}</Fragment>
+}
+
+export function useI18n(): I18n {
+  const ctx = useContext(I18nContext)
+  if (!ctx) throw new Error('useI18n outside I18nProvider')
+  return ctx
+}

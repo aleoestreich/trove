@@ -9,6 +9,7 @@ import { totals } from '../lib/summary'
 import { Icon } from '../components/Icon'
 import { TransactionRow } from '../components/TransactionRow'
 import { TransactionSheet } from '../components/TransactionSheet'
+import { useI18n } from '../i18n/I18nProvider'
 
 export interface TransactionFilters {
   month?: string
@@ -40,6 +41,7 @@ export function Transactions() {
   const { transactions, accounts, institutionsById, categories, categoriesById } = useData()
   const [params, setParams] = useSearchParams()
   const [selected, setSelected] = useState<Transaction | null>(null)
+  const { t, categoryName } = useI18n()
 
   const latest = monthKey(toISO(new Date()))
   const filters: TransactionFilters = {
@@ -65,7 +67,7 @@ export function Transactions() {
 
   const byDate = useMemo(() => {
     const groups = new Map<string, Transaction[]>()
-    for (const t of filtered) groups.set(t.date, [...(groups.get(t.date) ?? []), t])
+    for (const tx of filtered) groups.set(tx.date, [...(groups.get(tx.date) ?? []), tx])
     return [...groups]
   }, [filtered])
 
@@ -77,7 +79,7 @@ export function Transactions() {
         <Icon name="search" className="size-5 text-muted" />
         <input
           type="search"
-          placeholder="Search transactions"
+          placeholder={t.transactions.search}
           value={filters.query ?? ''}
           onChange={(e) => set('q', e.target.value)}
           className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted"
@@ -86,7 +88,7 @@ export function Transactions() {
 
       {/* Filters: one horizontally scrollable row on phones */}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-        <select aria-label="Month" className={selectCls} value={params.get('m') ?? latest} onChange={(e) => set('m', e.target.value)}>
+        <select aria-label={t.transactions.month} className={selectCls} value={params.get('m') ?? latest} onChange={(e) => set('m', e.target.value)}>
           {lastMonths(latest, MONTHS_OF_HISTORY)
             .reverse()
             .map((m) => (
@@ -94,27 +96,27 @@ export function Transactions() {
                 {formatMonth(m)}
               </option>
             ))}
-          <option value="all">All months</option>
+          <option value="all">{t.transactions.allMonths}</option>
         </select>
-        <select aria-label="Type" className={selectCls} value={filters.kind ?? ''} onChange={(e) => set('type', e.target.value)}>
-          <option value="">All types</option>
-          <option value="expense">Expenses</option>
-          <option value="income">Income</option>
-          <option value="transfer">Transfers</option>
+        <select aria-label={t.transactions.type} className={selectCls} value={filters.kind ?? ''} onChange={(e) => set('type', e.target.value)}>
+          <option value="">{t.transactions.allTypes}</option>
+          <option value="expense">{t.expenses}</option>
+          <option value="income">{t.income}</option>
+          <option value="transfer">{t.transfers}</option>
         </select>
-        <select aria-label="Account" className={selectCls} value={filters.accountId ?? ''} onChange={(e) => set('a', e.target.value)}>
-          <option value="">All accounts</option>
+        <select aria-label={t.transactions.account} className={selectCls} value={filters.accountId ?? ''} onChange={(e) => set('a', e.target.value)}>
+          <option value="">{t.transactions.allAccounts}</option>
           {accounts.map((a) => (
             <option key={a.id} value={a.id}>
               {institutionsById.get(a.institutionId)!.name} · {a.name}
             </option>
           ))}
         </select>
-        <select aria-label="Category" className={selectCls} value={filters.categoryId ?? ''} onChange={(e) => set('c', e.target.value)}>
-          <option value="">All categories</option>
+        <select aria-label={t.category} className={selectCls} value={filters.categoryId ?? ''} onChange={(e) => set('c', e.target.value)}>
+          <option value="">{t.transactions.allCategories}</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {categoryName(c)}
             </option>
           ))}
         </select>
@@ -123,23 +125,23 @@ export function Transactions() {
             className="h-10 shrink-0 rounded-full px-3 text-sm text-accent"
             onClick={() => setParams(params.has('m') ? { m: params.get('m')! } : {}, { replace: true })}
           >
-            Clear
+            {t.transactions.clear}
           </button>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-sm">
         <div className="rounded-2xl bg-surface p-3 ring-1 ring-line">
-          <p className="text-xs text-muted">Income</p>
+          <p className="text-xs text-muted">{t.income}</p>
           <p className="tabular font-semibold text-income">{formatMoney(sums.income)}</p>
         </div>
         <div className="rounded-2xl bg-surface p-3 ring-1 ring-line">
-          <p className="text-xs text-muted">Expenses</p>
+          <p className="text-xs text-muted">{t.expenses}</p>
           <p className="tabular font-semibold">{formatMoney(sums.expenses)}</p>
         </div>
       </div>
 
-      {byDate.length === 0 && <p className="py-8 text-center text-sm text-muted">No transactions match these filters.</p>}
+      {byDate.length === 0 && <p className="py-8 text-center text-sm text-muted">{t.transactions.noMatch}</p>}
 
       {byDate.map(([date, txs]) => (
         <section key={date}>
@@ -147,8 +149,8 @@ export function Transactions() {
             {formatDay(date)}
           </h3>
           <div className="divide-y divide-line rounded-2xl bg-surface px-3 ring-1 ring-line">
-            {txs.map((t) => (
-              <TransactionRow key={t.id} tx={t} onSelect={setSelected} />
+            {txs.map((tx) => (
+              <TransactionRow key={tx.id} tx={tx} onSelect={setSelected} />
             ))}
           </div>
         </section>

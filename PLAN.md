@@ -55,6 +55,8 @@ No backend, no auth. It runs in the browser on hardcoded data.
   count the full purchase up front). Future installments are
   projected from what has been charged so far, and they reduce the card's
   available limit.
+- **Languages:** English and PT-BR, switchable in the header (saved on the
+  device; defaults to the phone's language). Formatting follows the language.
 - **Mobile:** bottom tab bar, touch-sized targets, native selects, bottom
   sheet, dark mode, safe-area insets, and a web app manifest + icons for "Add
   to Home screen".

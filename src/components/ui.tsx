@@ -3,6 +3,7 @@ import type { Cents, CurrencyCode, Institution } from '../data/types'
 import { formatMoney } from '../lib/money'
 import { formatMonth, lastMonths } from '../lib/dates'
 import { Icon } from './Icon'
+import { useI18n } from '../i18n/I18nProvider'
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <section className={`rounded-2xl bg-surface p-4 ring-1 ring-line ${className}`}>{children}</section>
@@ -59,16 +60,17 @@ export function Amount({
 
 /** ‹ set. de 2026 › — steps through the months that have data. */
 export function MonthSwitcher({ month, latest, count, onChange }: { month: string; latest: string; count: number; onChange(m: string): void }) {
+  const { t } = useI18n()
   const months = lastMonths(latest, count)
   const i = months.indexOf(month)
   const btn = 'flex size-11 items-center justify-center rounded-full text-ink-2 active:bg-track disabled:opacity-30'
   return (
     <div className="flex items-center justify-between">
-      <button className={btn} disabled={i <= 0} onClick={() => onChange(months[i - 1])} aria-label="Previous month">
+      <button className={btn} disabled={i <= 0} onClick={() => onChange(months[i - 1])} aria-label={t.previousMonth}>
         <Icon name="chevronLeft" />
       </button>
       <span className="font-semibold">{formatMonth(month)}</span>
-      <button className={btn} disabled={i >= months.length - 1} onClick={() => onChange(months[i + 1])} aria-label="Next month">
+      <button className={btn} disabled={i >= months.length - 1} onClick={() => onChange(months[i + 1])} aria-label={t.nextMonth}>
         <Icon name="chevronRight" />
       </button>
     </div>
