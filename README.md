@@ -61,7 +61,8 @@ card bill payments.
 - **Transfers between your own accounts and card bill payments are not income
   or expenses.** This way a card purchase is counted once, when it happens,
   and not again when the bill is paid.
-- Net balance = money in accounts − open credit card bills.
+- Net worth = money in accounts − open credit card bills. Its history is
+  rebuilt from today's balances minus the transactions since each month end.
 - **Installments (parcelas):** each installment is charged in its own bill and
   counts as an expense in the month it's charged, the same way the bank bills
   it. Installments not charged yet still reduce the card's available limit

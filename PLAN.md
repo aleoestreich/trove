@@ -31,9 +31,17 @@ No backend, no auth. It runs in the browser on hardcoded data.
 - **Money:** integer cents. Transfers and card bill payments are excluded from
   income and expenses, so nothing is counted twice.
 - **Screens:**
-  - **Overview:** net balance across all accounts (with the USD breakdown),
-    month switcher, income / expenses / net, spending by category, 6-month
-    trend, latest transactions.
+  - **Overview (overall situation):**
+    - net worth now and a 6-month net worth chart;
+    - where the money is (by bank, and BRL vs USD);
+    - income vs expenses per month and the share of income kept;
+    - coming up (open card bills + installments next month);
+    - spending by category per month (top 5 + Other);
+    - then one month in detail (totals, categories, latest transactions).
+- **Balance history:** rebuilt backwards from today's balances minus later
+  transactions (works the same with Pluggy data). USD balances are converted
+  at the rate of that month's transactions. Demo balances are opening
+  balances + all transactions, so the history is consistent.
   - **Transactions:** search, filters (month, type, account, category), list
     grouped by day. Tap a transaction to see details and change its category.
   - **Accounts:** grouped by institution. Bank balances, USD balance with its

@@ -37,6 +37,7 @@ export const categories: Category[] = [
   { id: 'leisure', name: 'Leisure', kind: 'expense' },
   { id: 'travel', name: 'Travel', kind: 'expense' },
   { id: 'education', name: 'Education', kind: 'expense' },
+  { id: 'taxes', name: 'Taxes & fees', kind: 'expense' },
   { id: 'other-expense', name: 'Other expenses', kind: 'expense' },
   { id: 'transfer', name: 'Transfer between accounts', kind: 'transfer' },
   { id: 'card-payment', name: 'Credit card payment', kind: 'transfer' },
@@ -56,7 +57,19 @@ const cards = [
   { id: 'inter-card', institutionId: 'inter', name: 'Inter Mastercard Gold', payFrom: 'inter-checking', limit: 5_000_00, closeDay: 10, dueDay: 17 },
 ] as const
 
-const WISE_USD_BALANCE: Cents = 3_412_37
+/**
+ * Balances at the start of the demo period. Current balances are these plus
+ * every transaction since, so balance history can be rebuilt from the data
+ * (as it will be with Pluggy: current balance minus later transactions).
+ */
+const OPENING_BALANCES: Record<string, Cents> = {
+  'nubank-checking': 1_850_00,
+  'itau-checking': 4_300_00,
+  'inter-checking': 2_400_00,
+  'wise-brl': 350_00,
+  /** In USD cents. */
+  'wise-usd': 1_950_00,
+}
 
 // ---------------------------------------------------------------------------
 
@@ -130,30 +143,34 @@ export function buildSeed(today: Date = new Date()): Snapshot {
     add({ accountId: 'itau-checking', date: day(5), description: 'Salário - Acme Tecnologia Ltda', amount: 12_500_00, categoryId: 'salary' })
     add({ accountId: 'itau-checking', date: day(10), description: 'Aluguel - Imobiliária Lopes', amount: -3_200_00, categoryId: 'housing' })
     add({ accountId: 'itau-checking', date: day(10), description: 'Condomínio Ed. Aurora', amount: -780_00, categoryId: 'housing' })
-    transfer('itau-checking', 'nubank-checking', day(6), 2_500_00, 'Pix - transferência entre contas')
-    transfer('itau-checking', 'inter-checking', day(6), 900_00, 'Pix - transferência entre contas')
+    add({ accountId: 'itau-checking', date: day(8), description: 'Unimed - plano de saúde', amount: -890_00, categoryId: 'health' })
+    add({ accountId: 'itau-checking', date: day(20), description: 'DAS - Simples Nacional', amount: -between(420, 560), categoryId: 'taxes' })
+    transfer('itau-checking', 'nubank-checking', day(6), 3_000_00, 'Pix - transferência entre contas')
+    transfer('itau-checking', 'inter-checking', day(6), 1_800_00, 'Pix - transferência entre contas')
 
     // Inter checking: bills and investment yield.
     add({ accountId: 'inter-checking', date: day(12), description: 'Enel Distribuição SP', amount: -between(180, 290), categoryId: 'utilities' })
     add({ accountId: 'inter-checking', date: day(15), description: 'Vivo Fibra', amount: -119_90, categoryId: 'utilities' })
+    add({ accountId: 'inter-checking', date: day(11), description: 'Wizard Idiomas', amount: -460_00, categoryId: 'education' })
     add({ accountId: 'inter-checking', date: day(28), description: 'Rendimento CDB Inter', amount: between(38, 72), categoryId: 'investments' })
 
     // Nubank checking: Pix to people.
     add({ accountId: 'nubank-checking', date: day(3 + Math.floor(random() * 20)), description: 'Pix enviado - Mariana Costa', amount: -between(80, 350), categoryId: 'other-expense' })
+    add({ accountId: 'nubank-checking', date: day(25), description: 'Pix enviado - Diarista Josefa', amount: -640_00, categoryId: 'housing' })
     if (random() > 0.5) {
       add({ accountId: 'nubank-checking', date: day(14 + Math.floor(random() * 10)), description: 'Pix recebido - Rafael Souza', amount: between(50, 200), categoryId: 'other-income' })
     }
 
     // Wise USD: freelance income in dollars, USD subscriptions, conversion to BRL.
     const usd = (usdCents: Cents) => ({ amount: convertToBRL(usdCents, usdRate), foreign: { currency: 'USD' as const, amount: usdCents } })
-    add({ accountId: 'wise-usd', date: day(15), description: 'Northwind Inc. - Invoice', categoryId: 'freelance', ...usd(1_800_00) })
+    add({ accountId: 'wise-usd', date: day(15), description: 'Northwind Inc. - Invoice', categoryId: 'freelance', ...usd(1_200_00) })
     add({ accountId: 'wise-usd', date: day(3), description: 'GitHub', categoryId: 'subscriptions', ...usd(-10_00) })
     add({ accountId: 'wise-usd', date: day(9), description: 'Figma', categoryId: 'subscriptions', ...usd(-15_00) })
     add({ accountId: 'wise-usd', date: day(2), description: 'AWS', categoryId: 'subscriptions', ...usd(-toCents(18 + random() * 12)) })
-    const converted = usd(-800_00)
+    const converted = usd(-1_000_00)
     add({ accountId: 'wise-usd', date: day(20), description: 'Converted USD to BRL', categoryId: 'transfer', ...converted })
     add({ accountId: 'wise-brl', date: day(20), description: 'Converted USD to BRL', categoryId: 'transfer', amount: -converted.amount })
-    transfer('wise-brl', 'itau-checking', day(21), 3_000_00, 'Wise - envio para Itaú')
+    transfer('wise-brl', 'itau-checking', day(21), 5_000_00, 'Wise - envio para Itaú')
 
     // Credit card purchases.
     add({ accountId: 'nubank-card', date: day(7), description: 'Netflix.com', amount: -44_90, categoryId: 'subscriptions' })
@@ -251,22 +268,34 @@ export function buildSeed(today: Date = new Date()): Snapshot {
     }
   })
 
+  const flow = (accountId: string, foreign = false) =>
+    txs.filter((t) => t.accountId === accountId).reduce((sum, t) => sum + (foreign ? t.foreign!.amount : t.amount), 0)
+  const bank = (id: string, institutionId: string, name: string): Account => ({
+    id,
+    institutionId,
+    name,
+    type: 'BANK',
+    subtype: 'CHECKING_ACCOUNT',
+    balance: OPENING_BALANCES[id] + flow(id),
+  })
+  const usdBalance = OPENING_BALANCES['wise-usd'] + flow('wise-usd', true)
+
   const accounts: Account[] = [
-    { id: 'nubank-checking', institutionId: 'nubank', name: 'Conta corrente', type: 'BANK', subtype: 'CHECKING_ACCOUNT', balance: 4_832_19 },
+    bank('nubank-checking', 'nubank', 'Conta corrente'),
     cardAccounts[0],
-    { id: 'itau-checking', institutionId: 'itau', name: 'Conta corrente', type: 'BANK', subtype: 'CHECKING_ACCOUNT', balance: 9_214_55 },
+    bank('itau-checking', 'itau', 'Conta corrente'),
     cardAccounts[1],
-    { id: 'inter-checking', institutionId: 'inter', name: 'Conta digital', type: 'BANK', subtype: 'CHECKING_ACCOUNT', balance: 2_150_00 },
+    bank('inter-checking', 'inter', 'Conta digital'),
     cardAccounts[2],
-    { id: 'wise-brl', institutionId: 'wise', name: 'Saldo em BRL', type: 'BANK', subtype: 'CHECKING_ACCOUNT', balance: 1_268_40 },
+    bank('wise-brl', 'wise', 'Saldo em BRL'),
     {
       id: 'wise-usd',
       institutionId: 'wise',
       name: 'Saldo em USD',
       type: 'BANK',
       subtype: 'CHECKING_ACCOUNT',
-      balance: convertToBRL(WISE_USD_BALANCE, USD_BRL_TODAY),
-      foreign: { currency: 'USD', balance: WISE_USD_BALANCE, rate: USD_BRL_TODAY },
+      balance: convertToBRL(usdBalance, USD_BRL_TODAY),
+      foreign: { currency: 'USD', balance: usdBalance, rate: USD_BRL_TODAY },
     },
   ]
 
