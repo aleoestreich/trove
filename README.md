@@ -15,14 +15,18 @@ npm run dev
 
 Open the URL Vite prints (http://localhost:5173).
 
-### On your Android phone
+### On your Android phone (tested at Galaxy S25+ size)
 
 1. Connect your computer and phone to the same Wi-Fi.
 2. Run `npm run dev`. Vite prints a **Network** URL, such as
    `http://192.168.0.12:5173`.
-3. Open that URL in Chrome on the phone.
-4. To add it to your home screen, open Chrome's ⋮ menu and choose
-   **Add to Home screen**.
+3. Open that URL on the phone.
+4. Add it to the home screen:
+   - **Samsung Internet:** menu (☰) → **Add page to** → **Home screen**.
+   - **Chrome:** ⋮ menu → **Add to Home screen**.
+
+The app follows the phone's light/dark setting. If Windows Firewall or macOS
+blocks the connection, allow Node.js on private networks.
 
 ## Scripts
 

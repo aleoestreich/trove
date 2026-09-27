@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useData } from '../state'
 import type { Account } from '../data/types'
 import { balances } from '../lib/summary'
-import { formatDay } from '../lib/dates'
+import { formatShortDate } from '../lib/dates'
 import { formatMoney, formatRate } from '../lib/money'
 import { Card, InstitutionBadge } from '../components/ui'
 
@@ -12,21 +12,10 @@ export function Accounts() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <div className="grid grid-cols-3 gap-2 text-sm">
-          <div>
-            <p className="text-xs text-muted">In accounts</p>
-            <p className="tabular font-semibold">{formatMoney(bal.cash)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted">Card bills</p>
-            <p className="tabular font-semibold">−{formatMoney(bal.cardDebt)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted">Net</p>
-            <p className="tabular font-semibold">{formatMoney(bal.net)}</p>
-          </div>
-        </div>
+      <Card className="divide-y divide-line !py-1">
+        <SummaryRow label="In accounts" value={formatMoney(bal.cash)} />
+        <SummaryRow label="Open card bills" value={`−${formatMoney(bal.cardDebt)}`} />
+        <SummaryRow label="Net" value={formatMoney(bal.net)} strong />
       </Card>
 
       {institutions.map((inst) => {
@@ -55,6 +44,15 @@ export function Accounts() {
         Demo data. Real accounts will be connected through Meu Pluggy once the backend is added.
       </p>
     </div>
+  )
+}
+
+function SummaryRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <p className="flex items-baseline justify-between gap-3 py-2.5">
+      <span className="text-sm text-ink-2">{label}</span>
+      <span className={`tabular ${strong ? 'text-lg font-semibold' : 'font-medium'}`}>{value}</span>
+    </p>
   )
 }
 
@@ -92,7 +90,7 @@ function CreditCardRow({ account }: { account: Account }) {
         <div className="min-w-0">
           <p className="font-medium">{account.name}</p>
           <p className="text-xs text-muted">
-            Closes {formatDay(credit.balanceCloseDate)} · Due {formatDay(credit.balanceDueDate)}
+            Closes {formatShortDate(credit.balanceCloseDate)} · Due {formatShortDate(credit.balanceDueDate)}
           </p>
         </div>
         <div className="text-right">

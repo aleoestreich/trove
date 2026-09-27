@@ -37,6 +37,13 @@ function parse(iso: string): Date {
   return new Date(y, m - 1, d ?? 1)
 }
 
+const shortDateFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' })
+
+/** "01/10" */
+export function formatShortDate(iso: string): string {
+  return shortDateFmt.format(parse(iso))
+}
+
 /** "Setembro de 2026" */
 export function formatMonth(key: string): string {
   const s = monthFmt.format(parse(key))
