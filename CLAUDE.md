@@ -52,7 +52,10 @@ Run `npm test` and `npm run build` before pushing.
   environment variables.
 - **Real data:** `/api/finance` reads Pluggy live (`server/pluggy/`, setup in
   `docs/pluggy-setup.md`). Pluggy credentials and item IDs are Vercel
-  environment variables only. The mapping to Trove's model lives in
+  environment variables only. Access must stay on Pluggy's free path for
+  individuals (the "Access your data" tutorial, via Meu Pluggy); never suggest
+  connecting banks directly through Pluggy Connect or a paid plan. The mapping
+  to Trove's model lives in
   `server/pluggy/map.ts`; shared types come from `src/data/types.ts` and
   `src/data/categories.ts`, which must stay free of browser-only imports.
   Never log or return amounts, descriptions or credentials in errors or

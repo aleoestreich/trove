@@ -10,39 +10,33 @@ service behind Meu Pluggy. Nothing is stored:
 Until the three settings in step 3 exist, the deployed site keeps showing demo
 data (with the "Demo data" label).
 
-> I couldn't open Pluggy's documentation from my session, so the dashboard
-> steps below may use slightly different names. The goal of steps 1 and 2 is
-> always the same: **a Client ID and Client Secret**, and **the ID of the
-> connection (item)** that holds your accounts.
+> **Stay on the free path.** Trove only needs your *own* data, which Pluggy
+> gives individuals for free through Meu Pluggy. Follow Pluggy's **"Access your
+> data"** tutorial (docs.pluggy.ai) exactly.
+>
+> **Don't connect banks directly** in the Pluggy dashboard or Pluggy Connect,
+> and don't pick a paid plan. Direct bank connections are Pluggy's paid
+> product. Your banks should be connected **in the Meu Pluggy app**, and
+> reached through it.
 
 ---
 
-## 1. Create a Pluggy developer account and get API credentials
+## 1–2. Get your credentials and your Meu Pluggy item (Pluggy's tutorial)
 
-1. Go to <https://dashboard.pluggy.ai> and sign up. You can use the same email
-   as Meu Pluggy.
-2. Create an application (e.g. `Trove`).
-3. Open the application's credentials and copy its **Client ID** and **Client
-   Secret**.
-4. Check the plan. Pluggy has limits and pricing for connections; use the
-   free, trial or personal option if one is offered, and read what it allows.
+Follow Pluggy's **"Access your data"** tutorial. By the end you should have
+three things:
 
-Keep the Client Secret private: don't paste it in chats, issues or code. It
-only goes into Vercel (step 3).
+| You need | What it is |
+|---|---|
+| **Client ID** | Your API credentials' ID |
+| **Client Secret** | Your API credentials' secret. Keep it private: never paste it in chats, issues or code |
+| **Item ID** | The ID of the connection that gives the API access to your Meu Pluggy data |
 
-## 2. Create the connection to your accounts
+Your banks (Nubank, Itaú, Inter, Wise…) stay connected in the **Meu Pluggy**
+app. Trove reads them through that single item.
 
-In the Pluggy dashboard, open the way to test or add a connection (Pluggy
-Connect), then:
-
-- **Option A: Meu Pluggy (if listed).** Choose the **MeuPluggy** connector and
-  log in with your Meu Pluggy account. This brings in the banks you already
-  linked in Meu Pluggy (Nubank, Itaú, Inter, Wise…) as one connection.
-- **Option B: each bank directly.** Choose each bank (Open Finance) and
-  authorise it. Each bank becomes its own connection.
-
-Then open the dashboard's list of **Items** (connections) and copy each item's
-**ID**. It looks like `a1b2c3d4-...`.
+If a step asks you to choose or pay for a plan, stop: that's not the free
+path.
 
 ## 3. Add three settings in Vercel
 
@@ -54,7 +48,7 @@ these for **Production** (and Preview if you test on preview links), marked
 |---|---|
 | `PLUGGY_CLIENT_ID` | the Client ID from step 1 |
 | `PLUGGY_CLIENT_SECRET` | the Client Secret from step 1 |
-| `PLUGGY_ITEM_IDS` | the item ID(s) from step 2. Separate several with commas: `id1,id2` |
+| `PLUGGY_ITEM_IDS` | the item ID from the tutorial (if you ever have more than one, separate them with commas) |
 
 Then redeploy: **Deployments** → latest production deployment → **⋯** →
 **Redeploy**. Settings only apply to new deployments.
@@ -86,11 +80,11 @@ Then redeploy: **Deployments** → latest production deployment → **⋯** →
 | You see | Meaning | Fix |
 |---|---|---|
 | Still "Demo data" | A setting is missing, or no redeploy since adding them | Step 3, then redeploy |
-| "Pluggy refused the credentials (HTTP 401)" | Wrong Client ID or Secret | Re-copy both (step 1) |
-| "…GET /items/… (HTTP 404)" | Wrong item ID | Re-copy it from the Items list (step 2) |
+| "Pluggy refused the credentials (HTTP 401)" | Wrong Client ID or Secret | Re-copy both (steps 1–2) |
+| "…GET /items/… (HTTP 404)" | Wrong item ID | Re-copy it (steps 1–2) |
 | "Exchange rate service failed" / "No exchange rate for USD" | The USD→BRL rate couldn't be fetched | Try again in a minute |
-| Data looks out of date | Pluggy refreshes connections on its own schedule; Trove also caches for 5 minutes | Open `/api/finance?refresh` to skip Trove's cache; update the connection in Meu Pluggy / Pluggy if it's stale there |
-| A connection shows `LOGIN_ERROR` or `OUTDATED` in the summary | The bank consent expired or needs attention | Reconnect it in Meu Pluggy / the Pluggy dashboard |
+| Data looks out of date | Pluggy refreshes connections on its own schedule; Trove also caches for 5 minutes | Open `/api/finance?refresh` to skip Trove's cache; update the connection in the Meu Pluggy app if it's stale there |
+| A connection shows `LOGIN_ERROR` or `OUTDATED` in the summary | The bank consent expired or needs attention | Reconnect that bank in the Meu Pluggy app |
 
 ## How it works (for developers)
 
