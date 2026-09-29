@@ -8,13 +8,16 @@ export function messagePage(status: number, title: string, detail: string, link:
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>Trove</title>
 <style>
-:root{color-scheme:light dark;--bg:#f9f9f7;--ink:#0b0b0b;--muted:#52514e;--accent:#2a78d6}
-@media (prefers-color-scheme:dark){:root{--bg:#0d0d0d;--ink:#fff;--muted:#c3c2b7;--accent:#3987e5}}
-body{margin:0;min-height:100dvh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif;padding:0 16px}
-main{max-width:28rem}h1{font-size:1.25rem;margin:0 0 .5rem}p{color:var(--muted);margin:0 0 1rem}
-a{display:inline-block;padding:.6rem 1rem;border-radius:999px;background:var(--accent);color:#fff;text-decoration:none}
+:root{color-scheme:light dark;--page:#f5f5f9;--surface:#fff;--ink:#0b0b1f;--ink-2:#3d3d56;--line:#e4e4ee;--accent:#3d5afe;--blend:multiply}
+@media (prefers-color-scheme:dark){:root{--page:#0b0b1f;--surface:#15152e;--ink:#f2f2f8;--ink-2:#c4c4d6;--line:#28284a;--accent:#7c8bff;--blend:screen}}
+body{margin:0;min-height:100dvh;display:grid;place-items:center;background:var(--page);color:var(--ink);font:15px/22px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;padding:0 16px}
+main{max-width:22rem;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+svg{width:56px;height:53px}circle{mix-blend-mode:var(--blend)}
+h1{font-size:20px;line-height:26px;font-weight:500;margin:4px 0 0}p{color:var(--ink-2);margin:0}
+a{margin-top:8px;display:inline-flex;align-items:center;height:48px;padding:0 24px;border-radius:14px;background:var(--accent);color:var(--surface);font-weight:500;text-decoration:none}
 </style></head>
-<body><main><h1>${escape(title)}</h1><p>${escape(detail)}</p><a href="${escape(link.href)}">${escape(link.label)}</a></main></body></html>`
+<body><main><svg viewBox="11 14 42 40" aria-hidden="true"><g style="isolation:isolate"><circle cx="25" cy="28" r="14" fill="#3d5afe"/><circle cx="39" cy="28" r="14" fill="#a34bff"/><circle cx="32" cy="40" r="14" fill="#19e3b1"/></g></svg>
+<h1>${escape(title)}</h1><p>${escape(detail)}</p><a href="${escape(link.href)}">${escape(link.label)}</a></main></body></html>`
   return new Response(html, {
     status,
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY' },
