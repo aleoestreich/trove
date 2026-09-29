@@ -1,9 +1,9 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, type JWTVerifyGetKey } from 'jose'
-import { readConfig, type AuthConfig } from './config'
-import { LOGIN_COOKIE, SESSION_COOKIE } from './cookies'
-import { seal, unseal } from './session'
-import { callback, guard, login, logout, safeReturnTo } from './handlers'
+import { readConfig, type AuthConfig } from './config.js'
+import { LOGIN_COOKIE, SESSION_COOKIE } from './cookies.js'
+import { seal, unseal } from './session.js'
+import { callback, guard, login, logout, safeReturnTo } from './handlers.js'
 
 const config: AuthConfig = {
   domain: 'trove-test.us.auth0.com',
