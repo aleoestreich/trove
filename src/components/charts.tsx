@@ -28,7 +28,7 @@ export function NetWorthChart({ points, label }: { points: NetWorthPoint[]; labe
   const data = points.map((p) => ({ ...p, value: reais(p.net) }))
   const last = data.length - 1
   return (
-    <div className="h-[140px]" role="img" aria-label={label}>
+    <div className="h-[140px] lg:h-auto lg:flex-1" role="img" aria-label={label}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="2 4" />
@@ -104,7 +104,7 @@ function MonthLabels({ labels }: { labels: string[] }) {
       {labels.map((l, i) => (
         <span
           key={i}
-          className={`flex-1 text-center text-[11px] leading-5 whitespace-nowrap ${i === labels.length - 1 ? 'font-medium text-ink' : 'text-muted'}`}
+          className={`flex-1 text-center text-[11px] leading-5 lg:text-xs whitespace-nowrap ${i === labels.length - 1 ? 'font-medium text-ink' : 'text-muted'}`}
         >
           {l}
         </span>
@@ -127,14 +127,14 @@ export function CashFlowChart({ data, label }: { data: CashFlowPoint[]; label: s
   const top = Math.ceil(max / step) * step
   return (
     <div role="img" aria-label={label}>
-      <div className="relative h-32">
-        <span className="absolute top-0 right-0 text-[11px] leading-[14px] text-muted">{formatCompact(reais(top))}</span>
+      <div className="relative h-32 lg:h-44">
+        <span className="absolute top-0 right-0 text-[11px] leading-[14px] lg:text-xs text-muted">{formatCompact(reais(top))}</span>
         <div className="absolute inset-x-0 top-4 border-t border-dashed border-line" />
         <div className="absolute inset-x-0 top-4 bottom-0 flex items-end border-b border-line">
           {data.map((d, i) => (
             <div key={i} className="flex h-full flex-1 items-end justify-center gap-0.5">
-              <div className="w-3.5 rounded-t-[4px] bg-income" style={{ height: `${(d.income / top) * 100}%` }} />
-              <div className="w-3.5 rounded-t-[4px] bg-ink-2" style={{ height: `${(d.expenses / top) * 100}%` }} />
+              <div className="w-3.5 rounded-t-[4px] bg-income lg:w-5" style={{ height: `${(d.income / top) * 100}%` }} />
+              <div className="w-3.5 rounded-t-[4px] bg-ink-2 lg:w-5" style={{ height: `${(d.expenses / top) * 100}%` }} />
             </div>
           ))}
         </div>
@@ -160,13 +160,13 @@ export function SpendingTrendChart({ data, series, label }: { data: Record<strin
   const last = data.length - 1
   return (
     <div role="img" aria-label={label}>
-      <div className="flex h-[152px] items-end border-b border-line">
+      <div className="flex h-[152px] items-end border-b border-line lg:h-[176px]">
         {data.map((d, i) => (
           <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-            <span className={`tabular text-[11px] leading-[14px] whitespace-nowrap ${i === last ? 'font-medium text-ink' : 'text-muted'}`}>
+            <span className={`tabular text-[11px] leading-[14px] lg:text-xs whitespace-nowrap ${i === last ? 'font-medium text-ink' : 'text-muted'}`}>
               {formatCompact(Math.round(reais(totals[i])))}
             </span>
-            <div className="flex w-[26px] flex-col-reverse gap-0.5 overflow-hidden rounded-t-[4px]" style={{ height: `max(2px, calc(${(totals[i] / max) * 100}% - 18px))` }}>
+            <div className="flex w-[26px] flex-col-reverse lg:w-9 gap-0.5 overflow-hidden rounded-t-[4px]" style={{ height: `max(2px, calc(${(totals[i] / max) * 100}% - 18px))` }}>
               {series.map((s, j) => {
                 const v = Number(d[s.key] ?? 0)
                 return v > 0 ? <div key={s.key} className="min-h-0.5" style={{ flexGrow: v, flexBasis: 0, background: seriesColor(j) }} /> : null
@@ -185,14 +185,14 @@ export function MonthBars({ data, label }: { data: { label: string; amount: numb
   const max = Math.max(1, ...data.map((d) => d.amount))
   return (
     <div role="img" aria-label={label}>
-      <div className="flex h-28 items-end border-b border-line">
+      <div className="flex h-28 items-end border-b border-line lg:h-32">
         {data.map((d, i) => (
           <div key={i} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
-            <span className={`tabular text-[11px] leading-[14px] whitespace-nowrap ${i === 0 ? 'font-medium text-ink' : 'text-muted'}`}>
+            <span className={`tabular text-[11px] leading-[14px] lg:text-xs whitespace-nowrap ${i === 0 ? 'font-medium text-ink' : 'text-muted'}`}>
               {formatCompact(Math.round(reais(d.amount)))}
             </span>
             <div
-              className={`w-6 rounded-t-[4px] bg-[var(--bar)] ${i === 0 ? '' : 'opacity-55'}`}
+              className={`w-6 rounded-t-[4px] bg-[var(--bar)] lg:w-10 ${i === 0 ? '' : 'opacity-55'}`}
               style={{ height: `max(2px, calc(${(d.amount / max) * 100}% - 18px))` }}
             />
           </div>
@@ -200,7 +200,7 @@ export function MonthBars({ data, label }: { data: { label: string; amount: numb
       </div>
       <div className="flex h-5" aria-hidden>
         {data.map((d, i) => (
-          <span key={i} className={`flex-1 text-center text-[11px] leading-5 whitespace-nowrap ${i === 0 ? 'font-medium text-ink' : 'text-muted'}`}>
+          <span key={i} className={`flex-1 text-center text-[11px] leading-5 lg:text-xs whitespace-nowrap ${i === 0 ? 'font-medium text-ink' : 'text-muted'}`}>
             {d.label}
           </span>
         ))}

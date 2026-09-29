@@ -8,7 +8,7 @@ import { useI18n } from '../i18n/I18nProvider'
 
 /** Surface card: 20px radius, 1px border, 16px padding. Borders, not shadows. */
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-lg border border-line bg-surface p-4 ${className}`}>{children}</section>
+  return <section className={`rounded-lg border border-line bg-surface p-4 lg:p-5 ${className}`}>{children}</section>
 }
 
 /** Card title (16/22 medium) with an optional muted subtitle. */
@@ -166,18 +166,34 @@ export function Amount({
   )
 }
 
-/** ‹ September 2026 › on a page-coloured bar; steps through the months with data. */
-export function MonthSwitcher({ month, latest, count, onChange }: { month: string; latest: string; count: number; onChange(m: string): void }) {
+/**
+ * ‹ September 2026 › — steps through the months with data. `bar`: full width
+ * on a page-coloured bar (phones); `compact`: a bordered box (desktop header).
+ */
+export function MonthSwitcher({
+  month,
+  latest,
+  count,
+  onChange,
+  variant = 'bar',
+}: {
+  month: string
+  latest: string
+  count: number
+  onChange(m: string): void
+  variant?: 'bar' | 'compact'
+}) {
   const { t } = useI18n()
   const months = lastMonths(latest, count)
   const i = months.indexOf(month)
-  const btn = 'flex size-12 items-center justify-center rounded-md text-ink-2 active:bg-track disabled:text-line'
+  const compact = variant === 'compact'
+  const btn = `flex items-center justify-center text-ink-2 active:bg-track disabled:text-line ${compact ? 'size-10 rounded-[10px] hover:bg-track disabled:hover:bg-transparent' : 'size-12 rounded-md'}`
   return (
-    <div className="-mx-2 flex items-center justify-between rounded-md bg-page">
+    <div className={compact ? 'flex items-center gap-1 rounded-md border border-line bg-surface p-1' : '-mx-2 flex items-center justify-between rounded-md bg-page'}>
       <button type="button" className={btn} disabled={i <= 0} onClick={() => onChange(months[i - 1])} aria-label={t.previousMonth}>
         <Icon name="chevronLeft" className="size-[22px]" strokeWidth={2} />
       </button>
-      <span className="text-[15px] font-medium text-ink">{formatMonth(month)}</span>
+      <span className={compact ? 'min-w-[150px] text-center text-sm font-medium text-ink' : 'text-[15px] font-medium text-ink'}>{formatMonth(month)}</span>
       <button type="button" className={btn} disabled={i >= months.length - 1} onClick={() => onChange(months[i + 1])} aria-label={t.nextMonth}>
         <Icon name="chevronRight" className="size-[22px]" strokeWidth={2} />
       </button>
@@ -205,6 +221,19 @@ export function EmptyState({
       <h2 className="mt-1 text-xl leading-[26px] font-medium text-ink">{title}</h2>
       <p className="max-w-[290px] text-[15px] leading-[22px] text-ink-2">{children}</p>
       {action && <div className="mt-2">{action}</div>}
+    </div>
+  )
+}
+
+/** Desktop page heading: title, subtitle and optional controls on the right. */
+export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="mb-6 hidden min-h-14 items-end justify-between gap-6 lg:flex">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-[28px] leading-[34px] font-medium tracking-[-0.01em] text-ink">{title}</h1>
+        {subtitle && <p className="tabular text-sm leading-5 text-muted">{subtitle}</p>}
+      </div>
+      {children}
     </div>
   )
 }

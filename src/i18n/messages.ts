@@ -8,6 +8,7 @@ const en = {
   nav: { overview: 'Overview', transactions: 'Transactions', accounts: 'Accounts', installments: 'Installments' },
   mainNav: 'Main',
   demoData: 'Demo data',
+  demoNote: 'Real accounts will be connected through Meu Pluggy once the backend is added.',
   language: 'Language',
   loading: 'Loading your finances',
   loadErrorTitle: 'Couldn’t load your finances',
@@ -29,6 +30,7 @@ const en = {
   oneUnitIs: (currency: string, rate: string) => `1 ${currency} = R$ ${rate}`,
 
   overview: {
+    subtitle: (date: string) => `As of ${date}`,
     netWorth: 'Net worth',
     vsLastMonth: 'vs last month',
     netWorthChart: (months: number, from: string, to: string) => `Net worth over the last ${months} months, from ${from} to ${to}`,
@@ -40,6 +42,7 @@ const en = {
     incomeVsExpenses: 'Income vs expenses',
     lastMonths: (months: number) => `Last ${months} months`,
     kept: 'of this month’s income kept',
+    keptShort: 'Kept this month',
     comingUp: 'Coming up',
     openCardBills: 'Open card bills',
     due: (date: string) => `Due ${date}`,
@@ -62,6 +65,8 @@ const en = {
     allCategories: 'All categories',
     clear: 'Clear',
     clearFilters: 'Clear filters',
+    colDescription: 'Description',
+    colAmount: 'Amount',
     count: (n: number, month: string | null) =>
       `${n} ${n === 1 ? 'transaction' : 'transactions'}${month ? ` in ${month.replace(/ \d{4}$/, '')}` : ''}`,
     emptyTitle: 'No transactions found',
@@ -84,12 +89,15 @@ const en = {
   },
 
   installments: {
+    subtitle: 'Card purchases split into monthly payments',
     stillToPay: 'Still to pay',
     summary: (n: number, lastMonth: string | null) =>
       `${n} ${n === 1 ? 'purchase' : 'purchases'}${lastMonth ? ` · last installment in ${lastMonth}` : ''}`,
     committedPerMonth: 'Committed per month',
     committedNote: 'Already taken from your card limits. New purchases will add to these bills.',
     purchases: 'Purchases',
+    purchase: 'Purchase',
+    progress: 'Progress',
     finished: 'Paid off',
     paid: 'paid',
     toGo: (n: number) => `${n} to go`,
@@ -148,6 +156,7 @@ const ptBR: Messages = {
   nav: { overview: 'Visão geral', transactions: 'Transações', accounts: 'Contas', installments: 'Parcelas' },
   mainNav: 'Principal',
   demoData: 'Dados de exemplo',
+  demoNote: 'As contas reais serão conectadas pelo Meu Pluggy quando o backend for adicionado.',
   language: 'Idioma',
   loading: 'Carregando suas finanças',
   loadErrorTitle: 'Não foi possível carregar suas finanças',
@@ -169,6 +178,7 @@ const ptBR: Messages = {
   oneUnitIs: (currency, rate) => `1 ${currency} = R$ ${rate}`,
 
   overview: {
+    subtitle: (date) => `Posição em ${date}`,
     netWorth: 'Patrimônio líquido',
     vsLastMonth: 'vs. mês passado',
     netWorthChart: (months, from, to) => `Patrimônio líquido nos últimos ${months} meses, de ${from} para ${to}`,
@@ -180,6 +190,7 @@ const ptBR: Messages = {
     incomeVsExpenses: 'Receitas vs. despesas',
     lastMonths: (months) => `Últimos ${months} meses`,
     kept: 'da receita do mês foi guardado',
+    keptShort: 'Guardado no mês',
     comingUp: 'Próximos pagamentos',
     openCardBills: 'Faturas em aberto',
     due: (date) => `Vence ${date}`,
@@ -202,6 +213,8 @@ const ptBR: Messages = {
     allCategories: 'Todas as categorias',
     clear: 'Limpar',
     clearFilters: 'Limpar filtros',
+    colDescription: 'Descrição',
+    colAmount: 'Valor',
     count: (n, month) =>
       `${n} ${n === 1 ? 'transação' : 'transações'}${month ? ` em ${month.replace(/ de \d{4}$/, '').toLowerCase()}` : ''}`,
     emptyTitle: 'Nenhuma transação encontrada',
@@ -224,11 +237,14 @@ const ptBR: Messages = {
   },
 
   installments: {
+    subtitle: 'Compras no cartão divididas em parcelas mensais',
     stillToPay: 'Falta pagar',
     summary: (n, lastMonth) => `${n} ${n === 1 ? 'compra' : 'compras'}${lastMonth ? ` · última parcela em ${lastMonth}` : ''}`,
     committedPerMonth: 'Comprometido por mês',
     committedNote: 'Já descontado do limite dos cartões. Novas compras vão somar a essas faturas.',
     purchases: 'Compras parceladas',
+    purchase: 'Compra',
+    progress: 'Andamento',
     finished: 'Quitadas',
     paid: 'pagas',
     toGo: (n) => `${n} ${n === 1 ? 'restante' : 'restantes'}`,

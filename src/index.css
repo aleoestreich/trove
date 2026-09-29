@@ -131,6 +131,9 @@ body {
 .bg-accent-soft {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
+.bg-accent-faint {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
 .bg-income-soft {
   background: color-mix(in srgb, var(--income) 12%, transparent);
 }
