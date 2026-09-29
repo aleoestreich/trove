@@ -28,7 +28,7 @@ export function NetWorthChart({ points, label }: { points: NetWorthPoint[]; labe
   const data = points.map((p) => ({ ...p, value: reais(p.net) }))
   const last = data.length - 1
   return (
-    <div className="chart-focus h-[140px] lg:h-auto lg:flex-1" role="img" aria-label={label}>
+    <div className="h-[140px] lg:h-auto lg:flex-1" role="img" aria-label={label}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="2 4" />
