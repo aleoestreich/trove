@@ -54,7 +54,10 @@ Run `npm test` and `npm run build` before pushing.
   `docs/pluggy-setup.md`). Pluggy credentials and item IDs are Vercel
   environment variables only. Access must stay on Pluggy's free path for
   individuals (the "Access your data" tutorial, via Meu Pluggy); never suggest
-  connecting banks directly through Pluggy Connect or a paid plan. The mapping
+  connecting banks directly or a paid plan. Pluggy Connect is only opened
+  restricted to the MeuPluggy connector (the server looks it up and refuses if
+  it's missing). The webhook (`/api/webhooks/pluggy`) is the only route the
+  login middleware lets through; it must check its shared secret. The mapping
   to Trove's model lives in
   `server/pluggy/map.ts`; shared types come from `src/data/types.ts` and
   `src/data/categories.ts`, which must stay free of browser-only imports.

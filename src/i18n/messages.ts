@@ -86,6 +86,20 @@ const en = {
     paidOff: 'Paid off',
   },
 
+  connect: {
+    title: 'Connect your banks',
+    intro: 'Trove reads your accounts through Meu Pluggy. Connect it once to get the connection ID.',
+    button: 'Connect Meu Pluggy',
+    opening: 'Opening…',
+    connected: 'Connected',
+    nextStep: 'Copy this ID into Vercel as PLUGGY_ITEM_IDS, then redeploy.',
+    copy: 'Copy',
+    copied: 'Copied',
+    notConfigured: 'Add PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET in Vercel first, then redeploy.',
+    meuPluggyMissing: "Meu Pluggy isn't available for these credentials, so nothing was opened (to avoid paid connections).",
+    failed: 'Could not connect. Try again.',
+  },
+
   accounts: {
     count: (n: number) => `${n} ${n === 1 ? 'account' : 'accounts'}`,
     footer: 'Demo data. Real accounts will be connected through Meu Pluggy once the backend is added.',
@@ -202,6 +216,20 @@ const ptBR: Messages = {
     ends: (month) => `até ${month}`,
     left: (amount) => `faltam ${amount}`,
     paidOff: 'Quitada',
+  },
+
+  connect: {
+    title: 'Conectar seus bancos',
+    intro: 'O Trove lê suas contas pelo Meu Pluggy. Conecte uma vez para obter o ID da conexão.',
+    button: 'Conectar Meu Pluggy',
+    opening: 'Abrindo…',
+    connected: 'Conectado',
+    nextStep: 'Copie este ID no Vercel como PLUGGY_ITEM_IDS e faça um novo deploy.',
+    copy: 'Copiar',
+    copied: 'Copiado',
+    notConfigured: 'Adicione PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET no Vercel e faça um novo deploy.',
+    meuPluggyMissing: 'O Meu Pluggy não está disponível para essas credenciais; nada foi aberto (para evitar conexões pagas).',
+    failed: 'Não foi possível conectar. Tente de novo.',
   },
 
   accounts: {

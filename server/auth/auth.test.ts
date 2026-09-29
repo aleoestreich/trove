@@ -132,6 +132,13 @@ describe('middleware (guard)', () => {
     expect((await guard(get('/assets/index-abc.js'), config)).status).toBe(401)
   })
 
+  it("lets only Pluggy's webhook path through without a session (it checks its own secret)", async () => {
+    expect(passedThrough(await guard(new Request(`${SITE}/api/webhooks/pluggy`, { method: 'POST' }), config))).toBe(true)
+    for (const path of ['/api/webhooks/pluggy/x', '/api/webhooks/other', '/api/webhooks/pluggyx', '/api/finance', '/api/connect-token']) {
+      expect(passedThrough(await guard(new Request(`${SITE}${path}`, { method: 'POST' }), config)), path).toBe(false)
+    }
+  })
+
   it('lets the login routes through', async () => {
     expect(passedThrough(await guard(get('/api/auth/callback?code=x'), config))).toBe(true)
   })

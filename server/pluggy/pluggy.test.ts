@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PluggyClient, PluggyError, readPluggyConfig, type PluggyConfig } from './client.js'
+import { PluggyClient, PluggyError, readPluggyConfig, readPluggyCredentials, type PluggyConfig } from './client.js'
+import { connectToken } from './connectToken.js'
+import { pluggyWebhook, readWebhookConfig, WEBHOOK_SECRET_HEADER } from './webhook.js'
 import { brazilDate, categoryFor, toSnapshot, type PluggyData } from './map.js'
 import { clearRateCache, ratesToBRL } from './rates.js'
 import { clearFinanceCache, finance, historyStart } from './finance.js'
@@ -278,5 +280,157 @@ describe('GET /api/finance', () => {
     expect(body.error).toBe('upstream')
     expect(body.message).toContain('/accounts')
     expect(JSON.stringify(body)).not.toContain('super-secret')
+  })
+})
+
+describe('POST /api/connect-token', () => {
+  const post = (body?: string) => new Request('https://trove.vercel.app/api/connect-token', { method: 'POST', body })
+
+  /** Fake Pluggy: /auth then /connect_token; records the connect_token body. */
+  function fakePluggy(opts: { fail?: boolean; connectors?: { id: number; name: string }[] } = {}) {
+    const bodies: unknown[] = []
+    const fetchFn = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/auth') return Response.json({ apiKey: 'KEY' })
+      if (url.pathname === '/connectors') {
+        expect(url.searchParams.get('name')).toBe('MeuPluggy')
+        const results = opts.connectors ?? [{ id: 200, name: 'MeuPluggy' }, { id: 201, name: 'MeuPluggy Clone Bank' }]
+        return Response.json({ results, page: 1, total: results.length, totalPages: 1 })
+      }
+      if (url.pathname === '/connect_token') {
+        expect(init?.method).toBe('POST')
+        expect(new Headers(init?.headers).get('X-API-KEY')).toBe('KEY')
+        bodies.push(JSON.parse(String(init?.body)))
+        return opts.fail ? new Response('down', { status: 500 }) : Response.json({ accessToken: 'CONNECT-TOKEN' })
+      }
+      return new Response('not found', { status: 404 })
+    })
+    return { fetchFn: fetchFn as unknown as typeof fetch, bodies }
+  }
+
+  it('only needs the Client ID and Secret (no item yet)', () => {
+    expect(readPluggyCredentials({ PLUGGY_CLIENT_ID: 'a', PLUGGY_CLIENT_SECRET: 'b' })).toMatchObject({ clientId: 'a', clientSecret: 'b' })
+    expect(readPluggyCredentials({ PLUGGY_CLIENT_ID: 'a' })).toBeNull()
+  })
+
+  it('returns a Connect token restricted to the MeuPluggy connector, passing clientUserId to Pluggy', async () => {
+    const { fetchFn, bodies } = fakePluggy()
+    const res = await connectToken(post(JSON.stringify({ clientUserId: 'trove-owner' })), config, fetchFn)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Cache-Control')).toBe('no-store')
+    // Only the exact "MeuPluggy" connector, not look-alikes.
+    expect(await res.json()).toEqual({ accessToken: 'CONNECT-TOKEN', connectorIds: [200] })
+    expect(bodies).toEqual([{ options: { clientUserId: 'trove-owner' } }])
+  })
+
+  it('works without a body (clientUserId is optional)', async () => {
+    const { fetchFn, bodies } = fakePluggy()
+    expect((await connectToken(post(), config, fetchFn)).status).toBe(200)
+    expect(bodies).toEqual([{ options: {} }])
+  })
+
+  it('rejects a body that is not JSON or an invalid clientUserId, without calling Pluggy', async () => {
+    const { fetchFn } = fakePluggy()
+    for (const body of ['not json', JSON.stringify({ clientUserId: 42 }), JSON.stringify({ clientUserId: '' }), JSON.stringify({ clientUserId: 'x'.repeat(129) })]) {
+      expect((await connectToken(post(body), config, fetchFn)).status, body).toBe(400)
+    }
+    expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('issues no token when the MeuPluggy connector is not available (stays on the free path)', async () => {
+    const { fetchFn, bodies } = fakePluggy({ connectors: [{ id: 5, name: 'Nubank' }] })
+    const res = await connectToken(post(), config, fetchFn)
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toBe('meupluggy_not_found')
+    expect(bodies).toEqual([])
+  })
+
+  it('fails closed when the credentials are missing', async () => {
+    const res = await connectToken(post(), null)
+    expect(res.status).toBe(503)
+    expect(await res.json()).toEqual({ error: 'not_configured' })
+  })
+
+  it('reports a Pluggy failure without leaking the credentials', async () => {
+    const res = await connectToken(post(), config, fakePluggy({ fail: true }).fetchFn)
+    expect(res.status).toBe(502)
+    const text = await res.text()
+    expect(text).toContain('/connect_token')
+    expect(text).not.toContain('super-secret')
+    expect(text).not.toContain('cid')
+  })
+})
+
+describe('POST /api/webhooks/pluggy', () => {
+  const secret = 'a-long-random-webhook-secret'
+  const cfg = { secret, itemIds: ['item-1'] }
+  const hook = (body: unknown, header: string | null = secret) =>
+    new Request('https://trove.vercel.app/api/webhooks/pluggy', {
+      method: 'POST',
+      headers: header === null ? {} : { [WEBHOOK_SECRET_HEADER]: header },
+      body: typeof body === 'string' ? body : JSON.stringify(body),
+    })
+  const logs: { message: string; details: Record<string, string | undefined> }[] = []
+  const log = (message: string, details: Record<string, string | undefined>) => void logs.push({ message, details })
+  beforeEach(() => {
+    logs.length = 0
+    clearFinanceCache()
+  })
+
+  it('reads its secret from PLUGGY_WEBHOOK_SECRET (fails closed without it)', () => {
+    expect(readWebhookConfig({ PLUGGY_WEBHOOK_SECRET: 's', PLUGGY_ITEM_IDS: 'a,b' })).toEqual({ secret: 's', itemIds: ['a', 'b'] })
+    expect(readWebhookConfig({})).toBeNull()
+  })
+
+  it('refuses requests without the right secret, and everything when not configured', async () => {
+    const event = { event: 'item/updated', eventId: 'e1', itemId: 'item-1' }
+    expect((await pluggyWebhook(hook(event, null), cfg, log)).status).toBe(401)
+    expect((await pluggyWebhook(hook(event, 'wrong'), cfg, log)).status).toBe(401)
+    expect((await pluggyWebhook(hook(event), null, log)).status).toBe(503)
+    expect(logs).toEqual([])
+  })
+
+  it('acknowledges item/updated with 2XX and clears the cache so the next load is fresh', async () => {
+    let pluggyCalls = 0
+    const upstream = (async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      if (url.hostname === 'api.pluggy.ai') pluggyCalls++
+      if (url.pathname === '/auth') return Response.json({ apiKey: 'K' })
+      if (url.pathname.startsWith('/items/')) return Response.json(item)
+      if (url.pathname === '/accounts') return Response.json({ results: [checking], page: 1, total: 1, totalPages: 1 })
+      return Response.json({ results: [], next: null })
+    }) as typeof fetch
+    const load = () => finance(new Request('https://t/api/finance'), config, { fetch: upstream })
+
+    await load()
+    const afterFirst = pluggyCalls
+    await load()
+    expect(pluggyCalls).toBe(afterFirst) // served from the cache
+
+    const res = await pluggyWebhook(hook({ event: 'item/updated', eventId: 'e1', itemId: 'item-1' }), cfg, log)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ received: true })
+    expect(logs[0].message).toMatch(/cache cleared/)
+
+    await load()
+    expect(pluggyCalls).toBeGreaterThan(afterFirst) // fetched again after the webhook
+  })
+
+  it('logs item/created with its ID, and item/error with its code only', async () => {
+    await pluggyWebhook(hook({ event: 'item/created', eventId: 'e2', itemId: 'item-1' }), cfg, log)
+    await pluggyWebhook(hook({ event: 'item/error', eventId: 'e3', itemId: 'item-1', error: { code: 'INVALID_CREDENTIALS', message: 'Senha incorreta para CPF 123' } }), cfg, log)
+    expect(logs[0].details).toMatchObject({ event: 'item/created', itemId: 'item-1' })
+    expect(logs[1].details).toMatchObject({ event: 'item/error', code: 'INVALID_CREDENTIALS' })
+    expect(JSON.stringify(logs)).not.toContain('Senha')
+  })
+
+  it('acknowledges but ignores events for connections Trove does not read', async () => {
+    const res = await pluggyWebhook(hook({ event: 'item/updated', eventId: 'e4', itemId: 'someone-else' }), cfg, log)
+    expect(res.status).toBe(200)
+    expect(logs[0].message).toMatch(/ignored/)
+  })
+
+  it('rejects a body that is not JSON', async () => {
+    expect((await pluggyWebhook(hook('not json'), cfg, log)).status).toBe(400)
   })
 })

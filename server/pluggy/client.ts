@@ -1,28 +1,39 @@
 // Minimal Pluggy API client (fetch-based). Endpoints and auth match the
 // official SDK: POST /auth -> apiKey, then `X-API-KEY` on every request.
 
-import type { CursorPageResponse, PageResponse, PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
+import type { CursorPageResponse, PageResponse, PluggyAccount, PluggyConnectorInfo, PluggyItem, PluggyTransaction } from './types.js'
 
-export interface PluggyConfig {
+/** API credentials (server-side only, from Vercel environment variables). */
+export interface PluggyCredentials {
   clientId: string
   clientSecret: string
+  baseUrl: string
+}
+
+export interface PluggyConfig extends PluggyCredentials {
   /** Item IDs to read (the Meu Pluggy connection). */
   itemIds: string[]
-  baseUrl: string
 }
 
 type Env = Record<string, string | undefined>
 
-/** Null when anything is missing, so the endpoint fails closed. */
-export function readPluggyConfig(env: Env): PluggyConfig | null {
+/** Credentials only (enough to create a Connect token). Null when missing, so callers fail closed. */
+export function readPluggyCredentials(env: Env): PluggyCredentials | null {
   const clientId = env.PLUGGY_CLIENT_ID?.trim()
   const clientSecret = env.PLUGGY_CLIENT_SECRET?.trim()
+  if (!clientId || !clientSecret) return null
+  return { clientId, clientSecret, baseUrl: 'https://api.pluggy.ai' }
+}
+
+/** Credentials plus the items to read. Null when anything is missing, so the endpoint fails closed. */
+export function readPluggyConfig(env: Env): PluggyConfig | null {
+  const credentials = readPluggyCredentials(env)
   const itemIds = (env.PLUGGY_ITEM_IDS ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
-  if (!clientId || !clientSecret || itemIds.length === 0) return null
-  return { clientId, clientSecret, itemIds, baseUrl: 'https://api.pluggy.ai' }
+  if (!credentials || itemIds.length === 0) return null
+  return { ...credentials, itemIds }
 }
 
 export class PluggyError extends Error {
@@ -41,7 +52,7 @@ export class PluggyClient {
   private apiKey: { value: string; expiresAt: number } | null = null
 
   constructor(
-    private readonly config: PluggyConfig,
+    private readonly config: PluggyCredentials,
     private readonly fetchFn: typeof fetch = fetch,
   ) {}
 
@@ -66,6 +77,28 @@ export class PluggyClient {
     const res = await this.fetchFn(url, { headers: { 'X-API-KEY': await this.key(), Accept: 'application/json' } })
     if (!res.ok) throw new PluggyError(res.status, `Pluggy request failed: GET /${path} (HTTP ${res.status}).`)
     return (await res.json()) as T
+  }
+
+  /**
+   * Short-lived token that lets the browser open Pluggy Connect without ever
+   * seeing the Client ID or Secret (POST /connect_token, as in the SDK).
+   */
+  async createConnectToken(options: { clientUserId?: string } = {}): Promise<string> {
+    const res = await this.fetchFn(`${this.config.baseUrl}/connect_token`, {
+      method: 'POST',
+      headers: { 'X-API-KEY': await this.key(), 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ options }),
+    })
+    if (!res.ok) throw new PluggyError(res.status, `Pluggy request failed: POST /connect_token (HTTP ${res.status}).`)
+    const { accessToken } = (await res.json()) as { accessToken?: string }
+    if (!accessToken) throw new PluggyError(502, 'Pluggy did not return a Connect token.')
+    return accessToken
+  }
+
+  /** Connectors whose name matches `name` (GET /connectors?name=, as in the SDK). */
+  async findConnectors(name: string): Promise<PluggyConnectorInfo[]> {
+    const page = await this.get<PageResponse<PluggyConnectorInfo>>('connectors', { name })
+    return page.results
   }
 
   getItem(id: string): Promise<PluggyItem> {

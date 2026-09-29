@@ -65,6 +65,9 @@ export function loginLocale(request: Request): 'pt-BR' | 'en' {
 export async function guard(request: Request, config: AuthConfig | null): Promise<Response> {
   const url = new URL(request.url)
   if (url.pathname.startsWith('/api/auth/')) return next()
+  // Pluggy's webhook can't log in; that handler checks its own shared secret
+  // (server/pluggy/webhook.ts). Exact path only.
+  if (url.pathname === '/api/webhooks/pluggy') return next()
   if (!config) return notConfigured()
 
   const session = await unseal<SessionClaims>('session', readCookie(request, SESSION_COOKIE), config.secret)

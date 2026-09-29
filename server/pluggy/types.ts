@@ -21,6 +21,12 @@ export interface PluggyConnector {
   primaryColor?: string | null
 }
 
+/** A connector as listed by GET /connectors (id and name are enough here). */
+export interface PluggyConnectorInfo {
+  id: number
+  name: string
+}
+
 export interface PluggyItem {
   id: string
   connector: PluggyConnector

@@ -21,39 +21,84 @@ data (with the "Demo data" label).
 
 ---
 
-## 1–2. Get your credentials and your Meu Pluggy item (Pluggy's tutorial)
+## 1. Get your API credentials (Pluggy's tutorial)
 
-Follow Pluggy's **"Access your data"** tutorial. By the end you should have
-three things:
+Follow Pluggy's **"Access your data"** tutorial to get:
 
 | You need | What it is |
 |---|---|
 | **Client ID** | Your API credentials' ID |
 | **Client Secret** | Your API credentials' secret. Keep it private: never paste it in chats, issues or code |
-| **Item ID** | The ID of the connection that gives the API access to your Meu Pluggy data |
-
-Your banks (Nubank, Itaú, Inter, Wise…) stay connected in the **Meu Pluggy**
-app. Trove reads them through that single item.
 
 If a step asks you to choose or pay for a plan, stop: that's not the free
 path.
 
-## 3. Add three settings in Vercel
+## 2. Add the credentials in Vercel
 
 In the `trove` project, go to **Settings** → **Environment Variables**. Add
 these for **Production** (and Preview if you test on preview links), marked
-**Sensitive**:
+**Sensitive**. Use your real values, typed only into Vercel:
 
 | Name | Value |
 |---|---|
-| `PLUGGY_CLIENT_ID` | the Client ID from step 1 |
-| `PLUGGY_CLIENT_SECRET` | the Client Secret from step 1 |
-| `PLUGGY_ITEM_IDS` | the item ID from the tutorial (if you ever have more than one, separate them with commas) |
+| `PLUGGY_CLIENT_ID` | your Client ID |
+| `PLUGGY_CLIENT_SECRET` | your Client Secret |
+| `PLUGGY_WEBHOOK_SECRET` | a long random value you make up (e.g. from a password generator). It proves webhook calls come from Pluggy (step 5) |
 
 Then redeploy: **Deployments** → latest production deployment → **⋯** →
 **Redeploy**. Settings only apply to new deployments.
 
-## 4. Check it
+## 3. Connect Meu Pluggy from Trove
+
+1. Open Trove on your phone and log in. Go to the **Accounts** tab →
+   **Connect your banks** → **Connect Meu Pluggy**.
+2. Pluggy Connect opens, showing **only Meu Pluggy**. Trove's server restricts
+   it to that connector, so banks can't be connected directly (the paid path).
+   If the MeuPluggy connector isn't available for your credentials, Trove
+   opens nothing and tells you.
+3. Log in with your Meu Pluggy account and approve sharing.
+4. Trove shows the new connection's **item ID**. Tap **Copy**.
+
+Your banks (Nubank, Itaú, Inter, Wise…) stay connected in the **Meu Pluggy**
+app. Trove reads them all through this one item.
+
+(If the tutorial already gave you an item ID for your Meu Pluggy connection,
+you can use that instead and skip this step.)
+
+## 4. Add the item ID in Vercel
+
+Add one more variable, then redeploy:
+
+| Name | Value |
+|---|---|
+| `PLUGGY_ITEM_IDS` | the item ID from step 3 (if you ever have more than one, separate them with commas) |
+
+The **Connect your banks** box disappears once your real data loads.
+
+## 5. Webhook (optional, keeps data fresh)
+
+Pluggy can notify Trove when your data changes, so Trove refreshes right away
+instead of within 5 minutes. Register a webhook for your application (in the
+Pluggy dashboard or through its API) with:
+
+| Field | Value |
+|---|---|
+| URL | `https://YOUR_SITE/api/webhooks/pluggy` |
+| Event | `all` (or at least `item/updated`, `item/created`, `item/error`, `transactions/created`) |
+| Header | `X-Trove-Webhook-Secret` = the same value as `PLUGGY_WEBHOOK_SECRET` |
+
+Calls without that header are refused (`401`). If `PLUGGY_WEBHOOK_SECRET`
+isn't set, every webhook call is refused (`503`).
+
+What Trove does with each event:
+- `item/updated` and `transactions/*`: clears its cache, so the next load is
+  fresh.
+- `item/created`: logs the new item ID (useful for step 4).
+- `item/error`: logs the error code, so you know to reconnect in Meu Pluggy.
+
+Nothing else is stored. You can see these logs in Vercel → **Logs**.
+
+## 6. Check it
 
 1. Open Trove and log in. Your real accounts should appear, and the "Demo
    data" label should be gone.
@@ -79,9 +124,11 @@ Then redeploy: **Deployments** → latest production deployment → **⋯** →
 
 | You see | Meaning | Fix |
 |---|---|---|
-| Still "Demo data" | A setting is missing, or no redeploy since adding them | Step 3, then redeploy |
+| Still "Demo data" | A setting is missing, or no redeploy since adding them | Steps 2 and 4, then redeploy |
 | "Pluggy refused the credentials (HTTP 401)" | Wrong Client ID or Secret | Re-copy both (steps 1–2) |
-| "…GET /items/… (HTTP 404)" | Wrong item ID | Re-copy it (steps 1–2) |
+| "Add PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET…" when connecting | Credentials missing, or no redeploy | Step 2 |
+| "Meu Pluggy isn't available for these credentials…" | Pluggy doesn't list the MeuPluggy connector for your application | Check the tutorial's steps; Trove won't open other connectors |
+| "…GET /items/… (HTTP 404)" | Wrong item ID | Re-copy it (step 3) |
 | "Exchange rate service failed" / "No exchange rate for USD" | The USD→BRL rate couldn't be fetched | Try again in a minute |
 | Data looks out of date | Pluggy refreshes connections on its own schedule; Trove also caches for 5 minutes | Open `/api/finance?refresh` to skip Trove's cache; update the connection in the Meu Pluggy app if it's stale there |
 | A connection shows `LOGIN_ERROR` or `OUTDATED` in the summary | The bank consent expired or needs attention | Reconnect that bank in the Meu Pluggy app |
@@ -101,6 +148,16 @@ Then redeploy: **Deployments** → latest production deployment → **⋯** →
   - installments from `creditCardMetadata`;
   - category matching;
   - transfer detection.
+- `api/connect-token.ts` → `server/pluggy/connectToken.ts`: `POST` (behind
+  the login). It looks up the MeuPluggy connector (`GET /connectors?name=`),
+  refuses with `409` if it's missing, then creates a Connect token
+  (`POST /connect_token`). It returns `{ accessToken, connectorIds }`, and the
+  app opens Pluggy Connect restricted to those `connectorIds`
+  (`src/components/ConnectMeuPluggy.tsx`, `react-pluggy-connect`, loaded on
+  demand).
+- `api/webhooks/pluggy.ts` → `server/pluggy/webhook.ts`: the only non-login
+  route the middleware lets through. It checks `X-Trove-Webhook-Secret` in
+  constant time and clears the cache on data changes.
 - `server/pluggy/rates.ts`: USD→BRL (and other currencies) from
   `economia.awesomeapi.com.br`, cached for 1 hour.
 - `src/data/pluggyRepository.ts`: the app side. It loads `/api/finance`, falls

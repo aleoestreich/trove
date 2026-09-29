@@ -9,6 +9,7 @@ import { formatMoney, formatRate } from '../lib/money'
 import { Card, InstitutionBadge } from '../components/ui'
 import { useI18n } from '../i18n/I18nProvider'
 import { isDeployed } from '../lib/env'
+import { ConnectMeuPluggy } from '../components/ConnectMeuPluggy'
 
 export function Accounts() {
   const { institutions, accounts, transactions, source } = useData()
@@ -43,6 +44,9 @@ export function Accounts() {
           </Card>
         )
       })}
+
+      {/* Until Pluggy is connected (demo data on the deployed site): connect Meu Pluggy. */}
+      {isDeployed() && source === 'demo' && <ConnectMeuPluggy />}
 
       {isDeployed() && (
         <a
