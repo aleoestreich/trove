@@ -146,6 +146,20 @@ body {
   mix-blend-mode: var(--logo-blend);
 }
 
+/*
+ * Recharts makes the chart and its layers focusable, so tapping it on a phone
+ * drew the browser's focus rings around them. Hide those; keyboard users get
+ * one rounded ring around the whole chart instead.
+ */
+.recharts-wrapper :focus {
+  outline: none;
+}
+.chart-focus:has(:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-xs);
+}
+
 /* Loading skeletons pulse gently; still when the user asks for less motion. */
 @keyframes skeleton {
   50% {
