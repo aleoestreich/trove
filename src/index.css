@@ -146,6 +146,18 @@ body {
   mix-blend-mode: var(--logo-blend);
 }
 
+/*
+ * Recharts makes the chart and its layers focusable, so tapping it drew the
+ * browser's focus rings. Charts never show an outline.
+ */
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-wrapper:focus,
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible {
+  outline: none;
+}
+
 /* Loading skeletons pulse gently; still when the user asks for less motion. */
 @keyframes skeleton {
   50% {
