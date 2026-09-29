@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
 import { useI18n } from '../i18n/I18nProvider'
+import { Badge, Button, CardTitle, IconDisc } from './ui'
 
 // The Pluggy Connect widget is loaded only when needed, so the app stays light
 // on slower phones.
@@ -45,37 +46,40 @@ export function ConnectMeuPluggy() {
     }
   }
 
+  const busy = state.step === 'loading' || state.step === 'open'
+
   return (
-    <section className="rounded-2xl bg-surface p-4 ring-1 ring-line">
-      <h2 className="font-semibold">{t.connect.title}</h2>
-      <p className="mt-1 text-sm text-ink-2">{t.connect.intro}</p>
+    <section className="flex flex-col gap-3.5 rounded-lg border border-line bg-surface p-4 lg:p-5">
+      <div className="flex items-start gap-3">
+        <IconDisc icon="accounts" tone="accent" />
+        <CardTitle subtitle={t.connect.intro}>{t.connect.title}</CardTitle>
+      </div>
 
       {state.step === 'connected' ? (
-        <div className="mt-3 space-y-2">
-          <p className="text-sm font-medium text-income">{t.connect.connected}</p>
-          <p className="text-sm text-ink-2">{t.connect.nextStep}</p>
+        <div className="flex flex-col gap-2">
+          <div>
+            <Badge tone="income" icon="check">
+              {t.connect.connected}
+            </Badge>
+          </div>
+          <p className="text-sm leading-5 text-ink-2">{t.connect.nextStep}</p>
           <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded-lg bg-track px-2 py-2 text-xs select-all">{state.itemId}</code>
-            <button
-              type="button"
-              onClick={() => copy(state.itemId)}
-              className="h-10 shrink-0 rounded-full px-4 text-sm font-medium text-accent ring-1 ring-line focus-visible:outline-2 focus-visible:outline-accent"
-            >
+            <code className="min-w-0 flex-1 truncate rounded-sm bg-page px-3 py-3 text-[13px] text-ink select-all">{state.itemId}</code>
+            <Button variant="secondary" className="shrink-0" onClick={() => copy(state.itemId)}>
               {copied ? t.connect.copied : t.connect.copy}
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
         <>
-          <button
-            type="button"
-            onClick={open}
-            disabled={state.step === 'loading' || state.step === 'open'}
-            className="mt-3 h-11 rounded-full bg-accent px-5 font-medium text-white disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-accent"
-          >
-            {state.step === 'loading' || state.step === 'open' ? t.connect.opening : t.connect.button}
-          </button>
-          {state.step === 'error' && <p className="mt-2 text-sm text-critical">{state.message}</p>}
+          <Button className="self-start" onClick={open} disabled={busy}>
+            {busy ? t.connect.opening : t.connect.button}
+          </Button>
+          {state.step === 'error' && (
+            <p role="alert" className="text-sm leading-5 text-critical">
+              {state.message}
+            </p>
+          )}
         </>
       )}
 

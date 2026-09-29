@@ -1,26 +1,37 @@
 @import 'tailwindcss';
 
-/* Colour tokens. Components use roles (bg-surface, text-ink...), never raw hex. */
+/*
+ * Colour tokens. Components use roles (bg-surface, text-ink...), never raw hex.
+ * The palette comes from the logo: its blue is `accent` and `series-1`, its
+ * mint is `income` and `series-3`, its violet is `series-4`, and its ink is the
+ * text and the dark background. Series 1-5 pass a colour-blind check in both
+ * modes; series 6 is the neutral for "Other". Text never uses series colours.
+ */
 :root {
   color-scheme: light;
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --muted: #6f6d68;
-  --line: #e1e0d9;
-  --accent: #2a78d6;
-  --income: #006300;
-  --critical: #d03b3b;
-  /* Categorical chart slots, in this fixed order (validated for colour-blind separation). */
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-6: #008300;
-  --bar: #2a78d6;
-  --track: #f0efec;
+  --page: #f5f5f9;
+  --surface: #ffffff;
+  --ink: #0b0b1f;
+  --ink-2: #3d3d56;
+  --muted: #6b6b82;
+  --line: #e4e4ee;
+  --track: #ececf3;
+  --accent: #3d5afe;
+  --income: #0a7f60;
+  --critical: #c8283f;
+  --series-1: #3d5afe;
+  --series-2: #d9791a;
+  --series-3: #12a383;
+  --series-4: #a34bff;
+  --series-5: #e0518f;
+  --series-6: #9a9aae;
+  --bar: #3d5afe;
+  --scrim: rgb(11 11 31 / 0.45);
+  /* Logo discs; they overlap with multiply on light and screen on dark. */
+  --logo-1: #3d5afe;
+  --logo-2: #a34bff;
+  --logo-3: #19e3b1;
+  --logo-blend: multiply;
 }
 
 /* Dark palette: follows the OS setting unless light is forced with
@@ -28,45 +39,49 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --ink: #ffffff;
-    --ink-2: #c3c2b7;
-    --muted: #9a988f;
-    --line: #2c2c2a;
-    --accent: #3987e5;
-    --income: #0ca30c;
-    --critical: #e66767;
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #008300;
-    --bar: #3987e5;
-    --track: #2c2c2a;
+    --page: #0b0b1f;
+    --surface: #15152e;
+    --ink: #f2f2f8;
+    --ink-2: #c4c4d6;
+    --muted: #9090a8;
+    --line: #28284a;
+    --track: #23233f;
+    --accent: #7c8bff;
+    --income: #4dbf9f;
+    --critical: #ff6b7d;
+    --series-1: #6f7eff;
+    --series-2: #cf7a2c;
+    --series-3: #1fa585;
+    --series-4: #a06df2;
+    --series-5: #d0568e;
+    --series-6: #5e5e7a;
+    --bar: #6f7eff;
+    --scrim: rgb(0 0 0 / 0.6);
+    --logo-blend: screen;
   }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --page: #0d0d0d;
-  --surface: #1a1a19;
-  --ink: #ffffff;
-  --ink-2: #c3c2b7;
-  --muted: #9a988f;
-  --line: #2c2c2a;
-  --accent: #3987e5;
-  --income: #0ca30c;
-  --critical: #e66767;
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --series-4: #c98500;
-  --series-5: #d55181;
-  --series-6: #008300;
-  --bar: #3987e5;
-  --track: #2c2c2a;
+  --page: #0b0b1f;
+  --surface: #15152e;
+  --ink: #f2f2f8;
+  --ink-2: #c4c4d6;
+  --muted: #9090a8;
+  --line: #28284a;
+  --track: #23233f;
+  --accent: #7c8bff;
+  --income: #4dbf9f;
+  --critical: #ff6b7d;
+  --series-1: #6f7eff;
+  --series-2: #cf7a2c;
+  --series-3: #1fa585;
+  --series-4: #a06df2;
+  --series-5: #d0568e;
+  --series-6: #5e5e7a;
+  --bar: #6f7eff;
+  --scrim: rgb(0 0 0 / 0.6);
+  --logo-blend: screen;
 }
 
 @theme inline {
@@ -80,7 +95,16 @@
   --color-income: var(--income);
   --color-critical: var(--critical);
   --color-track: var(--track);
+  --color-scrim: var(--scrim);
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Only the logo uses Sora. */
+  --font-brand: 'Sora', system-ui, sans-serif;
+  /* Radius scale: bars, inner panels, buttons and inputs, cards, bottom sheet. */
+  --radius-xs: 6px;
+  --radius-sm: 12px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
 }
 
 body {
@@ -91,4 +115,61 @@ body {
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Overline: small caps label above a group ("By bank"). */
+.label-caps {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Accent tint for active tabs, applied chips and the selected language. */
+.bg-accent-soft {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.bg-accent-faint {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.bg-income-soft {
+  background: color-mix(in srgb, var(--income) 12%, transparent);
+}
+.bg-critical-soft {
+  background: color-mix(in srgb, var(--critical) 12%, transparent);
+}
+
+/* Logo discs overlap: multiply on light, screen on dark. */
+.logo-disc {
+  mix-blend-mode: var(--logo-blend);
+}
+
+/*
+ * Recharts makes the chart and its layers focusable, so tapping it drew the
+ * browser's focus rings. Charts never show an outline.
+ */
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-wrapper:focus,
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible {
+  outline: none;
+}
+
+/* Loading skeletons pulse gently; still when the user asks for less motion. */
+@keyframes skeleton {
+  50% {
+    opacity: 0.55;
+  }
+}
+.skeleton {
+  background: var(--track);
+  animation: skeleton 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
 }

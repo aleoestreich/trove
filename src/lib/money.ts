@@ -45,3 +45,8 @@ export function formatRate(rate: number): string {
 export function formatCompact(value: number): string {
   return new Intl.NumberFormat(intlLocale(), { notation: 'compact', maximumFractionDigits: 1 }).format(value)
 }
+
+/** Percentage in the active language: pt-BR "6,0%", en "6.0%". */
+export function formatPercent(value: number, decimals = 0): string {
+  return new Intl.NumberFormat(intlLocale(), { style: 'percent', minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value / 100)
+}
