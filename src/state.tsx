@@ -19,7 +19,7 @@ export function DataProvider({ repository, children }: { repository: Repository;
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    repository.load().then(setSnapshot, (e) => setError(String(e)))
+    repository.load().then(setSnapshot, (e) => setError(e instanceof Error ? e.message : String(e)))
   }, [repository])
 
   const setCategory = useCallback(
@@ -47,7 +47,21 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [snapshot, setCategory],
   )
 
-  if (error) return <p className="p-4 text-critical">{t.loadError(error)}</p>
+  if (error) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col gap-3 p-4">
+        <p className="font-medium text-critical">{t.loadError}</p>
+        <p className="text-sm break-words text-muted">{error}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="h-11 self-start rounded-full bg-accent px-5 font-medium text-white focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          {t.retry}
+        </button>
+      </div>
+    )
+  }
   if (!value) return <p className="p-4 text-muted">{t.loading}</p>
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }

@@ -72,25 +72,27 @@ No backend, no auth. It runs in the browser on hardcoded data.
 
 ---
 
-## Phase 2 — Backend + Meu Pluggy
+## Phase 2 — Real data from Meu Pluggy
 
-- API: Node (Fastify) + TypeScript, reusing `src/data/types.ts`. PostgreSQL via
-  Prisma.
-- Pluggy integration:
-  - The user connects their Meu Pluggy items. Store the item IDs; the backend
-    fetches accounts and transactions with the Pluggy API key (server-side
-    only).
-  - Map Pluggy's `Account.balance` (already BRL) → `balance`, and keep the
-    original currency and amount in `foreign`. Map `Transaction.amount` and
-    `currencyCode` / `amountInAccountCurrency` the same way. Map
-    `creditCardMetadata` (installmentNumber, totalInstallments, totalAmount,
-    purchaseDate) → `installment`.
-  - Map Pluggy categories to ours, and detect transfers between the user's own
-    accounts.
-  - Sync through Pluggy webhooks (`item/updated`, `transactions/created`)
-    plus a daily fallback job. Dedupe by Pluggy transaction ID.
-- Frontend: add `apiRepository.ts` implementing the same `Repository`
-  interface and swap it in for `mockRepository`.
+- ✅ **Live data from Pluggy** (first version): `GET /api/finance` (behind the
+  login) reads the connections in `PLUGGY_ITEM_IDS`, their accounts and 6
+  months of transactions from the Pluggy API, maps them to Trove's model and
+  returns them to the app. No database; 5-minute in-memory cache. Setup:
+  `docs/pluggy-setup.md`.
+  - BRL totals; foreign accounts (Wise USD) converted with the day's rate and
+    shown in their own currency too.
+  - Installments from `creditCardMetadata`.
+  - Pluggy categories matched to Trove's by name.
+  - Transfers between own accounts and card bill payments detected.
+  - The app falls back to demo data until Pluggy is configured.
+- Next:
+  - tune the category and transfer mapping with real data
+    (`/api/finance?summary`);
+  - confirm how Meu Pluggy reports Wise;
+  - add a "last updated" indicator and a manual refresh.
+- Later, if needed: store data in Postgres (e.g. Neon on Vercel), synced by
+  Pluggy webhooks (`item/updated`, `transactions/created`) plus a daily job,
+  for full history, faster loads and category edits saved on the server.
 
 ## Phase 3 — Authentication & security
 

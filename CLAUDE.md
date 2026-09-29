@@ -50,3 +50,10 @@ Run `npm test` and `npm run build` before pushing.
   managed only in Auth0 (its user list, sign-ups disabled). Never hardcode
   emails, user IDs or secrets in code, docs or config; secrets are Vercel
   environment variables.
+- **Real data:** `/api/finance` reads Pluggy live (`server/pluggy/`, setup in
+  `docs/pluggy-setup.md`). Pluggy credentials and item IDs are Vercel
+  environment variables only. The mapping to Trove's model lives in
+  `server/pluggy/map.ts`; shared types come from `src/data/types.ts` and
+  `src/data/categories.ts`, which must stay free of browser-only imports.
+  Never log or return amounts, descriptions or credentials in errors or
+  diagnostics.

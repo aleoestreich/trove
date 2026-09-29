@@ -4,44 +4,20 @@
 // data. Amounts come from a seeded random generator, so the data is the same
 // on every reload.
 
-import type { Account, Category, Cents, Institution, Transaction } from './types'
+import type { Account, Cents, Institution, Snapshot, Transaction } from './types'
+import { MONTHS_OF_HISTORY } from './types'
+import { categories } from './categories'
 import { convertToBRL, toCents } from '../lib/money'
 import { dayOfMonth, toISO } from '../lib/dates'
 
-export interface Snapshot {
-  institutions: Institution[]
-  accounts: Account[]
-  categories: Category[]
-  transactions: Transaction[]
-}
+export type { Snapshot } from './types'
+export { MONTHS_OF_HISTORY, categories }
 
-export const MONTHS_OF_HISTORY = 6
 
 /** USD -> BRL rate today, and for each earlier month (index 0 = current month). */
 export const USD_BRL_TODAY = 5.45
 const USD_BRL_BY_MONTH = [5.45, 5.49, 5.47, 5.51, 5.58, 5.62]
 
-export const categories: Category[] = [
-  { id: 'salary', name: 'Salary', kind: 'income' },
-  { id: 'freelance', name: 'Freelance', kind: 'income' },
-  { id: 'investments', name: 'Investment income', kind: 'income' },
-  { id: 'other-income', name: 'Other income', kind: 'income' },
-  { id: 'housing', name: 'Housing', kind: 'expense' },
-  { id: 'utilities', name: 'Bills & utilities', kind: 'expense' },
-  { id: 'groceries', name: 'Groceries', kind: 'expense' },
-  { id: 'food', name: 'Restaurants & delivery', kind: 'expense' },
-  { id: 'transport', name: 'Transport', kind: 'expense' },
-  { id: 'subscriptions', name: 'Subscriptions', kind: 'expense' },
-  { id: 'shopping', name: 'Shopping', kind: 'expense' },
-  { id: 'health', name: 'Health & fitness', kind: 'expense' },
-  { id: 'leisure', name: 'Leisure', kind: 'expense' },
-  { id: 'travel', name: 'Travel', kind: 'expense' },
-  { id: 'education', name: 'Education', kind: 'expense' },
-  { id: 'taxes', name: 'Taxes & fees', kind: 'expense' },
-  { id: 'other-expense', name: 'Other expenses', kind: 'expense' },
-  { id: 'transfer', name: 'Transfer between accounts', kind: 'transfer' },
-  { id: 'card-payment', name: 'Credit card payment', kind: 'transfer' },
-]
 
 export const institutions: Institution[] = [
   { id: 'nubank', name: 'Nubank', color: '#8a3ffc' },
@@ -301,5 +277,5 @@ export function buildSeed(today: Date = new Date()): Snapshot {
 
   txs.sort((a, b) => (a.date === b.date ? b.id.localeCompare(a.id, undefined, { numeric: true }) : b.date.localeCompare(a.date)))
 
-  return { institutions, accounts, categories, transactions: txs }
+  return { institutions, accounts, categories, transactions: txs, source: 'demo' }
 }

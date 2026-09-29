@@ -159,7 +159,9 @@ export function Dashboard() {
             <li key={c.id} className="flex items-baseline justify-between gap-3 py-2">
               <span className="min-w-0">
                 <span className="block truncate">{c.name}</span>
-                <span className="text-xs text-muted">{t.overview.billDue(formatShortDate(c.creditData!.balanceDueDate))}</span>
+                {c.creditData?.balanceDueDate && (
+                  <span className="text-xs text-muted">{t.overview.billDue(formatShortDate(c.creditData.balanceDueDate))}</span>
+                )}
               </span>
               <span className="tabular shrink-0 font-medium">{formatMoney(c.balance)}</span>
             </li>

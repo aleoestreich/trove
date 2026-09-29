@@ -33,6 +33,16 @@ describe('installmentPlans', () => {
     expect(plan.upcoming.reduce((s, u) => s + u.amount, 0)).toBe(plan.remaining)
   })
 
+  it('works out what is left when earlier installments are outside the fetched history', () => {
+    // Only 7/12 and 8/12 were fetched; 1..6 were charged before the window.
+    const [p] = installmentPlans([inst(7, '2026-10-14', 358_32), inst(8, '2026-11-14', 358_32)])
+    expect(p.charged).toBe(8)
+    expect(p.remaining).toBe(4 * 358_32)
+    expect(p.chargedAmount + p.remaining).toBe(p.totalAmount)
+    expect(p.upcoming).toHaveLength(4)
+    expect(p.upcoming.reduce((s, u) => s + u.amount, 0)).toBe(p.remaining)
+  })
+
   it('treats a fully charged purchase as paid off', () => {
     const done = installmentPlans([
       { ...inst(1, '2026-01-10', 150_00), installment: { number: 1, total: 2, totalAmount: 300_00, purchaseDate: '2026-01-10' } },

@@ -47,6 +47,18 @@ const get = (path: string, headers: Record<string, string> = {}) => new Request(
 const page = (path: string, headers: Record<string, string> = {}) => get(path, { Accept: 'text/html', 'Sec-Fetch-Mode': 'navigate', ...headers })
 const passedThrough = (res: Response) => res.headers.get('x-middleware-next') === '1'
 
+/**
+ * Changes the first character of the ciphertext segment of a compact JWE
+ * (header.key.iv.ciphertext.tag). A segment's first base64url character always
+ * carries 6 real bits, so this always changes the decoded bytes (changing the
+ * last characters may only touch padding bits and be a no-op).
+ */
+function tamper(jwe: string): string {
+  const parts = jwe.split('.')
+  parts[3] = (parts[3][0] === 'A' ? 'B' : 'A') + parts[3].slice(1)
+  return parts.join('.')
+}
+
 /** Runs /api/auth/login and returns what the callback needs. */
 async function startLogin(path = '/api/auth/login?returnTo=%2Ftransactions', headers: Record<string, string> = {}) {
   const res = await login(get(path, headers), config)
@@ -95,7 +107,7 @@ describe('encrypted cookies', () => {
   it('round-trip, and reject tampering, another secret, another purpose and expiry', async () => {
     const v = await seal('session', { sub: 'auth0|owner' }, config.secret, 60)
     expect(await unseal('session', v, config.secret)).toMatchObject({ sub: 'auth0|owner' })
-    expect(await unseal('session', v.slice(0, -2) + 'xx', config.secret)).toBeNull()
+    expect(await unseal('session', tamper(v), config.secret)).toBeNull()
     expect(await unseal('session', v, 'another-secret')).toBeNull()
     expect(await unseal('login', v, config.secret)).toBeNull()
     vi.useFakeTimers({ now: Date.now() + 61_000 })

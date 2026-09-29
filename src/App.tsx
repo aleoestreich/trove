@@ -1,6 +1,8 @@
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
-import { DataProvider } from './state'
+import { DataProvider, useData } from './state'
 import { createMockRepository } from './data/mockRepository'
+import { createPluggyRepository, withDemoFallback } from './data/pluggyRepository'
+import { isDeployed } from './lib/env'
 import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { Accounts } from './pages/Accounts'
@@ -10,7 +12,9 @@ import { LanguageSwitch } from './components/LanguageSwitch'
 import { I18nProvider, useI18n } from './i18n/I18nProvider'
 import type { Messages } from './i18n/messages'
 
-const repository = createMockRepository()
+// Deployed: the owner's data via Pluggy (demo data until Pluggy is configured).
+// Local development: demo data.
+const repository = isDeployed() ? withDemoFallback(createPluggyRepository(), createMockRepository()) : createMockRepository()
 
 const tabs: { to: string; label: keyof Messages['nav']; icon: IconName }[] = [
   { to: '/', label: 'overview', icon: 'home' },
@@ -33,6 +37,7 @@ export function App() {
 
 function Shell() {
   const { t } = useI18n()
+  const { source } = useData()
   return (
     <div className="min-h-dvh pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
       <header className="sticky top-0 z-20 border-b border-line bg-page/90 backdrop-blur pt-[env(safe-area-inset-top)]">
@@ -53,9 +58,11 @@ function Shell() {
             ))}
           </nav>
           <div className="flex items-center gap-2">
-            <span className="hidden rounded-full bg-surface px-2 py-0.5 text-xs text-muted ring-1 ring-line min-[380px]:inline">
-              {t.demoData}
-            </span>
+            {source === 'demo' && (
+              <span className="hidden rounded-full bg-surface px-2 py-0.5 text-xs text-muted ring-1 ring-line min-[380px]:inline">
+                {t.demoData}
+              </span>
+            )}
             <LanguageSwitch />
           </div>
         </div>

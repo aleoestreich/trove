@@ -1,8 +1,8 @@
 // Domain model. Shapes follow Pluggy's API (Item -> Account -> Transaction)
 // so the Phase 2 backend can map Pluggy responses onto them directly.
 
-/** ISO 4217 code. BRL is the home currency; everything is totalled in BRL. */
-export type CurrencyCode = 'BRL' | 'USD' | 'EUR'
+/** ISO 4217 code (e.g. 'BRL', 'USD'). BRL is the home currency; everything is totalled in BRL. */
+export type CurrencyCode = string
 
 /** An amount in minor units (cents). Never use floats for money. */
 export type Cents = number
@@ -22,10 +22,10 @@ export interface CreditData {
   creditLimit: Cents
   /** Limit minus the open bill minus installments still to be charged. */
   availableCreditLimit: Cents
-  /** Day the current bill closes (ISO date). */
-  balanceCloseDate: string
-  /** Day the current bill is due (ISO date). */
-  balanceDueDate: string
+  /** Day the current bill closes (ISO date), if the bank reports it. */
+  balanceCloseDate: string | null
+  /** Day the current bill is due (ISO date), if the bank reports it. */
+  balanceDueDate: string | null
 }
 
 export interface Account {
@@ -84,3 +84,20 @@ export interface Transaction {
     purchaseDate: string
   }
 }
+
+/** Where the data came from: hardcoded demo data or the owner's banks via Pluggy. */
+export type DataSource = 'demo' | 'pluggy'
+
+/** Everything the app shows, loaded in one go through the Repository. */
+export interface Snapshot {
+  institutions: Institution[]
+  accounts: Account[]
+  categories: Category[]
+  transactions: Transaction[]
+  source: DataSource
+  /** When the data was fetched (ISO timestamp); only for live data. */
+  fetchedAt?: string
+}
+
+/** Months of history the app shows (charts, month filters) and the server fetches. */
+export const MONTHS_OF_HISTORY = 6

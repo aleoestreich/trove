@@ -8,9 +8,10 @@ import { formatShortDate } from '../lib/dates'
 import { formatMoney, formatRate } from '../lib/money'
 import { Card, InstitutionBadge } from '../components/ui'
 import { useI18n } from '../i18n/I18nProvider'
+import { isDeployed } from '../lib/env'
 
 export function Accounts() {
-  const { institutions, accounts, transactions } = useData()
+  const { institutions, accounts, transactions, source } = useData()
   const { t } = useI18n()
   const bal = balances(accounts)
   const futureInstallments = useMemo(() => remainingByAccount(installmentPlans(transactions)), [transactions])
@@ -52,7 +53,7 @@ export function Accounts() {
         </a>
       )}
 
-      <p className="px-2 text-center text-xs text-muted">{t.accounts.footer}</p>
+      {source === 'demo' && <p className="px-2 text-center text-xs text-muted">{t.accounts.footer}</p>}
     </div>
   )
 }
@@ -61,11 +62,6 @@ export function Accounts() {
  * Login only exists on the deployed site (Vercel), not in local development
  * (localhost or a LAN address), so Sign out is shown only there.
  */
-function isDeployed(): boolean {
-  const host = window.location.hostname
-  return !/^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/.test(host)
-}
-
 function SummaryRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
     <p className="flex items-baseline justify-between gap-3 py-2.5">
@@ -110,7 +106,8 @@ function CreditCardRow({ account, futureInstallments }: { account: Account; futu
         <div className="min-w-0">
           <p className="font-medium">{account.name}</p>
           <p className="text-xs text-muted">
-            {t.accounts.cardDates(formatShortDate(credit.balanceCloseDate), formatShortDate(credit.balanceDueDate))}
+            {(credit.balanceCloseDate || credit.balanceDueDate) &&
+              t.accounts.cardDates(formatShortDate(credit.balanceCloseDate), formatShortDate(credit.balanceDueDate))}
           </p>
         </div>
         <div className="text-right">
