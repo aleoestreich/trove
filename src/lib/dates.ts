@@ -15,6 +15,12 @@ export function dayOfMonth(ref: Date, offset: number, day: number): string {
   return toISO(new Date(first.getFullYear(), first.getMonth(), Math.min(day, last)))
 }
 
+/** The same day `months` months later (overflowing days clamp). */
+export function addMonths(iso: string, months: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return dayOfMonth(new Date(y, m - 1, 1), months, d)
+}
+
 /** "2026-09" for a given ISO date. */
 export function monthKey(iso: string): string {
   return iso.slice(0, 7)
@@ -77,4 +83,20 @@ export function formatDay(iso: string): string {
 /** pt-BR "03/2027", en "Mar 2027" */
 export function formatMonthYear(key: string): string {
   return getLocale() === 'pt-BR' ? `${key.slice(5)}/${key.slice(0, 4)}` : fmt({ month: 'short', year: 'numeric' }).format(parse(key))
+}
+
+/** pt-BR "qui., 25 de set. de 2026", en "Thu, Sep 25, 2026" */
+export function formatFullDate(iso: string): string {
+  return fmt({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(parse(iso))
+}
+
+/** Day heading: pt-BR "Quinta, 25 de setembro", en "Thursday, September 25" */
+export function formatDayHeading(iso: string): string {
+  const s = fmt({ weekday: 'long', day: 'numeric', month: 'long' }).format(parse(iso))
+  return (s[0].toUpperCase() + s.slice(1)).replace('-feira', '')
+}
+
+/** pt-BR "outubro", en "October" */
+export function formatMonthName(key: string): string {
+  return fmt({ month: 'long' }).format(parse(key))
 }

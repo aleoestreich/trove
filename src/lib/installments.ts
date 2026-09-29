@@ -1,5 +1,5 @@
 import type { Cents, Transaction } from '../data/types'
-import { dayOfMonth, monthKey } from './dates'
+import { addMonths, monthKey } from './dates'
 
 export interface UpcomingInstallment {
   number: number
@@ -26,10 +26,6 @@ export interface InstallmentPlan {
   upcoming: UpcomingInstallment[]
 }
 
-function addMonths(iso: string, months: number): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return dayOfMonth(new Date(y, m - 1, 1), months, d)
-}
 
 /**
  * Groups installment transactions into purchases and projects the installments

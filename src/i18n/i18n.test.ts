@@ -25,10 +25,12 @@ describe('messages', () => {
   })
 
   it('handles singular and plural', () => {
-    expect(messages.en.accounts.count(1)).toBe('1 account')
-    expect(messages.en.accounts.count(2)).toBe('2 accounts')
-    expect(messages['pt-BR'].accounts.count(1)).toBe('1 conta')
-    expect(messages['pt-BR'].accounts.count(2)).toBe('2 contas')
+    expect(messages.en.transactions.count(1, null)).toBe('1 transaction')
+    expect(messages.en.transactions.count(42, 'September 2026')).toBe('42 transactions in September')
+    expect(messages['pt-BR'].transactions.count(1, null)).toBe('1 transação')
+    expect(messages['pt-BR'].transactions.count(42, 'Setembro de 2026')).toBe('42 transações em setembro')
+    expect(messages['pt-BR'].installments.toGo(1)).toBe('1 restante')
+    expect(messages['pt-BR'].installments.toGo(7)).toBe('7 restantes')
   })
 })
 

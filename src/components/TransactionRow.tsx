@@ -1,38 +1,66 @@
 import type { Transaction } from '../data/types'
 import { useData } from '../state'
-import { Amount, InstitutionBadge } from './ui'
+import { Amount, IconDisc } from './ui'
+import { categoryIcon } from './Icon'
+import { formatShortDate } from '../lib/dates'
 import { useI18n } from '../i18n/I18nProvider'
 
-export function TransactionRow({ tx, onSelect }: { tx: Transaction; onSelect?(tx: Transaction): void }) {
-  const { accountsById, institutionsById, categoriesById } = useData()
-  const { t, categoryName } = useI18n()
-  const account = accountsById.get(tx.accountId)!
-  const institution = institutionsById.get(account.institutionId)!
+/** Account label for a row: "Nubank card", "Itaú", "Wise USD". */
+export function useAccountLabel() {
+  const { accountsById, institutionsById } = useData()
+  const { t } = useI18n()
+  return (accountId: string) => {
+    const account = accountsById.get(accountId)!
+    const institution = institutionsById.get(account.institutionId)!
+    if (account.type === 'CREDIT') return t.cardOf(institution.name)
+    return `${institution.name}${account.foreign ? ` ${account.foreign.currency}` : ''}`
+  }
+}
+
+/**
+ * Category icon, description, "account · 3/10" and the amount. `showDate`
+ * adds the date to the second line (lists that aren't grouped by day).
+ */
+export function TransactionRow({
+  tx,
+  onSelect,
+  showDate = false,
+  className = '',
+}: {
+  tx: Transaction
+  onSelect?(tx: Transaction): void
+  showDate?: boolean
+  className?: string
+}) {
+  const { categoriesById } = useData()
+  const { t } = useI18n()
+  const accountLabel = useAccountLabel()
   const category = categoriesById.get(tx.categoryId)
-  const isCard = account.type === 'CREDIT'
 
   return (
     <button
       type="button"
       onClick={() => onSelect?.(tx)}
-      className="flex w-full items-center gap-3 px-1 py-3 text-left active:bg-track"
+      className={`flex min-h-16 w-full items-center gap-3 py-2.5 text-left active:bg-track ${className}`}
     >
-      <InstitutionBadge institution={institution} size="sm" />
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          <span className="truncate font-medium">{tx.description}</span>
+      <IconDisc icon={categoryIcon(tx.categoryId)} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="truncate text-[15px] leading-5 font-medium text-ink">{tx.description}</span>
+        <span className="truncate text-[13px] leading-[18px] text-muted">
+          {accountLabel(tx.accountId)}
+          {showDate && ` · ${formatShortDate(tx.date)}`}
           {tx.installment && (
-            <span className="shrink-0 rounded bg-track px-1.5 text-xs text-ink-2 tabular">
-              {tx.installment.number}/{tx.installment.total}
-            </span>
+            <>
+              {' · '}
+              <span className="tabular font-medium text-ink-2">
+                {tx.installment.number}/{tx.installment.total}
+              </span>
+            </>
           )}
-          {tx.status === 'PENDING' && <span className="shrink-0 rounded bg-track px-1.5 text-xs text-ink-2">{t.pending}</span>}
-        </span>
-        <span className="block truncate text-xs text-muted">
-          {categoryName(category)} · {isCard ? t.cardOf(institution.name) : `${institution.name}${account.foreign ? ` ${account.foreign.currency}` : ''}`}
+          {tx.status === 'PENDING' && ` · ${t.pending}`}
         </span>
       </span>
-      <Amount cents={tx.amount} foreign={tx.foreign} muted={category?.kind === 'transfer'} />
+      <Amount cents={tx.amount} foreign={tx.foreign} transfer={category?.kind === 'transfer'} />
     </button>
   )
 }
