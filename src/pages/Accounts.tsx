@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { Fragment, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useData } from '../state'
 import type { Account } from '../data/types'
@@ -14,6 +14,7 @@ import { useI18n } from '../i18n/I18nProvider'
 import { accountLabel } from '../lib/accountLabel'
 import { isDeployed } from '../lib/useIsDesktop'
 import { ConnectMeuPluggy } from '../components/ConnectMeuPluggy'
+import { CardDaysEditor } from '../components/CardDaysEditor'
 
 /** Share of the limit at which a card is flagged "Near limit". */
 const NEAR_LIMIT = 0.8
@@ -37,7 +38,10 @@ export function Accounts() {
         </div>
         {own.map((a) =>
           a.type === 'CREDIT' ? (
-            <CreditCardBlock key={a.id} account={a} bill={currentBill(a, transactions, plans)} futureInstallments={futureInstallments.get(a.id) ?? 0} />
+            <Fragment key={a.id}>
+              <CreditCardBlock account={a} bill={currentBill(a, transactions, plans)} futureInstallments={futureInstallments.get(a.id) ?? 0} />
+              <CardDaysEditor account={a} />
+            </Fragment>
           ) : a.foreign ? (
             <ForeignBlock key={a.id} account={a} />
           ) : (
