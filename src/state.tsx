@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Repository } from './data/repository'
+import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
 import type { Snapshot } from './data/seed'
 import type { Account, Category, Institution } from './data/types'
 import { useI18n } from './i18n/I18nProvider'
@@ -10,6 +11,8 @@ interface AppData extends Snapshot {
   categoriesById: Map<string, Category>
   institutionsById: Map<string, Institution>
   setCategory(transactionId: string, categoryId: string): void
+  /** Set (or clear, with null) a card's closing and due days; saved on this device. */
+  setCardDays(accountId: string, days: CardDays | null): void
 }
 
 const DataContext = createContext<AppData | null>(null)
@@ -54,17 +57,26 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [repository],
   )
 
-  const value = useMemo<AppData | null>(
-    () =>
-      snapshot && {
-        ...snapshot,
-        accountsById: new Map(snapshot.accounts.map((a) => [a.id, a])),
-        categoriesById: new Map(snapshot.categories.map((c) => [c.id, c])),
-        institutionsById: new Map(snapshot.institutions.map((i) => [i.id, i])),
-        setCategory,
-      },
-    [snapshot, setCategory],
-  )
+  const [cardDays, setCardDaysState] = useState(readCardDays)
+  const setCardDays = useCallback((accountId: string, days: CardDays | null) => {
+    saveCardDays(accountId, days)
+    setCardDaysState(readCardDays())
+  }, [])
+
+  const value = useMemo<AppData | null>(() => {
+    if (!snapshot) return null
+    // The owner's closing and due days replace the bank's dates for those cards.
+    const accounts = applyCardDays(snapshot.accounts, cardDays)
+    return {
+      ...snapshot,
+      accounts,
+      accountsById: new Map(accounts.map((a) => [a.id, a])),
+      categoriesById: new Map(snapshot.categories.map((c) => [c.id, c])),
+      institutionsById: new Map(snapshot.institutions.map((i) => [i.id, i])),
+      setCategory,
+      setCardDays,
+    }
+  }, [snapshot, setCategory, cardDays, setCardDays])
 
   const load = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

@@ -28,6 +28,8 @@ export interface CreditData {
   balanceDueDate: string | null
   /** The bank's latest closed bill (from Pluggy's bills), if it reports them. */
   lastBill?: { dueDate: string; amount: Cents } | null
+  /** Closing and due days set by the owner; when present, the dates above come from them. */
+  userDays?: { close: number; due: number }
 }
 
 export interface Account {
