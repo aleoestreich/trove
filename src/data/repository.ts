@@ -1,9 +1,9 @@
-import type { Snapshot } from './seed'
+import type { Snapshot } from './types'
 
 /**
  * Everything the UI reads or writes goes through this interface.
- * Phase 1: `mockRepository` (hardcoded data + localStorage).
- * Phase 2: an API-backed implementation fed by Pluggy.
+ * - `mockRepository`: hardcoded demo data (local development).
+ * - `pluggyRepository`: the owner's real data via /api/finance (deployed site).
  */
 export interface Repository {
   load(): Promise<Snapshot>

@@ -10,12 +10,13 @@ import { Badge, InstitutionBadge, PageHeader, Progress } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n/I18nProvider'
 import { isDeployed } from '../lib/useIsDesktop'
+import { ConnectMeuPluggy } from '../components/ConnectMeuPluggy'
 
 /** Share of the limit at which a card is flagged "Near limit". */
 const NEAR_LIMIT = 0.8
 
 export function Accounts() {
-  const { institutions, accounts, transactions } = useData()
+  const { institutions, accounts, transactions, source } = useData()
   const { t } = useI18n()
   const bal = balances(accounts)
   const futureInstallments = useMemo(() => remainingByAccount(installmentPlans(transactions)), [transactions])
@@ -70,6 +71,9 @@ export function Accounts() {
           ))}
         </div>
 
+        {/* Until Pluggy is connected (demo data on the deployed site): connect Meu Pluggy. */}
+        {isDeployed() && source === 'demo' && <ConnectMeuPluggy />}
+
         {isDeployed() && (
           <a
             href="/api/auth/logout"
@@ -80,7 +84,7 @@ export function Accounts() {
           </a>
         )}
 
-        <p className="px-2 text-center text-xs leading-4 text-muted">{t.accounts.footer}</p>
+        {source === 'demo' && <p className="px-2 text-center text-xs leading-4 text-muted">{t.accounts.footer}</p>}
       </div>
     </>
   )

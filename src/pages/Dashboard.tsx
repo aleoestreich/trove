@@ -227,7 +227,9 @@ export function Dashboard() {
               <InstitutionBadge institution={institutionsById.get(c.institutionId)!} size="sm" />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-[15px] font-medium text-ink lg:text-sm">{t.cardOf(institutionsById.get(c.institutionId)!.name)}</span>
-                <span className="text-[13px] text-muted">{t.overview.due(formatShortDate(c.creditData!.balanceDueDate))}</span>
+                {c.creditData?.balanceDueDate && (
+                  <span className="text-[13px] text-muted">{t.overview.due(formatShortDate(c.creditData.balanceDueDate))}</span>
+                )}
               </span>
               <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(c.balance)}</span>
             </Link>

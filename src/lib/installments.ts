@@ -46,8 +46,16 @@ export function installmentPlans(transactions: Transaction[]): InstallmentPlan[]
     const latest = txs.reduce((a, b) => (b.installment!.number > a.installment!.number ? b : a))
     const { total, totalAmount, purchaseDate } = latest.installment!
     const charged = latest.installment!.number
-    const chargedAmount = -txs.reduce((s, t) => s + t.amount, 0)
-    const remaining = Math.max(0, totalAmount - chargedAmount)
+    // Exact when every charged installment is in the data. Otherwise (earlier
+    // installments fell before the fetched history window) the later
+    // installments are all equal to the latest one, so what's left is
+    // (installments left) x (latest installment).
+    const numbersSeen = new Set(txs.map((t) => t.installment!.number))
+    const complete = numbersSeen.size === charged
+    const remaining = complete
+      ? Math.max(0, totalAmount + txs.reduce((s, t) => s + t.amount, 0))
+      : Math.min(totalAmount, (total - charged) * Math.abs(latest.amount))
+    const chargedAmount = totalAmount - remaining
 
     // Split what's left evenly; the first upcoming installment absorbs rounding.
     const left = total - charged

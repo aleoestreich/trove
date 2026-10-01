@@ -109,18 +109,21 @@ export function Button({
   icon,
   className = '',
   onClick,
+  disabled = false,
 }: {
   children: ReactNode
   variant?: keyof typeof button
   icon?: IconName
   className?: string
   onClick?(): void
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-12 items-center justify-center gap-2 rounded-md text-[15px] font-medium active:opacity-80 ${button[variant]} ${className}`}
+      disabled={disabled}
+      className={`inline-flex h-12 items-center justify-center gap-2 rounded-md text-[15px] font-medium active:opacity-80 disabled:opacity-60 ${button[variant]} ${className}`}
     >
       {icon && <Icon name={icon} className="size-[18px]" strokeWidth={2} />}
       {children}

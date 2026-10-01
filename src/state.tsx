@@ -14,8 +14,21 @@ interface AppData extends Snapshot {
 
 const DataContext = createContext<AppData | null>(null)
 
+interface LoadState {
+  error: string | null
+  retry(): void
+  /** Where the data came from, once loaded (for the "Demo data" badge). */
+  source: Snapshot['source'] | null
+}
+
+const LoadContext = createContext<LoadState>({ error: null, retry() {}, source: null })
+
+/**
+ * Loads the snapshot for the whole app. The header and sidebar can read its
+ * source with `useDataSource()`; pages go inside `<DataGate>`, which shows the
+ * loading and error states in the content area.
+ */
 export function DataProvider({ repository, children }: { repository: Repository; children: ReactNode }) {
-  const { t } = useI18n()
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -24,7 +37,7 @@ export function DataProvider({ repository, children }: { repository: Repository;
     setError(null)
     repository.load().then(setSnapshot, (e) => {
       console.error(e)
-      setError(String(e))
+      setError(e instanceof Error ? e.message : String(e))
     })
   }, [repository, attempt])
 
@@ -53,6 +66,23 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [snapshot, setCategory],
   )
 
+  const load = useMemo<LoadState>(
+    () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),
+    [error, snapshot],
+  )
+
+  return (
+    <LoadContext.Provider value={load}>
+      <DataContext.Provider value={value}>{children}</DataContext.Provider>
+    </LoadContext.Provider>
+  )
+}
+
+/** Renders its children once the data has loaded; until then, a skeleton or the error. */
+export function DataGate({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
+  const { error, retry } = useContext(LoadContext)
+  const data = useContext(DataContext)
   if (error)
     return (
       <EmptyState
@@ -60,22 +90,29 @@ export function DataProvider({ repository, children }: { repository: Repository;
         icon="cloudOff"
         title={t.loadErrorTitle}
         action={
-          <Button icon="refresh" className="px-6" onClick={() => setAttempt((n) => n + 1)}>
+          <Button icon="refresh" className="px-6" onClick={retry}>
             {t.tryAgain}
           </Button>
         }
       >
         {t.loadErrorBody}
+        {/* The server's message (e.g. "Pluggy refused the credentials"); never contains amounts or credentials. */}
+        <span className="mt-2 block text-[13px] leading-[18px] break-words text-muted">{error}</span>
       </EmptyState>
     )
-  if (!value) return <LoadingSkeleton label={t.loading} />
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>
+  if (!data) return <LoadingSkeleton label={t.loading} />
+  return <>{children}</>
 }
 
 export function useData(): AppData {
   const ctx = useContext(DataContext)
-  if (!ctx) throw new Error('useData outside DataProvider')
+  if (!ctx) throw new Error('useData outside DataGate')
   return ctx
+}
+
+/** "demo" or "pluggy" once loaded, null while loading or on error. */
+export function useDataSource(): Snapshot['source'] | null {
+  return useContext(LoadContext).source
 }
 
 /** Placeholder cards while data loads. */

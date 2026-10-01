@@ -56,9 +56,10 @@ function parse(iso: string): Date {
 
 /**
  * Compact date: pt-BR "01/10", en "Oct 1". English spells out the month so
- * it can't be misread as day/month.
+ * it can't be misread as day/month. "—" when the date is unknown (null).
  */
-export function formatShortDate(iso: string): string {
+export function formatShortDate(iso: string | null): string {
+  if (!iso) return '—'
   return getLocale() === 'pt-BR'
     ? fmt({ day: '2-digit', month: '2-digit' }).format(parse(iso))
     : fmt({ day: 'numeric', month: 'short' }).format(parse(iso))

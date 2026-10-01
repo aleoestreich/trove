@@ -50,3 +50,16 @@ Run `npm test` and `npm run build` before pushing.
   managed only in Auth0 (its user list, sign-ups disabled). Never hardcode
   emails, user IDs or secrets in code, docs or config; secrets are Vercel
   environment variables.
+- **Real data:** `/api/finance` reads Pluggy live (`server/pluggy/`, setup in
+  `docs/pluggy-setup.md`). Pluggy credentials and item IDs are Vercel
+  environment variables only. Access must stay on Pluggy's free path for
+  individuals (the "Access your data" tutorial, via Meu Pluggy); never suggest
+  connecting banks directly or a paid plan. Pluggy Connect is only opened
+  restricted to the MeuPluggy connector (the server looks it up and refuses if
+  it's missing). The webhook (`/api/webhooks/pluggy`) is the only route the
+  login middleware lets through; it must check its shared secret. The mapping
+  to Trove's model lives in
+  `server/pluggy/map.ts`; shared types come from `src/data/types.ts` and
+  `src/data/categories.ts`, which must stay free of browser-only imports.
+  Never log or return amounts, descriptions or credentials in errors or
+  diagnostics.

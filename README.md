@@ -3,8 +3,9 @@
 See all your bank accounts, credit cards, income and expenses in one place.
 It's built mobile-first and can be installed on an Android phone.
 
-**Status:** Phase 1. It runs entirely in the browser on hardcoded demo data.
-There is no backend or login yet. See [PLAN.md](PLAN.md).
+**Status:** the deployed site is private (Auth0 login) and shows your real
+accounts from Meu Pluggy once configured. Local development runs on demo data.
+See [PLAN.md](PLAN.md).
 
 ## Run it
 
@@ -36,6 +37,13 @@ first launch it follows the phone's language. Text, category names, money
 (`R$ 1.234,56` / `R$1,234.56`) and dates follow the language. Transaction
 descriptions and account names come from the banks and are shown as-is.
 Strings live in `src/i18n/messages.ts`.
+
+## Real data (Meu Pluggy)
+
+On the deployed site, Trove shows your real accounts, read live from Pluggy
+(Meu Pluggy) by the server. Until Pluggy is configured it shows demo data.
+Local development always uses demo data. Setup:
+[docs/pluggy-setup.md](docs/pluggy-setup.md).
 
 ## Login (deployed site only)
 
@@ -96,7 +104,8 @@ src/
   data/types.ts           domain model (mirrors Pluggy's Item/Account/Transaction)
   data/seed.ts            hardcoded demo data
   data/repository.ts      data-access interface the UI uses
-  data/mockRepository.ts  Phase 1 implementation (demo data + localStorage)
+  data/mockRepository.ts  demo data (local development, or until Pluggy is set up)
+  data/pluggyRepository.ts  live data from /api/finance (deployed site)
   i18n/                   EN / PT-BR strings and the language switch
   lib/                    money, dates, income/expense summaries, installment plans
   pages/                  Overview, Transactions, Installments, Accounts
@@ -104,4 +113,6 @@ src/
 middleware.ts             Vercel middleware: only the signed-in owner gets the app
 api/auth/                 login, callback and logout (Vercel Functions)
 server/auth/              login logic, encrypted cookies, tests
+api/finance.ts            your accounts and transactions from Pluggy
+server/pluggy/            Pluggy client, mapping to Trove's model, exchange rates, tests
 ```

@@ -1,6 +1,7 @@
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
-import { DataProvider } from './state'
+import { DataGate, DataProvider, useDataSource } from './state'
 import { createMockRepository } from './data/mockRepository'
+import { createPluggyRepository, withDemoFallback } from './data/pluggyRepository'
 import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { Accounts } from './pages/Accounts'
@@ -12,7 +13,9 @@ import { I18nProvider, useI18n } from './i18n/I18nProvider'
 import type { Messages } from './i18n/messages'
 import { isDeployed } from './lib/useIsDesktop'
 
-const repository = createMockRepository()
+// Deployed: the owner's data via Pluggy (demo data until Pluggy is configured).
+// Local development: demo data.
+const repository = isDeployed() ? withDemoFallback(createPluggyRepository(), createMockRepository()) : createMockRepository()
 
 const tabs: { to: string; label: keyof Messages['nav']; icon: IconName }[] = [
   { to: '/', label: 'overview', icon: 'overview' },
@@ -25,7 +28,9 @@ export function App() {
   return (
     <HashRouter>
       <I18nProvider>
-        <Shell />
+        <DataProvider repository={repository}>
+          <Shell />
+        </DataProvider>
       </I18nProvider>
     </HashRouter>
   )
@@ -37,6 +42,7 @@ export function App() {
  */
 function Shell() {
   const { t } = useI18n()
+  const isDemo = useDataSource() === 'demo'
   return (
     <div className="mx-auto min-h-dvh max-w-[480px] pb-[calc(78px+env(safe-area-inset-bottom))] lg:flex lg:max-w-none lg:pb-0">
       <Sidebar />
@@ -45,9 +51,11 @@ function Shell() {
         <div className="flex h-14 items-center justify-between gap-2 pr-1 pl-4">
           <div className="flex min-w-0 items-center gap-2.5">
             <Wordmark className="text-[22px]" />
-            <span className="inline-flex h-[22px] items-center rounded-full border border-line bg-surface px-2 text-[11px] font-medium whitespace-nowrap text-ink-2">
-              {t.demoData}
-            </span>
+            {isDemo && (
+              <span className="inline-flex h-[22px] items-center rounded-full border border-line bg-surface px-2 text-[11px] font-medium whitespace-nowrap text-ink-2">
+                {t.demoData}
+              </span>
+            )}
           </div>
           <div className="mr-2">
             <LanguageSwitch />
@@ -57,14 +65,14 @@ function Shell() {
 
       <main className="px-4 pt-2 pb-6 lg:min-w-0 lg:flex-1 lg:px-10 lg:pt-8 lg:pb-12">
         <div className="lg:mx-auto lg:max-w-[1200px]">
-          <DataProvider repository={repository}>
+          <DataGate>
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/transactions" element={<Transactions />} />
               <Route path="/accounts" element={<Accounts />} />
               <Route path="/installments" element={<Installments />} />
             </Routes>
-          </DataProvider>
+          </DataGate>
         </div>
       </main>
 
@@ -101,6 +109,7 @@ function Shell() {
 /** Desktop navigation: logo, pages, and at the bottom demo note, language and sign out. */
 function Sidebar() {
   const { t } = useI18n()
+  const isDemo = useDataSource() === 'demo'
   return (
     <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col gap-7 overflow-y-auto border-r border-line bg-surface px-4 pt-7 pb-6 lg:flex">
       <div className="px-3">
@@ -122,12 +131,14 @@ function Sidebar() {
         ))}
       </nav>
       <div className="mt-auto flex flex-col gap-4 px-1">
-        <div className="flex flex-col gap-1 rounded-md bg-page p-3">
-          <span className="inline-flex h-[22px] items-center self-start rounded-full border border-line bg-surface px-2 text-[11px] font-medium text-ink-2">
-            {t.demoData}
-          </span>
-          <span className="text-xs leading-[17px] text-muted">{t.demoNote}</span>
-        </div>
+        {isDemo && (
+          <div className="flex flex-col gap-1 rounded-md bg-page p-3">
+            <span className="inline-flex h-[22px] items-center self-start rounded-full border border-line bg-surface px-2 text-[11px] font-medium text-ink-2">
+              {t.demoData}
+            </span>
+            <span className="text-xs leading-[17px] text-muted">{t.demoNote}</span>
+          </div>
+        )}
         <div className="self-start">
           <LanguageSwitch />
         </div>
