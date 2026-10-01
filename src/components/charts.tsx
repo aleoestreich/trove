@@ -1,4 +1,5 @@
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { useState } from 'react'
 import { formatCompact, formatMoney } from '../lib/money'
 import { useI18n } from '../i18n/I18nProvider'
 
@@ -168,27 +169,104 @@ export function StackedMonthChart({
   colors?: string[]
   highlight?: 'first' | 'last'
 }) {
+  const { t } = useI18n()
+  const [open, setOpen] = useState<number | null>(null)
   const totals = data.map((d) => series.reduce((s, x) => s + Number(d[x.key] ?? 0), 0))
   const max = Math.max(1, ...totals)
   const last = highlight === 'first' ? 0 : data.length - 1
+  const colorOf = (j: number) => colors?.[j] ?? seriesColor(j)
+  /** The month's values per series, largest first, without empty ones. */
+  const breakdown = (i: number) =>
+    series
+      .map((s, j) => ({ name: s.name, color: colorOf(j), value: Number(data[i][s.key] ?? 0) }))
+      .filter((x) => x.value > 0)
+      .sort((a, b) => b.value - a.value)
+
   return (
-    <div role="img" aria-label={label}>
+    // Hover (desktop), tap (phones) or focus a month to see its breakdown.
+    <div role="group" aria-label={label} className="relative" onMouseLeave={() => setOpen(null)}>
       <div className="flex h-[152px] items-end border-b border-line lg:h-[176px]">
         {data.map((d, i) => (
-          <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+          <button
+            key={i}
+            type="button"
+            aria-label={`${String(d.label)}: ${breakdown(i)
+              .map((x) => `${x.name} ${formatMoney(x.value)}`)
+              .join(', ')}; ${t.chartTotal} ${formatMoney(totals[i])}`}
+            aria-expanded={open === i}
+            onMouseEnter={() => setOpen(i)}
+            onFocus={() => setOpen(i)}
+            onBlur={() => setOpen(null)}
+            // Focus already opens it on a tap; clicking keeps it open. Tapping elsewhere blurs and closes it.
+            onClick={() => setOpen(i)}
+            className={`flex h-full flex-1 flex-col items-center justify-end gap-1 rounded-t-sm focus-visible:outline-2 focus-visible:outline-accent ${open === i ? 'bg-track/60' : ''}`}
+          >
             <span className={`tabular text-[11px] leading-[14px] lg:text-xs whitespace-nowrap ${i === last ? 'font-medium text-ink' : 'text-muted'}`}>
               {formatCompact(Math.round(reais(totals[i])))}
             </span>
-            <div className="flex w-[26px] flex-col-reverse lg:w-9 gap-0.5 overflow-hidden rounded-t-[4px]" style={{ height: `max(2px, calc(${(totals[i] / max) * 100}% - 18px))` }}>
+            <span className="flex w-[26px] flex-col-reverse lg:w-9 gap-0.5 overflow-hidden rounded-t-[4px]" style={{ height: `max(2px, calc(${(totals[i] / max) * 100}% - 18px))` }}>
               {series.map((s, j) => {
                 const v = Number(d[s.key] ?? 0)
-                return v > 0 ? <div key={s.key} className="min-h-0.5" style={{ flexGrow: v, flexBasis: 0, background: colors?.[j] ?? seriesColor(j) }} /> : null
+                return v > 0 ? <span key={s.key} className="block min-h-0.5" style={{ flexGrow: v, flexBasis: 0, background: colorOf(j) }} /> : null
               })}
-            </div>
-          </div>
+            </span>
+          </button>
         ))}
       </div>
       <MonthLabels labels={data.map((d) => String(d.label))} highlight={last} />
+      {open !== null && (
+        <BreakdownTooltip
+          title={String(data[open].label)}
+          rows={breakdown(open)}
+          total={totals[open]}
+          totalLabel={t.chartTotal}
+          // Keep it inside the card: anchor left, centre or right by column.
+          align={open < data.length / 3 ? 'left' : open >= (data.length * 2) / 3 ? 'right' : 'center'}
+          at={((open + 0.5) / data.length) * 100}
+        />
+      )}
+    </div>
+  )
+}
+
+/** A month's values per category or bank, with the total, over the chart. */
+function BreakdownTooltip({
+  title,
+  rows,
+  total,
+  totalLabel,
+  align,
+  at,
+}: {
+  title: string
+  rows: { name: string; color: string; value: number }[]
+  total: number
+  totalLabel: string
+  align: 'left' | 'center' | 'right'
+  at: number
+}) {
+  const position =
+    align === 'left'
+      ? { left: `max(0px, calc(${at}% - 24px))` }
+      : align === 'right'
+        ? { right: `max(0px, calc(${100 - at}% - 24px))` }
+        : { left: `${at}%`, transform: 'translateX(-50%)' }
+  return (
+    <div aria-hidden className={`${tooltipBox} pointer-events-none absolute top-0 z-10 flex min-w-[180px] flex-col gap-1`} style={position}>
+      <p className="text-xs text-muted">{title}</p>
+      {rows.map((r) => (
+        <p key={r.name} className="flex items-center justify-between gap-4">
+          <span className="inline-flex min-w-0 items-center gap-1.5 text-ink-2">
+            <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: r.color }} />
+            <span className="truncate">{r.name}</span>
+          </span>
+          <span className="tabular whitespace-nowrap">{formatMoney(r.value)}</span>
+        </p>
+      ))}
+      <p className="mt-0.5 flex justify-between gap-4 border-t border-line pt-1 font-medium">
+        <span>{totalLabel}</span>
+        <span className="tabular whitespace-nowrap">{formatMoney(total)}</span>
+      </p>
     </div>
   )
 }

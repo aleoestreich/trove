@@ -26,6 +26,8 @@ const en = {
   done: 'Done',
   category: 'Category',
   other: 'Other',
+  /** Last line of a chart's month breakdown. */
+  chartTotal: 'Total',
   cardOf: (institution: string) => `${institution} card`,
   oneUnitIs: (currency: string, rate: string) => `1 ${currency} = R$ ${rate}`,
 
@@ -196,6 +198,7 @@ const ptBR: Messages = {
   done: 'Concluir',
   category: 'Categoria',
   other: 'Outros',
+  chartTotal: 'Total',
   cardOf: (institution) => `Cartão ${institution}`,
   oneUnitIs: (currency, rate) => `1 ${currency} = R$ ${rate}`,
 
