@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import type { Cents, CurrencyCode, Institution } from '../data/types'
+import type { Cents, CurrencyCode } from '../data/types'
 import { formatMoney } from '../lib/money'
 import { formatMonth, lastMonths } from '../lib/dates'
 import { Icon, type IconName } from './Icon'
@@ -24,16 +24,6 @@ export function CardTitle({ children, subtitle }: { children: ReactNode; subtitl
 /** Small caps label above a group ("By bank"). */
 export function Overline({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <h3 className={`label-caps ${className}`}>{children}</h3>
-}
-
-/** Institution disc with its first letters, e.g. "Nu" for Nubank. */
-export function InstitutionBadge({ institution, size = 'md' }: { institution: Institution; size?: 'sm' | 'md' }) {
-  const cls = size === 'sm' ? 'size-9 text-[13px]' : 'size-10 text-sm'
-  return (
-    <span className={`inline-flex shrink-0 items-center justify-center rounded-full bg-track font-bold text-ink-2 ${cls}`} aria-hidden>
-      {institution.name.slice(0, 2)}
-    </span>
-  )
 }
 
 /** Icon on a neutral disc (categories, purchases). */
