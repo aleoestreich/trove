@@ -163,7 +163,17 @@ function pairOwnTransfers(txs: Transaction[], genericIds: Set<string>) {
 
 // ---------------------------------------------------------------------------
 
-export function toSnapshot(data: PluggyData): Snapshot {
+/**
+ * Bank accounts at zero with no transactions in the fetched window (e.g. an
+ * unused "Conta Pré-paga") are left out. Cards always stay: they show a limit.
+ */
+export function isEmptyBankAccount(a: PluggyAccount, withTransactions: Set<string>): boolean {
+  return a.type === 'BANK' && cents(a.balance) === 0 && !withTransactions.has(a.id)
+}
+
+export function toSnapshot(input: PluggyData): Snapshot {
+  const withTransactions = new Set(input.transactions.map((t) => t.accountId))
+  const data = { ...input, accounts: input.accounts.filter((a) => !isEmptyBankAccount(a, withTransactions)) }
   const { rates } = data
   const itemById = new Map(data.items.map((i) => [i.id, i]))
 

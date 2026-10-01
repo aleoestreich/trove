@@ -154,7 +154,9 @@ Nothing else is stored. You can see these logs in Vercel → **Logs**.
     name ("Nu Pagamentos S.A. - … (Conta Pré-paga)"). Trove shows one card
     per bank (Nubank, Itaú, Wise…), with known banks matched by name and
     others by their legal name, and shortens the account name to the part
-    in brackets ("Conta Pré-paga").
+    in brackets ("Conta Pré-paga");
+  - bank accounts at zero with no transactions in the last 6 months are
+    left out (cards always stay). The summary marks them `hiddenAsEmpty`.
 - `api/connect-token.ts` → `server/pluggy/connectToken.ts`: `POST` (behind
   the login). It looks up the MeuPluggy connector (`GET /connectors?name=`),
   refuses with `409` if it's missing, then creates a Connect token

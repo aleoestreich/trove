@@ -12,7 +12,7 @@
 
 import { MONTHS_OF_HISTORY } from '../../src/data/types.js'
 import { PluggyClient, PluggyError, type PluggyConfig } from './client.js'
-import { bankOf, categoryFor, isMeuPluggy, toSnapshot } from './map.js'
+import { bankOf, categoryFor, isEmptyBankAccount, isMeuPluggy, toSnapshot } from './map.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
 import { ratesToBRL } from './rates.js'
 
@@ -87,6 +87,7 @@ export function summarize(items: PluggyItem[], accounts: PluggyAccount[], transa
     entry.count++
     categories.set(key, entry)
   }
+  const withTransactions = new Set(transactions.map((t) => t.accountId))
   return {
     items: items.map((i) => ({ connector: i.connector.name, status: i.status, lastUpdatedAt: i.lastUpdatedAt ?? null })),
     accounts: accounts.map((a) => ({
@@ -100,6 +101,8 @@ export function summarize(items: PluggyItem[], accounts: PluggyAccount[], transa
       transactions: transactions.filter((t) => t.accountId === a.id).length,
       transactionCurrencies: [...new Set(transactions.filter((t) => t.accountId === a.id).map((t) => t.currencyCode))],
       hasCreditData: Boolean(a.creditData),
+      // Left out of the app: a bank account at zero with no transactions.
+      hiddenAsEmpty: isEmptyBankAccount(a, withTransactions),
     })),
     installments: transactions.filter((t) => (t.creditCardMetadata?.totalInstallments ?? 0) > 1).length,
     pending: transactions.filter((t) => t.status === 'PENDING').length,
