@@ -129,7 +129,7 @@ Nothing else is stored. You can see these logs in Vercel → **Logs**.
 | "Add PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET…" when connecting | Credentials missing, or no redeploy | Step 2 |
 | "Meu Pluggy isn't available for these credentials…" | Pluggy doesn't list the MeuPluggy connector for your application | Check the tutorial's steps; Trove won't open other connectors |
 | "…GET /items/… (HTTP 404)" | Wrong item ID | Re-copy it (step 3) |
-| "Exchange rate service failed" / "No exchange rate for USD" | The USD→BRL rate couldn't be fetched | Try again in a minute |
+| "No exchange rate for USD (AwesomeAPI HTTP 429; …)" | None of the three free rate sources answered, and this server instance has no earlier rate to reuse. The message names each source and its status | Try again in a minute |
 | Data looks out of date | Pluggy refreshes connections on its own schedule; Trove also caches for 5 minutes | Open `/api/finance?refresh` to skip Trove's cache; update the connection in the Meu Pluggy app if it's stale there |
 | A connection shows `LOGIN_ERROR` or `OUTDATED` in the summary | The bank consent expired or needs attention | Reconnect that bank in the Meu Pluggy app |
 
@@ -159,7 +159,12 @@ Nothing else is stored. You can see these logs in Vercel → **Logs**.
   route the middleware lets through. It checks `X-Trove-Webhook-Secret` in
   constant time and clears the cache on data changes.
 - `server/pluggy/rates.ts`: USD→BRL (and other currencies) from
-  `economia.awesomeapi.com.br`, cached for 1 hour.
+  free sources without keys, tried in order: AwesomeAPI
+  (`economia.awesomeapi.com.br`), Banco Central's PTAX
+  (`olinda.bcb.gov.br`), then `open.er-api.com`. AwesomeAPI limits requests
+  per IP, and Vercel's IPs are shared, so it can answer `429`; the others
+  then take over. Cached for 1 hour; if all fail, the last good rate is
+  reused.
 - `src/data/pluggyRepository.ts`: the app side. It loads `/api/finance`, falls
   back to demo data on `503`, and goes to login on `401`.
 - Tests: `server/pluggy/pluggy.test.ts`.
