@@ -28,23 +28,64 @@ export interface InstallmentPlan {
 
 
 /**
+ * The description without its installment marker, which banks often append:
+ * "LOJA EXEMPLO 04/10" -> "LOJA EXEMPLO". Also "PARC 4/10", "(4 de 10)".
+ */
+export function purchaseDescription(t: Transaction): string {
+  const i = t.installment
+  if (!i) return t.description
+  const marker = new RegExp(`\\s*[-–]?\\s*(?:parc(?:ela)?\\.?\\s*)?\\(?(?<!\\d)0*${i.number}\\s*(?:/|de|of)\\s*0*${i.total}(?!\\d)\\)?`, 'i')
+  return t.description.replace(marker, ' ').replace(/\s+/g, ' ').trim() || t.description
+}
+
+/** Months since year 0, to compare charge months. */
+const monthIndex = (iso: string) => Number(iso.slice(0, 4)) * 12 + Number(iso.slice(5, 7)) - 1
+
+/**
+ * Splits the installments of one card, shop and count into purchases. Each
+ * installment's "anchor" (charge month minus its number) is the same for one
+ * purchase, give or take a month around bill closing, so anchors within a
+ * month of each other chain together. A repeated installment number (two
+ * "5/18") means two purchases at the same shop.
+ */
+function splitPurchases(txs: Transaction[]): Transaction[][] {
+  const anchor = (t: Transaction) => monthIndex(t.date) - t.installment!.number
+  const sorted = [...txs].sort((a, b) => anchor(a) - anchor(b) || a.installment!.number - b.installment!.number)
+  const out: Transaction[][] = []
+  for (const t of sorted) {
+    const current = out.at(-1)
+    const fits =
+      current &&
+      anchor(t) - anchor(current.at(-1)!) <= 1 &&
+      !current.some((c) => c.installment!.number === t.installment!.number)
+    if (fits) current.push(t)
+    else out.push([t])
+  }
+  return out
+}
+
+/**
  * Groups installment transactions into purchases and projects the installments
  * not charged yet. Needs only what Pluggy reports per transaction (installment
  * number, total count, total amount, purchase date), so it works on real data.
+ * Installments are matched by card, description (without "04/18") and count,
+ * not by purchase date or total, which can differ between installments.
  */
 export function installmentPlans(transactions: Transaction[]): InstallmentPlan[] {
   const groups = new Map<string, Transaction[]>()
   for (const t of transactions) {
     if (!t.installment) continue
-    const i = t.installment
-    const key = `${t.accountId}|${t.description}|${i.purchaseDate}|${i.total}|${i.totalAmount}`
+    const key = `${t.accountId}|${purchaseDescription(t).toLowerCase()}|${t.installment.total}`
     groups.set(key, [...(groups.get(key) ?? []), t])
   }
 
   const plans: InstallmentPlan[] = []
-  for (const [key, txs] of groups) {
+  for (const [groupKey, group] of groups)
+  for (const txs of splitPurchases(group)) {
+    const key = `${groupKey}|${txs[0].id}`
     const latest = txs.reduce((a, b) => (b.installment!.number > a.installment!.number ? b : a))
-    const { total, totalAmount, purchaseDate } = latest.installment!
+    const { total, totalAmount } = latest.installment!
+    const purchaseDate = txs.map((t) => t.installment!.purchaseDate).sort()[0]
     const charged = latest.installment!.number
     // Exact when every charged installment is in the data. Otherwise (earlier
     // installments fell before the fetched history window) the later
@@ -72,7 +113,7 @@ export function installmentPlans(transactions: Transaction[]): InstallmentPlan[]
     plans.push({
       key,
       accountId: latest.accountId,
-      description: latest.description,
+      description: purchaseDescription(latest),
       categoryId: latest.categoryId,
       purchaseDate,
       totalAmount,
