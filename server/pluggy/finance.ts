@@ -13,7 +13,7 @@
 import { MONTHS_OF_HISTORY } from '../../src/data/types.js'
 import { PluggyClient, PluggyError, type PluggyConfig } from './client.js'
 import { categoryFor, isEmptyAccount, isMeuPluggy, itemBankName, toSnapshot } from './map.js'
-import type { PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
+import type { PluggyAccount, PluggyBill, PluggyItem, PluggyTransaction } from './types.js'
 import { ratesToBRL } from './rates.js'
 
 export interface FinanceDeps {
@@ -64,14 +64,26 @@ export async function finance(request: Request, config: PluggyConfig | null, dep
     const accounts = (await Promise.all(items.map((i) => client.getAccounts(i.id)))).flat()
     const from = historyStart(now)
     const transactions = (await Promise.all(accounts.map((a) => client.getTransactions(a.id, from)))).flat()
-    if (summary) return json(200, summarize(items, accounts, transactions))
+    // Card bills are optional: if Pluggy doesn't have them for a card, the bill is worked out from dates.
+    const bills = new Map<string, PluggyBill[]>()
+    await Promise.all(
+      accounts
+        .filter((a) => a.type === 'CREDIT')
+        .map((a) =>
+          client.getBills(a.id).then(
+            (b) => bills.set(a.id, b),
+            () => undefined,
+          ),
+        ),
+    )
+    if (summary) return json(200, summarize(items, accounts, transactions, bills))
     // Rates only for what's shown: empty, hidden balances (e.g. a Wise EUR
     // account at zero) don't need one, so they can't fail the load.
     const withTransactions = new Set(transactions.map((t) => t.accountId))
     const shown = accounts.filter((a) => !isEmptyAccount(a, withTransactions))
     const currencies = [...shown.map((a) => a.currencyCode), ...transactions.map((t) => t.currencyCode)].filter(Boolean)
     const rates = await ratesToBRL(currencies, fetchFn)
-    const body = JSON.stringify(toSnapshot({ items, accounts, transactions, rates, fetchedAt: now.toISOString() }))
+    const body = JSON.stringify(toSnapshot({ items, accounts, transactions, bills, rates, fetchedAt: now.toISOString() }))
     cache = { at: Date.now(), body }
     return json(200, body)
   } catch (e) {
@@ -82,7 +94,7 @@ export async function finance(request: Request, config: PluggyConfig | null, dep
 }
 
 /** Diagnostic report without amounts or descriptions. */
-export function summarize(items: PluggyItem[], accounts: PluggyAccount[], transactions: PluggyTransaction[]) {
+export function summarize(items: PluggyItem[], accounts: PluggyAccount[], transactions: PluggyTransaction[], bills = new Map<string, PluggyBill[]>()) {
   const categories = new Map<string, { pluggyCategory: string; type: string; count: number; mappedTo: string }>()
   for (const t of transactions) {
     const name = t.category ?? '(none)'
@@ -108,6 +120,27 @@ export function summarize(items: PluggyItem[], accounts: PluggyAccount[], transa
       // Left out of the app: a bank account at zero, or an unused card, with no transactions.
       hiddenAsEmpty: isEmptyAccount(a, withTransactions),
     })),
+    // How each card's bill can be worked out: dates and counts only, no amounts.
+    cards: accounts
+      .filter((a) => a.type === 'CREDIT')
+      .map((a) => {
+        const own = transactions.filter((t) => t.accountId === a.id)
+        const cardBills = bills.get(a.id)
+        const installments = own.filter((t) => (t.creditCardMetadata?.totalInstallments ?? 0) > 1)
+        return {
+          name: a.marketingName || a.name,
+          closeDate: a.creditData?.balanceCloseDate ?? null,
+          dueDate: a.creditData?.balanceDueDate ?? null,
+          billsAvailable: cardBills !== undefined,
+          billDueDates: (cardBills ?? []).map((b) => b.dueDate).sort().slice(-3),
+          transactionsWithBillId: own.filter((t) => t.creditCardMetadata?.billId).length,
+          transactionsWithoutBillId: own.filter((t) => !t.creditCardMetadata?.billId).length,
+          installmentsDatedOnPurchaseDay: installments.filter(
+            (t) => t.creditCardMetadata?.purchaseDate && t.date.slice(0, 10) === t.creditCardMetadata.purchaseDate.slice(0, 10),
+          ).length,
+          installmentsTotal: installments.length,
+        }
+      }),
     installments: transactions.filter((t) => (t.creditCardMetadata?.totalInstallments ?? 0) > 1).length,
     pending: transactions.filter((t) => t.status === 'PENDING').length,
     categories: [...categories.values()].sort((a, b) => b.count - a.count),

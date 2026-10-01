@@ -69,5 +69,15 @@ export interface PluggyTransaction {
     totalInstallments?: number
     totalAmount?: number
     purchaseDate?: string
+    /** The bill this card transaction was billed on; absent while it's on the open bill. */
+    billId?: string | null
   } | null
+}
+
+/** A closed credit card bill (GET /bills?accountId=, as in the SDK's CreditCardBills). */
+export interface PluggyBill {
+  id: string
+  dueDate: string
+  totalAmount: number
+  totalAmountCurrencyCode?: string | null
 }

@@ -1,7 +1,7 @@
 // Minimal Pluggy API client (fetch-based). Endpoints and auth match the
 // official SDK: POST /auth -> apiKey, then `X-API-KEY` on every request.
 
-import type { CursorPageResponse, PageResponse, PluggyAccount, PluggyConnectorInfo, PluggyItem, PluggyTransaction } from './types.js'
+import type { CursorPageResponse, PageResponse, PluggyAccount, PluggyBill, PluggyConnectorInfo, PluggyItem, PluggyTransaction } from './types.js'
 
 /** API credentials (server-side only, from Vercel environment variables). */
 export interface PluggyCredentials {
@@ -107,6 +107,12 @@ export class PluggyClient {
 
   async getAccounts(itemId: string): Promise<PluggyAccount[]> {
     const page = await this.get<PageResponse<PluggyAccount>>('accounts', { itemId, pageSize: '500' })
+    return page.results
+  }
+
+  /** A credit card's closed bills (GET /bills?accountId=, as in the SDK). */
+  async getBills(accountId: string): Promise<PluggyBill[]> {
+    const page = await this.get<PageResponse<PluggyBill>>('bills', { accountId })
     return page.results
   }
 

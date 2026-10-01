@@ -38,7 +38,7 @@ describe('current card bill (from the billing cycle)', () => {
 
   it('sums what is dated in the cycle, without bill payments', () => {
     const bill = currentBill(card('2026-10-20', '2026-10-27'), txs, [], today)
-    expect(bill).toEqual({ amount: 110_00, closeDate: '2026-10-20', dueDate: '2026-10-27', closed: false })
+    expect(bill).toEqual({ amount: 110_00, closeDate: '2026-10-20', dueDate: '2026-10-27', closed: false, source: 'cycle' })
   })
 
   it('shows a closed bill until it is due', () => {
@@ -73,6 +73,29 @@ describe('current card bill (from the billing cycle)', () => {
     expect(bill.amount).toBe(100_00)
   })
 
+  it("uses the bank's closed bill total while it isn't due yet", () => {
+    const c = { ...card('2026-10-20', '2026-10-27'), creditData: { ...card('2026-10-20', '2026-10-27').creditData!, lastBill: { dueDate: '2026-10-05', amount: 1_234_00 } } }
+    // Dates say the open cycle, but a closed bill is due on 5 Oct: that's what to pay now.
+    expect(currentBill(c, txs, [], today)).toEqual({ amount: 1_234_00, closeDate: '2026-09-20', dueDate: '2026-10-05', closed: true, source: 'bank-bill' })
+  })
+
+  it('ignores a closed bill that is already due', () => {
+    const c = { ...card('2026-10-20', '2026-10-27'), creditData: { ...card('2026-10-20', '2026-10-27').creditData!, lastBill: { dueDate: '2026-09-27', amount: 1_234_00 } } }
+    expect(currentBill(c, txs, [], today)!.source).toBe('cycle')
+  })
+
+  it('sums the transactions not on any bill yet, when the bank tags billed ones', () => {
+    const tagged = [
+      { ...tx('2026-09-10', -500_00), billId: 'bill-sep' }, // billed (previous)
+      { ...tx('2026-09-12', -80_00), billId: 'bill-sep' },
+      tx('2026-09-18', -40_00), // dated before the cycle by the dates, but not billed yet
+      tx('2026-10-01', -30_00),
+      tx('2026-09-25', 400_00, 'card-payment'),
+    ]
+    const bill = currentBill(card('2026-10-20', '2026-10-27'), tagged, [], today)!
+    expect(bill).toMatchObject({ amount: 70_00, source: 'unbilled', closed: false, closeDate: '2026-10-20' })
+  })
+
   it('is null when the bank gives no closing date (the app then shows the balance)', () => {
     expect(currentBill(card(null, null), txs, [], today)).toBeNull()
   })
@@ -85,11 +108,11 @@ describe('current card bill (from the billing cycle)', () => {
     const plans = installmentPlans(seed.transactions, day)
     for (const c of seed.accounts.filter((a) => a.type === 'CREDIT')) {
       const bill = currentBill(c, seed.transactions, plans, day)!
-      const from = addMonths(bill.closeDate, -1)
+      const from = addMonths(bill.closeDate!, -1)
       const expected = plans
         .filter((p) => p.accountId === c.id)
         .flatMap((p) => p.upcoming)
-        .filter((u) => u.date > from && u.date <= bill.closeDate)
+        .filter((u) => u.date > from && u.date <= bill.closeDate!)
         .reduce((sum, u) => sum + u.amount, 0)
       expect(bill.amount).toBe(c.balance + expected)
     }

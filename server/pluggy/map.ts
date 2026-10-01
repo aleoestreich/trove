@@ -16,12 +16,14 @@
 
 import { categories } from '../../src/data/categories.js'
 import type { Account, Cents, Institution, Snapshot, Transaction } from '../../src/data/types.js'
-import type { PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
+import type { PluggyAccount, PluggyBill, PluggyItem, PluggyTransaction } from './types.js'
 
 export interface PluggyData {
   items: PluggyItem[]
   accounts: PluggyAccount[]
   transactions: PluggyTransaction[]
+  /** Closed bills per credit card account, when Pluggy has them. */
+  bills?: Map<string, PluggyBill[]>
   /** BRL per 1 unit of each non-BRL currency present. */
   rates: Record<string, number>
   fetchedAt: string
@@ -150,6 +152,14 @@ function shortAccountName(a: PluggyAccount): string {
   return kind || name
 }
 
+/** The bill with the latest due date, in BRL (bills are in the card's currency unless they say otherwise). */
+function latestBill(bills: PluggyBill[] | undefined, accountCurrency: string, rates: Record<string, number>) {
+  const last = [...(bills ?? [])].filter((b) => b.dueDate).sort((x, y) => x.dueDate.localeCompare(y.dueDate)).pop()
+  if (!last) return null
+  const currency = (last.totalAmountCurrencyCode || accountCurrency).toUpperCase()
+  return { dueDate: brazilDate(last.dueDate), amount: cents(Math.abs(last.totalAmount) * rateOf(currency, rates)) }
+}
+
 // ---------------------------------------------------------------------------
 // Categories
 
@@ -258,6 +268,7 @@ export function toSnapshot(input: PluggyData): Snapshot {
           availableCreditLimit: available != null ? cents(available * rate) : limit - account.balance,
           balanceCloseDate: a.creditData?.balanceCloseDate ? brazilDate(a.creditData.balanceCloseDate) : null,
           balanceDueDate: a.creditData?.balanceDueDate ? brazilDate(a.creditData.balanceDueDate) : null,
+          lastBill: latestBill(data.bills?.get(a.id), currency, rates),
         }
       }
       return account
@@ -287,6 +298,7 @@ export function toSnapshot(input: PluggyData): Snapshot {
       else if (accCur !== 'BRL') tx.foreign = { currency: accCur, amount: sign * cents(inAccountCurrency) }
 
       const m = t.creditCardMetadata
+      if (m?.billId) tx.billId = m.billId
       if (m?.installmentNumber && m.totalInstallments && m.totalInstallments > 1) {
         // Convert the purchase total at the same rate as this installment.
         const brlPerUnit = Math.abs(t.amount) > 0 ? (inAccountCurrency * factor) / Math.abs(t.amount) : factor

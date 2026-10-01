@@ -107,7 +107,10 @@ Nothing else is stored. You can see these logs in Vercel → **Logs**.
    - your connections and their status;
    - each account's name and the bank its card is named after;
    - account types and currencies;
-   - how Pluggy's categories were matched to Trove's.
+   - how Pluggy's categories were matched to Trove's;
+   - for each card, how its bill can be worked out: closing and due dates,
+     whether the bank's bills are available, and how many transactions are
+     tagged with a bill (dates and counts only).
 
    It contains **no amounts or transaction descriptions**, and it's what's
    needed to fine-tune the mapping.
@@ -141,8 +144,9 @@ Nothing else is stored. You can see these logs in Vercel → **Logs**.
   settings are missing, and the app then falls back to demo data.
 - `server/pluggy/client.ts`: minimal `fetch` client. It calls `POST /auth`,
   sends the API key as `X-API-KEY`, and uses `GET /items/{id}`,
-  `GET /accounts?itemId=` and `GET /v2/transactions?accountId=&dateFrom=`
-  with the cursor.
+  `GET /accounts?itemId=`, `GET /v2/transactions?accountId=&dateFrom=` (with
+  the cursor) and, for cards, `GET /bills?accountId=` (optional: if it fails,
+  the load continues).
 - `server/pluggy/map.ts`: Pluggy → Trove model:
   - signs from `DEBIT`/`CREDIT`;
   - BRL conversion, keeping the original currency;

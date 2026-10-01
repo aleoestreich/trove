@@ -26,6 +26,8 @@ export interface CreditData {
   balanceCloseDate: string | null
   /** Day the current bill is due (ISO date), if the bank reports it. */
   balanceDueDate: string | null
+  /** The bank's latest closed bill (from Pluggy's bills), if it reports them. */
+  lastBill?: { dueDate: string; amount: Cents } | null
 }
 
 export interface Account {
@@ -74,6 +76,11 @@ export interface Transaction {
    * `creditCardMetadata`. Each installment is its own transaction, charged in
    * a later bill; `amount` is this installment only.
    */
+  /**
+   * Card transactions: the bank's bill this was charged on. Absent while it's
+   * on the open bill, or when the bank doesn't say.
+   */
+  billId?: string
   installment?: {
     /** 1-based: this is installment `number` of `total`. */
     number: number

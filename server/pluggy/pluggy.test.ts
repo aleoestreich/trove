@@ -405,7 +405,7 @@ describe('GET /api/finance', () => {
   afterEach(() => vi.restoreAllMocks())
 
   /** Fake Pluggy + exchange-rate service. */
-  function fakeUpstream(opts: { failAccounts?: boolean; extraAccounts?: PluggyAccount[] } = {}) {
+  function fakeUpstream(opts: { failAccounts?: boolean; extraAccounts?: PluggyAccount[]; bills?: unknown[]; cardTx?: Partial<PluggyTransaction> } = {}) {
     return vi.fn(async (input: string | URL | Request) => {
       const url = new URL(String(input))
       if (url.hostname === 'economia.awesomeapi.com.br') return Response.json({ USDBRL: { bid: '5.5' } })
@@ -417,9 +417,12 @@ describe('GET /api/finance', () => {
       }
       if (url.pathname === '/v2/transactions') {
         const acc = url.searchParams.get('accountId')!
-        if (opts.extraAccounts?.some((a) => a.id === acc)) return Response.json({ results: [], next: null })
+        if (opts.extraAccounts?.some((a) => a.id === acc)) {
+          return Response.json({ results: opts.cardTx ? [tx({ id: `t-${acc}`, accountId: acc, ...opts.cardTx })] : [], next: null })
+        }
         return Response.json({ results: [tx({ id: `t-${acc}`, accountId: acc, category: 'Groceries', description: 'Pão de Açúcar' })], next: null })
       }
+      if (url.pathname === '/bills' && opts.bills) return Response.json({ results: opts.bills, page: 1, total: opts.bills.length, totalPages: 1 })
       return new Response('not found', { status: 404 })
     })
   }
@@ -434,6 +437,40 @@ describe('GET /api/finance', () => {
     const rateUrls = fetchFn.mock.calls.map(([u]) => String(u)).filter((u) => u.includes('awesomeapi'))
     expect(rateUrls).toEqual(['https://economia.awesomeapi.com.br/json/last/USD-BRL'])
     expect((await res.json()).accounts.map((a: { id: string }) => a.id)).not.toContain('acc-eur')
+  })
+
+  // A made-up card with bills.
+  const cardAcc: PluggyAccount = {
+    id: 'acc-card', itemId: 'item-1', type: 'CREDIT', subtype: 'CREDIT_CARD', name: 'Cartão', balance: 900, currencyCode: 'BRL',
+    creditData: { creditLimit: 5000, availableCreditLimit: 4100, balanceCloseDate: '2026-10-20T03:00:00.000Z', balanceDueDate: '2026-10-27T03:00:00.000Z' },
+  }
+  const cardBills = [
+    { id: 'b1', dueDate: '2026-08-27T03:00:00.000Z', totalAmount: 300 },
+    { id: 'b2', dueDate: '2026-09-27T03:00:00.000Z', totalAmount: 450.5 },
+  ]
+
+  it("fetches each card's bills and keeps the latest one, and each transaction's bill", async () => {
+    const fetchFn = fakeUpstream({ extraAccounts: [cardAcc], bills: cardBills, cardTx: { creditCardMetadata: { billId: 'b2' } } })
+    const s = await (await finance(req(), config, { fetch: fetchFn as typeof fetch, now })).json()
+    const c = s.accounts.find((a: { id: string }) => a.id === 'acc-card')
+    expect(c.creditData.lastBill).toEqual({ dueDate: '2026-09-27', amount: 450_50 })
+    expect(s.transactions.find((t: { id: string }) => t.id === 't-acc-card').billId).toBe('b2')
+    expect(fetchFn.mock.calls.some(([u]) => String(u).includes('/bills?accountId=acc-card'))).toBe(true)
+  })
+
+  it('still loads when bills are not available for a card', async () => {
+    const res = await finance(req(), config, { fetch: fakeUpstream({ extraAccounts: [cardAcc], cardTx: {} }) as typeof fetch, now })
+    expect(res.status).toBe(200)
+    expect((await res.json()).accounts.find((a: { id: string }) => a.id === 'acc-card').creditData.lastBill).toBeNull()
+  })
+
+  it('reports how card bills can be worked out, with dates and counts but no amounts', async () => {
+    const fetchFn = fakeUpstream({ extraAccounts: [cardAcc], bills: cardBills, cardTx: { creditCardMetadata: { billId: 'b2' } } })
+    const body = await (await finance(req('?summary'), config, { fetch: fetchFn as typeof fetch, now })).text()
+    const card = JSON.parse(body).cards[0]
+    expect(card).toMatchObject({ billsAvailable: true, transactionsWithBillId: 1, transactionsWithoutBillId: 0 })
+    expect(card.billDueDates).toEqual(['2026-08-27T03:00:00.000Z', '2026-09-27T03:00:00.000Z'])
+    expect(body).not.toMatch(/450|300\b|"totalAmount"/)
   })
 
   it('returns 503 when Pluggy is not configured (the app then shows demo data)', async () => {
