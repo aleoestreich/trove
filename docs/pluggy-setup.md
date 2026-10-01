@@ -163,8 +163,10 @@ Nothing else is stored. You can see these logs in Vercel → **Logs**.
     "USD balance" / "Saldo em USD", and so on. Exchange rates are only
     fetched for accounts that are shown, so an empty EUR or GBP balance
     can't make the load fail;
-  - bank accounts at zero with no transactions in the last 6 months are
-    left out (cards always stay). The summary marks them `hiddenAsEmpty`.
+  - accounts with nothing to show and no transactions in the last 6 months
+    are left out: bank accounts at zero, and credit cards with no bill and
+    none of the limit in use (no future installments). The summary marks
+    them `hiddenAsEmpty`.
 - `api/connect-token.ts` → `server/pluggy/connectToken.ts`: `POST` (behind
   the login). It looks up the MeuPluggy connector (`GET /connectors?name=`),
   refuses with `409` if it's missing, then creates a Connect token
