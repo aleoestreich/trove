@@ -12,6 +12,7 @@ import { InstitutionBadge } from '../components/BankBadge'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n/I18nProvider'
 import { accountLabel } from '../lib/accountLabel'
+import { sortForDisplay } from '../lib/accountOrder'
 import { isDeployed } from '../lib/useIsDesktop'
 import { ConnectMeuPluggy } from '../components/ConnectMeuPluggy'
 import { CardDaysEditor } from '../components/CardDaysEditor'
@@ -30,7 +31,8 @@ export function Accounts() {
   const bal = balances(accounts)
 
   const bankCard = (inst: (typeof institutions)[number]) => {
-    const own = accounts.filter((a) => a.institutionId === inst.id)
+    // Checking first, then savings, then cards.
+    const own = sortForDisplay(accounts.filter((a) => a.institutionId === inst.id))
     const total = balances(own)
     return (
       <section key={inst.id} className="overflow-hidden rounded-lg border border-line bg-surface">
