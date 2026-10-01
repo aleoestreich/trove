@@ -202,16 +202,24 @@ function pairOwnTransfers(txs: Transaction[], genericIds: Set<string>) {
 // ---------------------------------------------------------------------------
 
 /**
- * Bank accounts at zero with no transactions in the fetched window (e.g. an
- * unused "Conta Pré-paga") are left out. Cards always stay: they show a limit.
+ * Accounts with nothing to show are left out, as long as they have no
+ * transactions in the fetched window (hiding those would change the totals):
+ * - bank accounts at zero (e.g. an unused "Conta Pré-paga");
+ * - credit cards with no bill and none of the limit in use (no future
+ *   installments either), e.g. a card that's never used.
  */
-export function isEmptyBankAccount(a: PluggyAccount, withTransactions: Set<string>): boolean {
-  return a.type === 'BANK' && cents(a.balance) === 0 && !withTransactions.has(a.id)
+export function isEmptyAccount(a: PluggyAccount, withTransactions: Set<string>): boolean {
+  if (withTransactions.has(a.id) || cents(a.balance) !== 0) return false
+  if (a.type === 'BANK') return true
+  const limit = a.creditData?.creditLimit
+  const available = a.creditData?.availableCreditLimit
+  // Limit in use = limit - available. Unknown -> treat as unused only if there's no bill (checked above).
+  return limit == null || available == null || cents(limit) - cents(available) <= 0
 }
 
 export function toSnapshot(input: PluggyData): Snapshot {
   const withTransactions = new Set(input.transactions.map((t) => t.accountId))
-  const data = { ...input, accounts: input.accounts.filter((a) => !isEmptyBankAccount(a, withTransactions)) }
+  const data = { ...input, accounts: input.accounts.filter((a) => !isEmptyAccount(a, withTransactions)) }
   const { rates } = data
   const itemById = new Map(data.items.map((i) => [i.id, i]))
 

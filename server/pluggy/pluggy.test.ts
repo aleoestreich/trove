@@ -212,12 +212,23 @@ describe('Meu Pluggy: one group per item, named after its checking account', () 
       [meuItem('nu'), meuItem('safra')],
       [
         acc('nu-empty', 'nu', 'Nu Pagamentos S.A. (Conta Pré-paga)', { balance: 0 }),
-        card('nu-card', 'nu', 'Mastercard (Cartão de Crédito)', { balance: 0 }),
+        card('nu-card', 'nu', 'Mastercard (Cartão de Crédito)', { balance: 120 }),
         acc('safra-empty', 'safra', 'Banco Safra S.A. (Conta Corrente)', { balance: 0 }),
       ],
     )
     expect(s.accounts.map((a) => a.id)).toEqual(['nu-card'])
     expect(s.institutions.map((i) => i.name)).toEqual(['Nubank'])
+  })
+
+  it('hides credit cards with no bill and none of the limit in use, unless they had transactions', () => {
+    const unused = card('unused', 'nu', 'Nu Pagamentos S.A. (Cartão de Crédito)', { balance: 0, creditData: { creditLimit: 1000, availableCreditLimit: 1000 } })
+    const noLimitInfo = card('no-info', 'nu', 'Cartão Extra', { balance: 0, creditData: null })
+    const installments = card('instal', 'nu', 'Cartão Parcelado', { balance: 0, creditData: { creditLimit: 1000, availableCreditLimit: 700 } })
+    const billed = card('billed', 'nu', 'Cartão Principal', { balance: 250.4, creditData: { creditLimit: 1000, availableCreditLimit: 749.6 } })
+    const paidOff = card('paid', 'nu', 'Cartão Quitado', { balance: 0, creditData: { creditLimit: 1000, availableCreditLimit: 1000 } })
+    const s = snap([meuItem('nu')], [unused, noLimitInfo, installments, billed, paidOff], [tx({ accountId: 'paid', amount: 80 })])
+    // Kept: future installments use part of the limit; a bill; spending in the window.
+    expect(s.accounts.map((a) => a.id)).toEqual(['instal', 'billed', 'paid'])
   })
 
   it('keeps a zero-balance bank account that had transactions', () => {

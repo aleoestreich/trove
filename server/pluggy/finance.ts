@@ -12,7 +12,7 @@
 
 import { MONTHS_OF_HISTORY } from '../../src/data/types.js'
 import { PluggyClient, PluggyError, type PluggyConfig } from './client.js'
-import { categoryFor, isEmptyBankAccount, isMeuPluggy, itemBankName, toSnapshot } from './map.js'
+import { categoryFor, isEmptyAccount, isMeuPluggy, itemBankName, toSnapshot } from './map.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
 import { ratesToBRL } from './rates.js'
 
@@ -68,7 +68,7 @@ export async function finance(request: Request, config: PluggyConfig | null, dep
     // Rates only for what's shown: empty, hidden balances (e.g. a Wise EUR
     // account at zero) don't need one, so they can't fail the load.
     const withTransactions = new Set(transactions.map((t) => t.accountId))
-    const shown = accounts.filter((a) => !isEmptyBankAccount(a, withTransactions))
+    const shown = accounts.filter((a) => !isEmptyAccount(a, withTransactions))
     const currencies = [...shown.map((a) => a.currencyCode), ...transactions.map((t) => t.currencyCode)].filter(Boolean)
     const rates = await ratesToBRL(currencies, fetchFn)
     const body = JSON.stringify(toSnapshot({ items, accounts, transactions, rates, fetchedAt: now.toISOString() }))
@@ -105,8 +105,8 @@ export function summarize(items: PluggyItem[], accounts: PluggyAccount[], transa
       transactions: transactions.filter((t) => t.accountId === a.id).length,
       transactionCurrencies: [...new Set(transactions.filter((t) => t.accountId === a.id).map((t) => t.currencyCode))],
       hasCreditData: Boolean(a.creditData),
-      // Left out of the app: a bank account at zero with no transactions.
-      hiddenAsEmpty: isEmptyBankAccount(a, withTransactions),
+      // Left out of the app: a bank account at zero, or an unused card, with no transactions.
+      hiddenAsEmpty: isEmptyAccount(a, withTransactions),
     })),
     installments: transactions.filter((t) => (t.creditCardMetadata?.totalInstallments ?? 0) > 1).length,
     pending: transactions.filter((t) => t.status === 'PENDING').length,
