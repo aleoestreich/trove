@@ -5,12 +5,12 @@ import type { Institution } from '../data/types'
 import { installmentPlans, upcomingByMonth, type InstallmentPlan } from '../lib/installments'
 import { formatMonthShort, formatMonthYear } from '../lib/dates'
 import { formatMoney } from '../lib/money'
-import { Card, CardTitle, EmptyState, IconDisc, Overline, PageHeader, Progress } from '../components/ui'
-import { MonthBars } from '../components/charts'
+import { Card, CardTitle, EmptyState, IconDisc, Overline, PageHeader, Progress, Swatch } from '../components/ui'
+import { StackedMonthChart } from '../components/charts'
 import { categoryIcon } from '../components/Icon'
 import { useAccountLabel } from '../components/TransactionRow'
 import { useI18n } from '../i18n/I18nProvider'
-import { InstitutionBadge } from '../components/BankBadge'
+import { InstitutionBadge, bankColors } from '../components/BankBadge'
 import { useIsDesktop } from '../lib/useIsDesktop'
 
 /** Months shown in the "committed per month" chart. */
@@ -75,11 +75,36 @@ export function Installments() {
       </span>
     </div>
   )
+  // Committed per month, stacked by bank (same order and colours as the list and badges).
+  const chartBanks = groupByBank(active, bankOf).map((g) => g.institution)
+  const colorOf = bankColors(chartBanks)
+  const chartSeries = chartBanks.map((i) => ({ key: i.id, name: i.name }))
+  const chartData = months.slice(0, CHART_MONTHS).map((m) => {
+    const row: Record<string, number | string> = { label: formatMonthShort(m.month) }
+    for (const plan of active) {
+      const bank = bankOf(plan.accountId).id
+      for (const u of plan.upcoming) if (u.month === m.month) row[bank] = Number(row[bank] ?? 0) + u.amount
+    }
+    return row
+  })
   const chart = months.length > 0 && (
-    <MonthBars
-      label={t.installments.committedPerMonth}
-      data={months.slice(0, CHART_MONTHS).map((m) => ({ label: formatMonthShort(m.month), amount: m.amount }))}
-    />
+    <div className="flex flex-col gap-3">
+      <StackedMonthChart
+        data={chartData}
+        series={chartSeries}
+        colors={chartSeries.map((s) => colorOf.get(s.key)!)}
+        highlight="first"
+        label={t.installments.committedPerMonth}
+      />
+      <ul className="flex flex-wrap gap-x-3.5 gap-y-2 lg:gap-x-4">
+        {chartSeries.map((s) => (
+          <li key={s.key} className="inline-flex items-center gap-1.5 text-[13px] leading-[18px] text-ink-2">
+            <Swatch color={colorOf.get(s.key)!} />
+            {s.name}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 
   // In progress / Paid off. Only shown when something is paid off.
