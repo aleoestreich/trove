@@ -10,7 +10,12 @@ export interface CardBill {
   dueDate: string | null
   /** Closed but not due yet: this is the amount to pay now. */
   closed: boolean
+  /** Closed bills: bill payments made since it closed (a partial payment; `amount` is what's left). */
+  paid: Cents
 }
+
+/** Rounding slack when comparing a payment with the bill (R$ 1). */
+const PAID_TOLERANCE = 1_00
 
 /**
  * A card's current bill, from its billing cycle rather than its balance (the
@@ -23,32 +28,55 @@ export interface CardBill {
  *   settle the previous bill);
  * - plus installments expected to post in the cycle that aren't in the data
  *   yet.
- * A previous bill left partly unpaid isn't included.
+ * A closed bill that's been paid (bill payments on the card since it closed
+ * cover it) moves on to the next cycle, even before its due date; if it's
+ * only partly paid, what's left is shown. A previous bill left partly unpaid
+ * isn't added to the next one.
  *
  * Null when the bank doesn't report a closing date: show the balance instead.
  */
 export function currentBill(account: Account, transactions: Transaction[], plans: InstallmentPlan[], today: Date = new Date()): CardBill | null {
   const credit = account.creditData
   if (account.type !== 'CREDIT' || !credit?.balanceCloseDate) return null
+  const reportedClose = credit.balanceCloseDate
+  const reportedDue = credit.balanceDueDate
   const todayISO = toISO(today)
-  // Move past bills that are already due (or closed, without a due date),
-  // counting from the reported dates so day 31 doesn't drift. Bounded.
-  let close = credit.balanceCloseDate
-  let due = credit.balanceDueDate
-  for (let k = 1; k <= 24 && (due ? due < todayISO : close < todayISO); k++) {
-    close = addMonths(credit.balanceCloseDate, k)
-    due = credit.balanceDueDate && addMonths(credit.balanceDueDate, k)
-  }
-  const from = addMonths(close, -1) // previous closing, excluded
-  const inCycle = (date: string) => date > from && date <= close
+  // Dates `k` months after the reported ones, so day 31 doesn't drift.
+  const cycle = (k: number) => ({ close: addMonths(reportedClose, k), due: reportedDue && addMonths(reportedDue, k) })
+  const own = transactions.filter((t) => t.accountId === account.id)
 
-  let amount = 0
-  for (const t of transactions) {
-    if (t.accountId === account.id && t.categoryId !== 'card-payment' && inCycle(t.date)) amount -= t.amount
+  /** What a cycle's bill adds up to. */
+  const billOf = (close: string) => {
+    const from = addMonths(close, -1) // previous closing, excluded
+    const inCycle = (date: string) => date > from && date <= close
+    let amount = 0
+    for (const t of own) if (t.categoryId !== 'card-payment' && inCycle(t.date)) amount -= t.amount
+    for (const p of plans) {
+      if (p.accountId !== account.id) continue
+      for (const u of p.upcoming) if (inCycle(u.date)) amount += u.amount
+    }
+    return amount
   }
-  for (const p of plans) {
-    if (p.accountId !== account.id) continue
-    for (const u of p.upcoming) if (inCycle(u.date)) amount += u.amount
+  /** Bill payments on the card since `close` (up to today). */
+  const paidSince = (close: string) =>
+    own.filter((t) => t.categoryId === 'card-payment' && t.amount > 0 && t.date > close && t.date <= todayISO).reduce((sum, t) => sum + t.amount, 0)
+
+  // Move past bills that are already due (or closed, without a due date). Bounded.
+  let k = 0
+  while (k < 24 && (cycle(k).due ? cycle(k).due! < todayISO : cycle(k).close < todayISO)) k++
+  let { close, due } = cycle(k)
+  let amount = billOf(close)
+  let paid = 0
+  if (close < todayISO) {
+    // Closed and not due yet: if it's been paid, the next cycle is what matters now.
+    paid = paidSince(close)
+    if (paid >= amount - PAID_TOLERANCE) {
+      ;({ close, due } = cycle(k + 1))
+      amount = billOf(close)
+      paid = 0
+    } else {
+      amount -= paid
+    }
   }
-  return { amount, closeDate: close, dueDate: due, closed: close < todayISO }
+  return { amount, closeDate: close, dueDate: due, closed: close < todayISO, paid }
 }
