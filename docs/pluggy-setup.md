@@ -105,6 +105,7 @@ Nothing else is stored. You can see these logs in Vercel → **Logs**.
 2. Open `https://YOUR_SITE/api/finance?summary` (while logged in) and send the
    result to whoever maintains the code. It lists:
    - your connections and their status;
+   - each account's name and the bank Trove grouped it under;
    - account types and currencies;
    - how Pluggy's categories were matched to Trove's.
 
@@ -147,7 +148,13 @@ Nothing else is stored. You can see these logs in Vercel → **Logs**.
   - BRL conversion, keeping the original currency;
   - installments from `creditCardMetadata`;
   - category matching;
-  - transfer detection.
+  - transfer detection;
+  - **Meu Pluggy accounts grouped by bank.** All of them arrive under one
+    connection named "MeuPluggy", with the real bank only in the account
+    name ("Nu Pagamentos S.A. - … (Conta Pré-paga)"). Trove shows one card
+    per bank (Nubank, Itaú, Wise…), with known banks matched by name and
+    others by their legal name, and shortens the account name to the part
+    in brackets ("Conta Pré-paga").
 - `api/connect-token.ts` → `server/pluggy/connectToken.ts`: `POST` (behind
   the login). It looks up the MeuPluggy connector (`GET /connectors?name=`),
   refuses with `409` if it's missing, then creates a Connect token
