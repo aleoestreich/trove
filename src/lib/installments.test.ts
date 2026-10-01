@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSeed } from '../data/seed'
 import type { Transaction } from '../data/types'
-import { installmentPlans, remainingByAccount, upcomingByMonth } from './installments'
+import { installmentPlans, purchaseDescription, remainingByAccount, upcomingByMonth } from './installments'
 
 const inst = (number: number, date: string, amount: number): Transaction => ({
   id: `t${number}`,
@@ -50,6 +50,54 @@ describe('installmentPlans', () => {
     ])
     expect(done[0].remaining).toBe(0)
     expect(done[0].upcoming).toEqual([])
+  })
+})
+
+describe('installments whose description carries the number ("LOJA EXEMPLO 04/10")', () => {
+  // Some banks put the number in the description, send no purchase date (so
+  // each falls back to its own charge date), and the charge days drift.
+  // Made-up shop and amounts.
+  const inst = (number: number, date: string, id = `i${number}`): Transaction => ({
+    id,
+    accountId: 'card',
+    date,
+    description: `LOJA EXEMPLO ${String(number).padStart(2, '0')}/10`,
+    amount: -150_00,
+    categoryId: 'shopping',
+    status: 'POSTED',
+    installment: { number, total: 10, totalAmount: 10 * 150_00, purchaseDate: date },
+  })
+  const plans = installmentPlans([inst(4, '2026-05-28'), inst(5, '2026-07-02'), inst(6, '2026-08-01')])
+
+  it('counts 04/10, 05/10 and 06/10 as one purchase', () => {
+    expect(plans).toHaveLength(1)
+    expect(plans[0]).toMatchObject({ description: 'LOJA EXEMPLO', count: 10, charged: 6 })
+  })
+
+  it('owes the installments left once, not once per installment', () => {
+    expect(plans[0].remaining).toBe(4 * 150_00)
+    expect(plans[0].upcoming).toHaveLength(4)
+    expect(plans[0].upcoming.at(-1)!.month).toBe('2026-12')
+  })
+
+  it('keeps two purchases apart when the same shop has the same installment twice', () => {
+    const two = installmentPlans([inst(5, '2026-07-02', 'a5'), inst(6, '2026-08-01', 'a6'), inst(5, '2026-08-01', 'b5'), inst(6, '2026-09-01', 'b6')])
+    expect(two).toHaveLength(2)
+    expect(two.reduce((s, p) => s + p.remaining, 0)).toBe(2 * 4 * 150_00)
+  })
+
+  it('keeps purchases bought months apart apart', () => {
+    expect(installmentPlans([inst(2, '2026-03-05', 'x'), inst(2, '2026-08-05', 'y')])).toHaveLength(2)
+  })
+
+  it('strips the common installment markers, and only the matching numbers', () => {
+    const d = (description: string, number: number, total: number) =>
+      purchaseDescription({ ...inst(number, '2026-01-01'), description, installment: { number, total, totalAmount: 0, purchaseDate: '2026-01-01' } })
+    expect(d('LOJA EXEMPLO 04/10', 4, 10)).toBe('LOJA EXEMPLO')
+    expect(d('MAGAZINE PARC 4/10', 4, 10)).toBe('MAGAZINE')
+    expect(d('Geladeira (3 de 12)', 3, 12)).toBe('Geladeira')
+    expect(d('LOJA 14/18', 4, 18)).toBe('LOJA 14/18') // a different number is left alone
+    expect(d('Geladeira', 3, 12)).toBe('Geladeira')
   })
 })
 
