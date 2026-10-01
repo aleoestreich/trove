@@ -20,8 +20,11 @@ const FALLBACK: Record<Bank, string> = {
   wise: 'M4.5 6.5l3.2 11 4.3-8.5 4.3 8.5 3.2-11',
 }
 
-/** Logo size as a share of the badge. Raise one bank's (e.g. to 64%) if its logo looks busy at 32px. */
-const LOGO_SCALE: Record<Bank, number> = { nubank: 0.58, itau: 0.58, santander: 0.58, wise: 0.58 }
+/**
+ * Logo size as a share of the badge. Itaú's logo is a filled square with the
+ * lettering cut out, which gets hard to read at 32px, so it's drawn larger.
+ */
+const LOGO_SCALE: Record<Bank, number> = { nubank: 0.58, itau: 0.64, santander: 0.58, wise: 0.58 }
 
 const logoUrl = (bank: Bank) => `/banks/${bank}.svg`
 
