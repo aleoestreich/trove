@@ -18,6 +18,11 @@ roadmap and `README.md` for how to run it.
   is merged.
 - **PRs:** fill in every section of `pull_request_template.md`, keeping its
   headings.
+- **No real financial data in the repo or on GitHub.** The owner's merchants,
+  amounts, balances, account names and screenshots are shared only to show a
+  bug. Never copy them into PR titles or descriptions, commit messages, code,
+  comments, tests, fixtures or docs. Describe the problem in general terms and
+  use made-up examples ("LOJA EXEMPLO 04/10", R$ 150,00).
 
 ## Commands
 
