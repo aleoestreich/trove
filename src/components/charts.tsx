@@ -98,13 +98,13 @@ function NetWorthTooltip({ active, payload, label }: { active?: boolean; payload
 // Bar charts are plain HTML: a baseline, bars that grow from it, and month
 // labels underneath. The last column is the current month.
 
-function MonthLabels({ labels }: { labels: string[] }) {
+function MonthLabels({ labels, highlight = labels.length - 1 }: { labels: string[]; highlight?: number }) {
   return (
     <div className="flex h-5" aria-hidden>
       {labels.map((l, i) => (
         <span
           key={i}
-          className={`flex-1 text-center text-[11px] leading-5 lg:text-xs whitespace-nowrap ${i === labels.length - 1 ? 'font-medium text-ink' : 'text-muted'}`}
+          className={`flex-1 text-center text-[11px] leading-5 lg:text-xs whitespace-nowrap ${i === highlight ? 'font-medium text-ink' : 'text-muted'}`}
         >
           {l}
         </span>
@@ -150,14 +150,27 @@ export interface StackSeries {
 }
 
 /**
- * Stacked monthly spending by category, total on top. Series take the
- * categorical slots in fixed order (max 6: top 5 + "Other"); 2px gaps
- * separate the segments.
+ * Stacked monthly bars, total on top; 2px gaps separate the segments.
+ * Series take the categorical slots in fixed order (max 6) unless `colors`
+ * gives one per series. The `highlight` month's label is emphasised: the
+ * latest month for history, the first one for months ahead.
  */
-export function SpendingTrendChart({ data, series, label }: { data: Record<string, number | string>[]; series: StackSeries[]; label: string }) {
+export function StackedMonthChart({
+  data,
+  series,
+  label,
+  colors,
+  highlight = 'last',
+}: {
+  data: Record<string, number | string>[]
+  series: StackSeries[]
+  label: string
+  colors?: string[]
+  highlight?: 'first' | 'last'
+}) {
   const totals = data.map((d) => series.reduce((s, x) => s + Number(d[x.key] ?? 0), 0))
   const max = Math.max(1, ...totals)
-  const last = data.length - 1
+  const last = highlight === 'first' ? 0 : data.length - 1
   return (
     <div role="img" aria-label={label}>
       <div className="flex h-[152px] items-end border-b border-line lg:h-[176px]">
@@ -169,42 +182,13 @@ export function SpendingTrendChart({ data, series, label }: { data: Record<strin
             <div className="flex w-[26px] flex-col-reverse lg:w-9 gap-0.5 overflow-hidden rounded-t-[4px]" style={{ height: `max(2px, calc(${(totals[i] / max) * 100}% - 18px))` }}>
               {series.map((s, j) => {
                 const v = Number(d[s.key] ?? 0)
-                return v > 0 ? <div key={s.key} className="min-h-0.5" style={{ flexGrow: v, flexBasis: 0, background: seriesColor(j) }} /> : null
+                return v > 0 ? <div key={s.key} className="min-h-0.5" style={{ flexGrow: v, flexBasis: 0, background: colors?.[j] ?? seriesColor(j) }} /> : null
               })}
             </div>
           </div>
         ))}
       </div>
-      <MonthLabels labels={data.map((d) => String(d.label))} />
-    </div>
-  )
-}
-
-/** Single-series bars with the value on top; the first bar (next month) is emphasised. */
-export function MonthBars({ data, label }: { data: { label: string; amount: number }[]; label: string }) {
-  const max = Math.max(1, ...data.map((d) => d.amount))
-  return (
-    <div role="img" aria-label={label}>
-      <div className="flex h-28 items-end border-b border-line lg:h-32">
-        {data.map((d, i) => (
-          <div key={i} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
-            <span className={`tabular text-[11px] leading-[14px] lg:text-xs whitespace-nowrap ${i === 0 ? 'font-medium text-ink' : 'text-muted'}`}>
-              {formatCompact(Math.round(reais(d.amount)))}
-            </span>
-            <div
-              className={`w-6 rounded-t-[4px] bg-[var(--bar)] lg:w-10 ${i === 0 ? '' : 'opacity-55'}`}
-              style={{ height: `max(2px, calc(${(d.amount / max) * 100}% - 18px))` }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="flex h-5" aria-hidden>
-        {data.map((d, i) => (
-          <span key={i} className={`flex-1 text-center text-[11px] leading-5 lg:text-xs whitespace-nowrap ${i === 0 ? 'font-medium text-ink' : 'text-muted'}`}>
-            {d.label}
-          </span>
-        ))}
-      </div>
+      <MonthLabels labels={data.map((d) => String(d.label))} highlight={last} />
     </div>
   )
 }

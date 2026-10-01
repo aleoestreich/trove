@@ -10,7 +10,7 @@ import { dayOfMonth, formatFullDate, formatMonth, formatMonthName, formatMonthSh
 import { formatMoney, formatPercent } from '../lib/money'
 import { Badge, Card, CardTitle, IconDisc, MonthSwitcher, Overline, PageHeader, Progress, SeeAll, Swatch } from '../components/ui'
 import { InstitutionBadge } from '../components/BankBadge'
-import { CashFlowChart, NetWorthChart, SpendingTrendChart, seriesColor } from '../components/charts'
+import { CashFlowChart, NetWorthChart, StackedMonthChart, seriesColor } from '../components/charts'
 import { TransactionRow } from '../components/TransactionRow'
 import { TransactionSheet } from '../components/TransactionSheet'
 import { useI18n } from '../i18n/I18nProvider'
@@ -250,7 +250,7 @@ export function Dashboard() {
         {/* 5. Spending trend */}
         <Card className="flex flex-col gap-3.5 lg:order-4 lg:col-span-6 lg:gap-4">
           <CardTitle subtitle={t.overview.lastMonths(MONTHS_OF_HISTORY)}>{t.overview.spendingByCategory}</CardTitle>
-          <SpendingTrendChart data={trendData} series={trendSeries} label={t.overview.spendingByCategory} />
+          <StackedMonthChart data={trendData} series={trendSeries} label={t.overview.spendingByCategory} />
           <ul className="flex flex-wrap gap-x-3.5 gap-y-2 lg:gap-x-4 lg:border-t lg:border-line lg:pt-3.5">
             {trendSeries.map((s, i) => (
               <li key={s.key} className="inline-flex items-center gap-1.5 text-[13px] leading-[18px] text-ink-2">

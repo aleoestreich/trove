@@ -51,6 +51,24 @@ function checkLogo(bank: Bank): Promise<'ok' | 'missing'> {
   return check
 }
 
+/**
+ * A chart colour per institution, matching its badge: known banks use their
+ * token; the others take the remaining series slots in order (series-1, -6…).
+ */
+export function bankColors(institutions: Institution[]): Map<string, string> {
+  const used = new Set(Object.values(TOKEN))
+  const free = ['--series-1', '--series-6', '--series-4', '--series-2', '--series-5', '--series-3'].filter((t) => !used.has(t))
+  let next = 0
+  const out = new Map<string, string>()
+  for (const inst of institutions) {
+    const bank = bankFor(inst.name)
+    // Unknown banks beyond the free slots reuse them in order.
+    const token = bank ? TOKEN[bank] : free[next++ % free.length]
+    out.set(inst.id, `var(${token})`)
+  }
+  return out
+}
+
 /** The bank for an institution name ("Itaú" → "itau"), or null when there's no logo for it. */
 export function bankFor(name: string): Bank | null {
   const key = name
