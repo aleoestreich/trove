@@ -155,6 +155,7 @@ function CreditCardBlock({ account, bill, futureInstallments }: { account: Accou
           <span className="tabular text-2xl leading-[30px] font-bold tracking-[-0.01em] text-ink lg:text-[26px] lg:leading-8">
             {formatMoney(billAmount)}
           </span>
+          {bill && bill.paid > 0 && <span className="tabular text-xs leading-4 text-muted">{t.accounts.alreadyPaid(formatMoney(bill.paid))}</span>}
         </div>
         {/* Desktop: close and due dates beside the bill */}
         <div className="hidden gap-5 text-right lg:flex">

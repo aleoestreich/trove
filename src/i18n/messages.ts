@@ -143,6 +143,8 @@ const en = {
     currentBill: 'Current bill',
     /** A bill that has closed and is waiting to be paid. */
     closedBill: 'Closed bill',
+    /** Under a closed bill that's been partly paid; the amount shown is what's left. */
+    alreadyPaid: (amount: string) => `${amount} already paid`,
     closed: 'Closed',
     /** Per-card closing and due days set by the owner. */
     cardDays: {
@@ -326,6 +328,7 @@ const ptBR: Messages = {
     nearLimit: 'Perto do limite',
     currentBill: 'Fatura atual',
     closedBill: 'Fatura fechada',
+    alreadyPaid: (amount) => `${amount} já pago`,
     closed: 'Fechou em',
     cardDays: {
       missing: 'O banco não informa a data de fechamento deste cartão, então não dá para calcular a fatura atual. Informe os dias pelo app do banco.',

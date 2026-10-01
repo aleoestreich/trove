@@ -38,7 +38,7 @@ describe('current card bill (from the billing cycle)', () => {
 
   it('sums what is dated in the cycle, without bill payments', () => {
     const bill = currentBill(card('2026-10-20', '2026-10-27'), txs, [], today)
-    expect(bill).toEqual({ amount: 110_00, closeDate: '2026-10-20', dueDate: '2026-10-27', closed: false })
+    expect(bill).toEqual({ amount: 110_00, closeDate: '2026-10-20', dueDate: '2026-10-27', closed: false, paid: 0 })
   })
 
   it('shows a closed bill until it is due', () => {
@@ -55,10 +55,11 @@ describe('current card bill (from the billing cycle)', () => {
   it('does not drift on month-end closing days', () => {
     // Closes on the 31st, due on the 7th: on 1 Oct the bill to pay is the one
     // that closed on 30 Sep (September has no 31st), due 7 Oct.
-    const bill = currentBill(card('2026-01-31', '2026-02-07'), [], [], today)!
-    expect(bill).toMatchObject({ closeDate: '2026-09-30', dueDate: '2026-10-07', closed: true })
+    const sep = [tx('2026-09-15', -80_00)]
+    const bill = currentBill(card('2026-01-31', '2026-02-07'), sep, [], today)!
+    expect(bill).toMatchObject({ closeDate: '2026-09-30', dueDate: '2026-10-07', closed: true, amount: 80_00 })
     // A month later it's back to the 31st, not the 30th.
-    expect(currentBill(card('2026-01-31', '2026-02-07'), [], [], new Date(2026, 9, 10))!.closeDate).toBe('2026-10-31')
+    expect(currentBill(card('2026-01-31', '2026-02-07'), sep, [], new Date(2026, 9, 10))!.closeDate).toBe('2026-10-31')
   })
 
   it('adds installments expected in the cycle that are not in the data yet', () => {
@@ -71,6 +72,36 @@ describe('current card bill (from the billing cycle)', () => {
     const bill = currentBill(card('2026-10-20', '2026-10-27'), [inst(5, '2026-09-10')], plans, today)!
     // 5/10 (10 Sep) belongs to the previous bill; 6/10 is expected on 10 Oct.
     expect(bill.amount).toBe(100_00)
+  })
+
+  describe('a closed bill that has been paid', () => {
+    // Closed 28 Sep, due 5 Oct; on 1 Oct it's waiting to be paid.
+    const closedCard = card('2026-09-28', '2026-10-05')
+    const cycleTxs = [tx('2026-09-10', -300_00), tx('2026-09-20', -200_00), tx('2026-09-30', -40_00)] // 500 closed, 40 open
+
+    it('shows the closed bill while nothing has been paid', () => {
+      expect(currentBill(closedCard, cycleTxs, [], today)).toMatchObject({ closeDate: '2026-09-28', closed: true, amount: 500_00, paid: 0 })
+    })
+
+    it('moves to the next cycle once it is paid, before the due date', () => {
+      const paid = [...cycleTxs, tx('2026-09-30', 500_00, 'card-payment')]
+      expect(currentBill(closedCard, paid, [], today)).toEqual({ amount: 40_00, closeDate: '2026-10-28', dueDate: '2026-11-05', closed: false, paid: 0 })
+    })
+
+    it('allows a little rounding in the payment', () => {
+      const paid = [...cycleTxs, tx('2026-09-30', 499_50, 'card-payment')]
+      expect(currentBill(closedCard, paid, [], today)!.closed).toBe(false)
+    })
+
+    it("shows what's left when it's only partly paid", () => {
+      const partly = [...cycleTxs, tx('2026-09-30', 200_00, 'card-payment')]
+      expect(currentBill(closedCard, partly, [], today)).toMatchObject({ closed: true, amount: 300_00, paid: 200_00 })
+    })
+
+    it('ignores payments made before the bill closed (they paid the one before)', () => {
+      const early = [...cycleTxs, tx('2026-09-27', 500_00, 'card-payment')]
+      expect(currentBill(closedCard, early, [], today)).toMatchObject({ closed: true, amount: 500_00 })
+    })
   })
 
   it('is null when the bank gives no closing date (the app then shows the balance)', () => {
