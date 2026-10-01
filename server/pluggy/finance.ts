@@ -12,7 +12,7 @@
 
 import { MONTHS_OF_HISTORY } from '../../src/data/types.js'
 import { PluggyClient, PluggyError, type PluggyConfig } from './client.js'
-import { bankOf, categoryFor, isEmptyBankAccount, isMeuPluggy, toSnapshot } from './map.js'
+import { categoryFor, isEmptyBankAccount, isMeuPluggy, itemBankName, toSnapshot } from './map.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
 import { ratesToBRL } from './rates.js'
 
@@ -93,8 +93,8 @@ export function summarize(items: PluggyItem[], accounts: PluggyAccount[], transa
     accounts: accounts.map((a) => ({
       name: a.name,
       marketingName: a.marketingName ?? null,
-      // The bank Trove groups it under (Meu Pluggy accounts only).
-      bank: items.some((i) => i.id === a.itemId && isMeuPluggy(i)) ? bankOf(a) : null,
+      // The bank Trove names this account's item after (Meu Pluggy items only).
+      bank: items.some((i) => i.id === a.itemId && isMeuPluggy(i)) ? itemBankName(accounts.filter((x) => x.itemId === a.itemId)) : null,
       type: a.type,
       subtype: a.subtype,
       currencyCode: a.currencyCode,

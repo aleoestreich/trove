@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PluggyClient, PluggyError, readPluggyConfig, readPluggyCredentials, type PluggyConfig } from './client.js'
 import { connectToken } from './connectToken.js'
 import { pluggyWebhook, readWebhookConfig, WEBHOOK_SECRET_HEADER } from './webhook.js'
-import { bankOf, brazilDate, categoryFor, toSnapshot, type PluggyData } from './map.js'
+import { bankOf, brazilDate, categoryFor, itemBankName, toSnapshot, type PluggyData } from './map.js'
 import { clearRateCache, ratesToBRL } from './rates.js'
 import { clearFinanceCache, finance, historyStart } from './finance.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
@@ -163,53 +163,71 @@ describe('exchange rates', () => {
   })
 })
 
-describe('Meu Pluggy: accounts grouped by bank', () => {
-  const meu: PluggyItem = { id: 'meu', connector: { id: 200, name: 'MeuPluggy', primaryColor: null }, status: 'UPDATED' }
-  const acc = (id: string, name: string, over: Partial<PluggyAccount> = {}): PluggyAccount => ({
-    id, itemId: 'meu', type: 'BANK', subtype: 'CHECKING_ACCOUNT', name, balance: 100, currencyCode: 'BRL', ...over,
+describe('Meu Pluggy: one group per item, named after its checking account', () => {
+  const meuItem = (id: string): PluggyItem => ({ id, connector: { id: 200, name: 'MeuPluggy', primaryColor: null }, status: 'UPDATED' })
+  const acc = (id: string, itemId: string, name: string, over: Partial<PluggyAccount> = {}): PluggyAccount => ({
+    id, itemId, type: 'BANK', subtype: 'CHECKING_ACCOUNT', name, balance: 100, currencyCode: 'BRL', ...over,
   })
-  const accounts = [
-    acc('nu-pre', 'Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)'),
-    acc('nu-card', 'Nu Pagamentos S.A. - Instituição de Pagamento (Cartão de Crédito)', { type: 'CREDIT', subtype: 'CREDIT_CARD', creditData: { creditLimit: 1000 } }),
-    acc('itau', 'Itaú Unibanco S.A. (Conta Corrente)'),
-    acc('wise-usd', 'Wise Brasil Corretora de Câmbio Ltda (Conta USD)', { currencyCode: 'USD' }),
-    acc('other', 'Cooperativa Exemplo de Crédito Ltda. - Conta'),
-  ]
-  const snap = toSnapshot({ items: [meu], accounts, transactions: [], rates: { USD: 5 }, fetchedAt: '2026-10-01T00:00:00Z' })
+  const card = (id: string, itemId: string, name: string, over: Partial<PluggyAccount> = {}) =>
+    acc(id, itemId, name, { type: 'CREDIT', subtype: 'CREDIT_CARD', creditData: { creditLimit: 1000 }, ...over })
+  const snap = (items: PluggyItem[], accounts: PluggyAccount[], transactions: PluggyTransaction[] = []) =>
+    toSnapshot({ items, accounts, transactions, rates: { USD: 5 }, fetchedAt: '2026-10-01T00:00:00Z' })
 
-  it('makes one institution per bank instead of one "MeuPluggy"', () => {
-    expect(snap.institutions.map((i) => i.name)).toEqual(['Nubank', 'Itaú', 'Wise', 'Cooperativa Exemplo de Crédito'])
-    const nubank = snap.institutions[0].id
-    expect(snap.accounts.filter((a) => a.institutionId === nubank).map((a) => a.id)).toEqual(['nu-pre', 'nu-card'])
+  it('keeps an item\'s checking account and card together, named after the checking account', () => {
+    const s = snap(
+      [meuItem('nu'), meuItem('itau')],
+      [
+        // The card comes first and its name doesn't say "Nubank": the checking account still names the group.
+        card('nu-card', 'nu', 'Mastercard Platinum (Cartão de Crédito)'),
+        acc('nu-chk', 'nu', 'Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)'),
+        acc('itau-chk', 'itau', 'Itaú Unibanco S.A. (Conta Corrente)'),
+        card('itau-card', 'itau', 'Itaú Unibanco S.A. (Cartão de Crédito)'),
+      ],
+    )
+    expect(s.institutions.map((i) => [i.id, i.name])).toEqual([
+      ['nu', 'Nubank'],
+      ['itau', 'Itaú'],
+    ])
+    expect(s.accounts.filter((a) => a.institutionId === 'nu').map((a) => a.id)).toEqual(['nu-card', 'nu-chk'])
+    expect(s.accounts.filter((a) => a.institutionId === 'itau').map((a) => a.id)).toEqual(['itau-chk', 'itau-card'])
   })
 
-  it('shortens account names to the kind of account', () => {
-    expect(snap.accounts.map((a) => a.name)).toEqual(['Conta Pré-paga', 'Cartão de Crédito', 'Conta Corrente', 'Conta USD', 'Cooperativa Exemplo de Crédito Ltda. - Conta'])
+  it('falls back to a savings account, then a card, then the legal name', () => {
+    expect(itemBankName([card('c', 'x', 'Banco Inter S.A. (Cartão)'), acc('p', 'x', 'Wise Brasil Ltda (Conta USD)', { subtype: 'SAVINGS_ACCOUNT' })])).toBe('Wise')
+    expect(itemBankName([card('c', 'x', 'Banco Inter S.A. (Cartão)')])).toBe('Inter')
+    expect(itemBankName([acc('o', 'x', 'Cooperativa Exemplo de Crédito Ltda. - Conta')])).toBe('Cooperativa Exemplo de Crédito')
   })
 
-  it('prefers a marketing name for the account and still finds the bank in it', () => {
+  it('shortens account names to the kind of account, or uses the marketing name', () => {
+    const s = snap(
+      [meuItem('nu')],
+      [acc('a', 'nu', 'Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)'), card('b', 'nu', 'Cartão', { marketingName: 'Nubank Ultravioleta' })],
+    )
+    expect(s.accounts.map((a) => a.name)).toEqual(['Conta Pré-paga', 'Nubank Ultravioleta'])
     expect(bankOf({ name: 'Cartão', marketingName: 'Nubank Ultravioleta' })).toBe('Nubank')
-    const s = toSnapshot({ items: [meu], accounts: [acc('c', 'Cartão', { marketingName: 'Nubank Ultravioleta' })], transactions: [], rates: {}, fetchedAt: '' })
-    expect(s.accounts[0].name).toBe('Nubank Ultravioleta')
-    expect(s.institutions[0].name).toBe('Nubank')
   })
 
-  it('leaves out bank accounts at zero with no transactions, and a bank left with none', () => {
-    const empty = acc('empty', 'Banco Safra S.A. (Conta Corrente)', { balance: 0 })
-    const zeroButUsed = acc('used', 'Itaú Unibanco S.A. (Conta Poupança)', { balance: 0.004 })
-    const zeroCard = acc('card0', 'Nu Pagamentos S.A. (Cartão de Crédito)', { type: 'CREDIT', subtype: 'CREDIT_CARD', balance: 0, creditData: { creditLimit: 500 } })
-    const s = toSnapshot({
-      items: [meu],
-      accounts: [empty, zeroButUsed, zeroCard],
-      transactions: [tx({ accountId: 'used', type: 'CREDIT', amount: 50 })],
-      rates: {},
-      fetchedAt: '',
-    })
-    expect(s.accounts.map((a) => a.id)).toEqual(['used', 'card0'])
-    expect(s.institutions.map((i) => i.name)).toEqual(['Itaú', 'Nubank'])
+  it('still names the group from a hidden (empty) checking account, and drops items left with nothing', () => {
+    const s = snap(
+      [meuItem('nu'), meuItem('safra')],
+      [
+        acc('nu-empty', 'nu', 'Nu Pagamentos S.A. (Conta Pré-paga)', { balance: 0 }),
+        card('nu-card', 'nu', 'Mastercard (Cartão de Crédito)', { balance: 0 }),
+        acc('safra-empty', 'safra', 'Banco Safra S.A. (Conta Corrente)', { balance: 0 }),
+      ],
+    )
+    expect(s.accounts.map((a) => a.id)).toEqual(['nu-card'])
+    expect(s.institutions.map((i) => i.name)).toEqual(['Nubank'])
   })
 
-  it('leaves items from other connectors as one institution', () => {
+  it('keeps a zero-balance bank account that had transactions', () => {
+    const s = snap([meuItem('itau')], [acc('used', 'itau', 'Itaú Unibanco S.A. (Conta Poupança)', { balance: 0.004 })], [
+      tx({ accountId: 'used', type: 'CREDIT', amount: 50 }),
+    ])
+    expect(s.accounts.map((a) => a.id)).toEqual(['used'])
+  })
+
+  it('leaves items from other connectors named after the connector', () => {
     expect(toSnapshot(data([])).institutions).toEqual([{ id: 'item-1', name: 'Nubank', color: '#8a05be' }])
   })
 })
