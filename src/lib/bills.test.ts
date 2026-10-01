@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSeed } from '../data/seed'
 import type { Account, Transaction } from '../data/types'
-import { currentBill } from './bills'
+import { currentBill, isIdleCard } from './bills'
 import { addMonths } from './dates'
 import { installmentPlans } from './installments'
 
@@ -126,4 +126,44 @@ describe('current card bill (from the billing cycle)', () => {
     }
   })
 
+})
+
+describe('cards with nothing in the current or future cycles', () => {
+  const inst = (number: number, date: string): Transaction => ({
+    ...tx(date, -100_00),
+    id: `i${number}`,
+    installment: { number, total: 10, totalAmount: 1_000_00, purchaseDate: '2026-02-10' },
+  })
+  const open = card('2026-10-20', '2026-10-27')
+
+  it('hides a card with no bill and no installments to come', () => {
+    expect(isIdleCard(open, [tx('2026-08-10', -90_00)], [], today)).toBe(true) // only old spending
+  })
+
+  it('keeps a card with something on the current bill', () => {
+    expect(isIdleCard(open, [tx('2026-09-25', -90_00)], [], today)).toBe(false)
+  })
+
+  it('keeps a card with installments still to come, even with nothing on this bill', () => {
+    const plans = installmentPlans([inst(5, '2026-09-10')], today)
+    expect(isIdleCard(open, [], plans, today)).toBe(false)
+  })
+
+  it('keeps a card with a closed bill still to be paid', () => {
+    expect(isIdleCard(card('2026-09-28', '2026-10-05'), [tx('2026-09-15', -90_00)], [], today)).toBe(false)
+  })
+
+  it('hides it once that closed bill is paid and nothing new came in', () => {
+    const paid = [tx('2026-09-15', -90_00), tx('2026-09-30', 90_00, 'card-payment')]
+    expect(isIdleCard(card('2026-09-28', '2026-10-05'), paid, [], today)).toBe(true)
+  })
+
+  it('uses the balance when the bank gives no closing date', () => {
+    expect(isIdleCard({ ...card(null, null), balance: 0 }, [], [], today)).toBe(true)
+    expect(isIdleCard(card(null, null), [], [], today)).toBe(false) // balance 9.999,00
+  })
+
+  it('never hides bank accounts', () => {
+    expect(isIdleCard({ ...card(null, null), type: 'BANK', subtype: 'CHECKING_ACCOUNT', balance: 0, creditData: undefined }, [], [], today)).toBe(false)
+  })
 })

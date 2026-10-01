@@ -80,3 +80,17 @@ export function currentBill(account: Account, transactions: Transaction[], plans
   }
   return { amount, closeDate: close, dueDate: due, closed: close < todayISO, paid }
 }
+
+/**
+ * A card with nothing in its current or future cycles: no bill to pay (the
+ * current one, or a closed one still unpaid) and no installments still to
+ * come. Such cards are hidden from Accounts and Coming up; their past
+ * transactions stay in the history. Without a closing date, the balance
+ * stands in for the bill.
+ */
+export function isIdleCard(account: Account, transactions: Transaction[], plans: InstallmentPlan[], today: Date = new Date()): boolean {
+  if (account.type !== 'CREDIT') return false
+  if (plans.some((p) => p.accountId === account.id && p.remaining > 0)) return false
+  const bill = currentBill(account, transactions, plans, today)
+  return (bill ? bill.amount : account.balance) <= 0
+}
