@@ -127,6 +127,8 @@ const en = {
   accounts: {
     total: (banks: number) => `Total across ${banks} ${banks === 1 ? 'bank' : 'banks'}`,
     totalNote: 'Balances minus open card bills',
+    /** Label for an account the bank sent without a name, e.g. "USD balance". */
+    balanceIn: (currency: string) => `${currency} balance`,
     footer: 'Demo data. Your real accounts appear here once Meu Pluggy is connected.',
     signOut: 'Sign out',
     nearLimit: 'Near limit',
@@ -288,6 +290,7 @@ const ptBR: Messages = {
   accounts: {
     total: (banks) => `Total ${banks === 1 ? 'no banco' : `nos ${banks} bancos`}`,
     totalNote: 'Saldos menos as faturas em aberto',
+    balanceIn: (currency) => `Saldo em ${currency}`,
     footer: 'Dados de exemplo. Suas contas reais aparecem aqui quando o Meu Pluggy for conectado.',
     signOut: 'Sair',
     nearLimit: 'Perto do limite',

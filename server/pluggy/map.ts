@@ -89,14 +89,30 @@ const BANKS: [RegExp, string][] = [
 
 /** The bank behind a Meu Pluggy account: a known name, else the legal name before " - " or " (". */
 export function bankOf(account: Pick<PluggyAccount, 'name' | 'marketingName'>): string | null {
-  const text = `${account.name} ${account.marketingName ?? ''}`
+  return knownBankOf(account) ?? legalNameOf(account)
+}
+
+/** A well-known bank named in the account's legal or marketing name. */
+function knownBankOf(account: Pick<PluggyAccount, 'name' | 'marketingName'>): string | null {
+  const text = `${account.name ?? ''} ${account.marketingName ?? ''}`
   for (const [re, name] of BANKS) if (re.test(text)) return name
-  const legal = account.name
+  return null
+}
+
+/** "Cooperativa X de Crédito Ltda. - Conta" -> "Cooperativa X de Crédito". */
+function legalNameOf(account: Pick<PluggyAccount, 'name'>): string | null {
+  const legal = (account.name ?? '')
     .split(/\s+-\s+|\s*\(/)[0]
     .replace(/[\s,]+(S\.?\s?\/?A\.?|Ltda\.?)$/i, '')
     .trim()
   return legal || null
 }
+
+/**
+ * The owner's USD account is at Wise, but Meu Pluggy doesn't give its bank
+ * name. So a USD account whose name doesn't name a known bank is Wise.
+ */
+const usdBank = (a: PluggyAccount) => ((a.currencyCode || '').toUpperCase() === 'USD' ? 'Wise' : null)
 
 /** Account types in the order used to name an item's bank: checking first. */
 const NAMING_ORDER = ['CHECKING_ACCOUNT', 'SAVINGS_ACCOUNT', 'CREDIT_CARD']
@@ -107,9 +123,13 @@ export function itemBankName(accounts: PluggyAccount[]): string | null {
     const i = NAMING_ORDER.indexOf(a.subtype)
     return i === -1 ? NAMING_ORDER.length : i
   }
-  for (const a of [...accounts].sort((x, y) => rank(x) - rank(y))) {
-    const bank = bankOf(a)
-    if (bank) return bank
+  const ranked = [...accounts].sort((x, y) => rank(x) - rank(y))
+  // A known bank anywhere beats the USD rule, which beats a legal name.
+  for (const find of [knownBankOf, usdBank, legalNameOf]) {
+    for (const a of ranked) {
+      const bank = find(a)
+      if (bank) return bank
+    }
   }
   return null
 }
@@ -117,8 +137,10 @@ export function itemBankName(accounts: PluggyAccount[]): string | null {
 /** "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)" -> "Conta Pré-paga". */
 function shortAccountName(a: PluggyAccount): string {
   if (a.marketingName) return a.marketingName
-  const kind = /\(([^()]+)\)\s*$/.exec(a.name)?.[1]?.trim()
-  return kind || a.name
+  const name = (a.name ?? '').trim()
+  const kind = /\(([^()]+)\)\s*$/.exec(name)?.[1]?.trim()
+  // Empty when Pluggy gives no name; the app then shows "USD balance" etc.
+  return kind || name
 }
 
 // ---------------------------------------------------------------------------

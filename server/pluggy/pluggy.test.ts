@@ -227,6 +227,29 @@ describe('Meu Pluggy: one group per item, named after its checking account', () 
     expect(s.accounts.map((a) => a.id)).toEqual(['used'])
   })
 
+  it('names an item with an unnamed USD account "Wise"', () => {
+    const s = snap(
+      [meuItem('nu'), meuItem('wise')],
+      [
+        acc('nu-chk', 'nu', 'Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)'),
+        acc('usd', 'wise', '', { currencyCode: 'USD' }),
+      ],
+    )
+    expect(s.institutions.map((i) => [i.id, i.name])).toEqual([
+      ['nu', 'Nubank'],
+      ['wise', 'Wise'],
+    ])
+    const usd = s.accounts.find((a) => a.id === 'usd')!
+    expect(usd.name).toBe('') // the app shows "USD balance" / "Saldo em USD"
+    expect(usd.foreign).toEqual({ currency: 'USD', balance: 10000, rate: 5 })
+  })
+
+  it('uses "Wise" for a USD account with only a generic name, but a named bank still wins', () => {
+    expect(itemBankName([acc('u', 'x', 'Conta Internacional (Conta USD)', { currencyCode: 'USD' })])).toBe('Wise')
+    expect(itemBankName([acc('u', 'x', 'Banco Inter S.A. (Conta Global)', { currencyCode: 'USD' })])).toBe('Inter')
+    expect(itemBankName([acc('b', 'x', 'Banco Inter S.A. (Conta Corrente)'), acc('u', 'x', '', { currencyCode: 'USD' })])).toBe('Inter')
+  })
+
   it('leaves items from other connectors named after the connector', () => {
     expect(toSnapshot(data([])).institutions).toEqual([{ id: 'item-1', name: 'Nubank', color: '#8a05be' }])
   })

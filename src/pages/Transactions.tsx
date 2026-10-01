@@ -11,6 +11,7 @@ import { Amount, Button, EmptyState, IconDisc, PageHeader } from '../components/
 import { TransactionRow, useAccountLabel } from '../components/TransactionRow'
 import { TransactionPanel, TransactionSheet } from '../components/TransactionSheet'
 import { useI18n } from '../i18n/I18nProvider'
+import { accountLabel } from '../lib/accountLabel'
 import { useIsDesktop } from '../lib/useIsDesktop'
 
 export interface TransactionFilters {
@@ -170,7 +171,7 @@ export function Transactions() {
               <option value="transfer">{t.transfers}</option>
             </FilterChip>
             <FilterChip
-              label={account ? `${institutionsById.get(account.institutionId)!.name} · ${account.name}` : t.transactions.account}
+              label={account ? `${institutionsById.get(account.institutionId)!.name} · ${accountLabel(account, t)}` : t.transactions.account}
               applied={!!account}
               value={filters.accountId ?? ''}
               onChange={(v) => set('a', v)}
@@ -178,7 +179,7 @@ export function Transactions() {
               <option value="">{t.transactions.allAccounts}</option>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {institutionsById.get(a.institutionId)!.name} · {a.name}
+                  {institutionsById.get(a.institutionId)!.name} · {accountLabel(a, t)}
                 </option>
               ))}
             </FilterChip>
