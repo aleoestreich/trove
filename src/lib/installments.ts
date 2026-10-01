@@ -3,6 +3,8 @@ import { addMonths, monthKey, toISO } from './dates'
 
 export interface UpcomingInstallment {
   number: number
+  /** Expected charge date (ISO), a month after the previous one. */
+  date: string
   /** Month it will be charged, "2026-10". */
   month: string
   amount: Cents
@@ -114,9 +116,11 @@ export function installmentPlans(transactions: Transaction[], today: Date = new 
     const each = left > 0 ? Math.floor(remaining / left) : 0
     const projected: UpcomingInstallment[] = []
     for (let n = charged + 1; n <= total; n++) {
+      const date = addMonths(latest.date, n - charged)
       projected.push({
         number: n,
-        month: monthKey(addMonths(latest.date, n - charged)),
+        date,
+        month: monthKey(date),
         amount: n === charged + 1 ? remaining - each * (left - 1) : each,
       })
     }
