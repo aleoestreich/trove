@@ -108,6 +108,59 @@ describe('exchange rates', () => {
   it('fails loudly rather than guessing a rate', async () => {
     await expect(ratesToBRL(['USD'], (async () => Response.json({})) as typeof fetch)).rejects.toThrow(/USD/)
   })
+
+  /** Each source answers with `status`, or its normal JSON when 200. */
+  function sources(status: { awesome?: number; bcb?: number; er?: number }) {
+    return vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.includes('awesomeapi')) return status.awesome && status.awesome !== 200 ? new Response('slow down', { status: status.awesome }) : Response.json({ USDBRL: { bid: '5.40' } })
+      if (url.includes('olinda.bcb.gov.br')) {
+        if (status.bcb && status.bcb !== 200) return new Response('down', { status: status.bcb })
+        return Response.json({
+          value: [
+            { cotacaoCompra: 5.3, dataHoraCotacao: '2026-09-29 13:00:00.000' },
+            { cotacaoCompra: 5.35, dataHoraCotacao: '2026-09-30 13:00:00.000' },
+          ],
+        })
+      }
+      if (url.includes('open.er-api.com')) return status.er && status.er !== 200 ? new Response('down', { status: status.er }) : Response.json({ result: 'success', rates: { USD: 0.2 } })
+      return new Response('not found', { status: 404 })
+    })
+  }
+  const now = new Date('2026-10-01T15:00:00Z')
+
+  it('falls back to Banco Central (latest PTAX in the last 10 days) when AwesomeAPI says 429', async () => {
+    const fetchFn = sources({ awesome: 429 })
+    expect(await ratesToBRL(['USD'], fetchFn as typeof fetch, now)).toEqual({ USD: 5.35 })
+    const bcbUrl = String(fetchFn.mock.calls[1][0])
+    expect(bcbUrl).toContain("@moeda='USD'")
+    expect(bcbUrl).toContain("@dataInicial='09-21-2026'")
+    expect(bcbUrl).toContain("@dataFinalCotacao='10-01-2026'")
+  })
+
+  it('then to ExchangeRate-API, inverting its per-BRL rate', async () => {
+    const fetchFn = sources({ awesome: 429, bcb: 503 })
+    expect(await ratesToBRL(['USD'], fetchFn as typeof fetch, now)).toEqual({ USD: 5 })
+  })
+
+  it('reuses the last good rate when every source fails', async () => {
+    await ratesToBRL(['USD'], sources({}) as typeof fetch, now)
+    const later = new Date(now.getTime() + 2 * 60 * 60 * 1000) // past the 1-hour cache
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(await ratesToBRL(['USD'], sources({ awesome: 429, bcb: 500, er: 500 }) as typeof fetch, later)).toEqual({ USD: 5.4 })
+  })
+
+  it('names every failed source (status codes only) when there is no rate at all', async () => {
+    await expect(ratesToBRL(['USD'], sources({ awesome: 429, bcb: 500, er: 502 }) as typeof fetch, now)).rejects.toThrow(
+      'No exchange rate for USD (AwesomeAPI HTTP 429; Banco Central HTTP 500; ExchangeRate-API HTTP 502).',
+    )
+  })
+
+  it('does not call the fallbacks when AwesomeAPI answers', async () => {
+    const fetchFn = sources({})
+    await ratesToBRL(['USD'], fetchFn as typeof fetch, now)
+    expect(fetchFn).toHaveBeenCalledOnce()
+  })
 })
 
 describe('mapping to Trove', () => {
