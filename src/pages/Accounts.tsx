@@ -4,7 +4,7 @@ import { useData } from '../state'
 import type { Account } from '../data/types'
 import { balances } from '../lib/summary'
 import { installmentPlans, remainingByAccount } from '../lib/installments'
-import { currentBill, type CardBill } from '../lib/bills'
+import { currentBill, isIdleCard, type CardBill } from '../lib/bills'
 import { formatShortDate } from '../lib/dates'
 import { formatMoney, formatPercent, formatRate } from '../lib/money'
 import { Badge, PageHeader, Progress } from '../components/ui'
@@ -20,11 +20,14 @@ import { CardDaysEditor } from '../components/CardDaysEditor'
 const NEAR_LIMIT = 0.8
 
 export function Accounts() {
-  const { institutions, accounts, transactions, source } = useData()
+  const { institutions: allInstitutions, accounts: allAccounts, transactions, source } = useData()
   const { t } = useI18n()
-  const bal = balances(accounts)
   const plans = useMemo(() => installmentPlans(transactions), [transactions])
   const futureInstallments = useMemo(() => remainingByAccount(plans), [plans])
+  // Cards with nothing in the current or future cycles are hidden, and banks left with nothing to show.
+  const accounts = allAccounts.filter((a) => !isIdleCard(a, transactions, plans))
+  const institutions = allInstitutions.filter((i) => accounts.some((a) => a.institutionId === i.id))
+  const bal = balances(accounts)
 
   const bankCard = (inst: (typeof institutions)[number]) => {
     const own = accounts.filter((a) => a.institutionId === inst.id)

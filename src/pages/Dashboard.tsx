@@ -6,7 +6,7 @@ import type { Transaction } from '../data/types'
 import { balances, expensesByCategory, inMonth, totals } from '../lib/summary'
 import { balanceHistory, cashByCurrency, cashByInstitution } from '../lib/history'
 import { installmentPlans, upcomingByMonth } from '../lib/installments'
-import { currentBill } from '../lib/bills'
+import { currentBill, isIdleCard } from '../lib/bills'
 import { dayOfMonth, formatFullDate, formatMonth, formatMonthName, formatMonthShort, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
 import { formatMoney, formatPercent } from '../lib/money'
 import { Badge, Card, CardTitle, IconDisc, MonthSwitcher, Overline, PageHeader, Progress, SeeAll, Swatch } from '../components/ui'
@@ -79,8 +79,9 @@ export function Dashboard() {
   }
 
   // Coming up: open card bills + installments charged next month.
-  const cards = accounts.filter((a) => a.type === 'CREDIT')
   const plans = useMemo(() => installmentPlans(transactions), [transactions])
+  // Coming up: cards with something to pay now or later.
+  const cards = accounts.filter((a) => a.type === 'CREDIT' && !isIdleCard(a, transactions, plans))
   const nextMonthKey = monthKey(dayOfMonth(new Date(), 1, 1))
   const nextMonthInstallments = upcomingByMonth(plans).find((m) => m.month === nextMonthKey)?.amount ?? 0
   const nextMonthPurchases = plans.filter((p) => p.upcoming.some((u) => u.month === nextMonthKey)).length
