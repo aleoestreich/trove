@@ -194,6 +194,21 @@ describe('Meu Pluggy: accounts grouped by bank', () => {
     expect(s.institutions[0].name).toBe('Nubank')
   })
 
+  it('leaves out bank accounts at zero with no transactions, and a bank left with none', () => {
+    const empty = acc('empty', 'Banco Safra S.A. (Conta Corrente)', { balance: 0 })
+    const zeroButUsed = acc('used', 'Itaú Unibanco S.A. (Conta Poupança)', { balance: 0.004 })
+    const zeroCard = acc('card0', 'Nu Pagamentos S.A. (Cartão de Crédito)', { type: 'CREDIT', subtype: 'CREDIT_CARD', balance: 0, creditData: { creditLimit: 500 } })
+    const s = toSnapshot({
+      items: [meu],
+      accounts: [empty, zeroButUsed, zeroCard],
+      transactions: [tx({ accountId: 'used', type: 'CREDIT', amount: 50 })],
+      rates: {},
+      fetchedAt: '',
+    })
+    expect(s.accounts.map((a) => a.id)).toEqual(['used', 'card0'])
+    expect(s.institutions.map((i) => i.name)).toEqual(['Itaú', 'Nubank'])
+  })
+
   it('leaves items from other connectors as one institution', () => {
     expect(toSnapshot(data([])).institutions).toEqual([{ id: 'item-1', name: 'Nubank', color: '#8a05be' }])
   })
