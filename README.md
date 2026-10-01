@@ -61,7 +61,8 @@ with their colour token: Nubank `--series-4`, Itaú `--series-2`, Santander
 `public/banks/<bank>.svg` (`nubank`, `itau`, `santander`, `wise`) and used as
 a CSS mask, so any single-shape SVG works and takes the theme's colour. The
 SVG needs a `viewBox`, or it won't scale inside the badge. Logos fill 58% of
-the badge (Itaú 64%, since its lettering is cut out of a square). If a file is
+the badge (Itaú 64%, since its lettering is cut out of a square; Nubank 68%,
+since its "nu" is wide and short). If a file is
 missing, a line icon is shown instead. Other banks get their first two letters
 in a neutral badge.
 
