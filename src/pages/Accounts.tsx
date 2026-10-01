@@ -4,6 +4,7 @@ import { useData } from '../state'
 import type { Account } from '../data/types'
 import { balances } from '../lib/summary'
 import { installmentPlans, remainingByAccount } from '../lib/installments'
+import { currentBill, type CardBill } from '../lib/bills'
 import { formatShortDate } from '../lib/dates'
 import { formatMoney, formatPercent, formatRate } from '../lib/money'
 import { Badge, PageHeader, Progress } from '../components/ui'
@@ -21,7 +22,8 @@ export function Accounts() {
   const { institutions, accounts, transactions, source } = useData()
   const { t } = useI18n()
   const bal = balances(accounts)
-  const futureInstallments = useMemo(() => remainingByAccount(installmentPlans(transactions)), [transactions])
+  const plans = useMemo(() => installmentPlans(transactions), [transactions])
+  const futureInstallments = useMemo(() => remainingByAccount(plans), [plans])
 
   const bankCard = (inst: (typeof institutions)[number]) => {
     const own = accounts.filter((a) => a.institutionId === inst.id)
@@ -35,7 +37,7 @@ export function Accounts() {
         </div>
         {own.map((a) =>
           a.type === 'CREDIT' ? (
-            <CreditCardBlock key={a.id} account={a} futureInstallments={futureInstallments.get(a.id) ?? 0} />
+            <CreditCardBlock key={a.id} account={a} bill={currentBill(a, transactions, plans)} futureInstallments={futureInstallments.get(a.id) ?? 0} />
           ) : a.foreign ? (
             <ForeignBlock key={a.id} account={a} />
           ) : (
@@ -115,9 +117,14 @@ function ForeignBlock({ account }: { account: Account }) {
   )
 }
 
-function CreditCardBlock({ account, futureInstallments }: { account: Account; futureInstallments: number }) {
+function CreditCardBlock({ account, bill, futureInstallments }: { account: Account; bill: CardBill | null; futureInstallments: number }) {
   const { t } = useI18n()
   const credit = account.creditData!
+  // The bill from the billing cycle; the balance only when the bank gives no closing date.
+  const billAmount = bill ? bill.amount : account.balance
+  const closeDate = bill ? bill.closeDate : credit.balanceCloseDate
+  const dueDate = bill ? bill.dueDate : credit.balanceDueDate
+  const closesLabel = bill?.closed ? t.accounts.closed : t.accounts.closes
   // Used = open bill + installments still to be charged (both take limit).
   const used = credit.creditLimit - credit.availableCreditLimit
   const share = credit.creditLimit > 0 ? used / credit.creditLimit : 0
@@ -140,15 +147,15 @@ function CreditCardBlock({ account, futureInstallments }: { account: Account; fu
       </div>
       <div className="flex items-end justify-between gap-4">
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs leading-4 text-muted">{t.accounts.currentBill}</span>
+          <span className="text-xs leading-4 text-muted">{bill?.closed ? t.accounts.closedBill : t.accounts.currentBill}</span>
           <span className="tabular text-2xl leading-[30px] font-bold tracking-[-0.01em] text-ink lg:text-[26px] lg:leading-8">
-            {formatMoney(account.balance)}
+            {formatMoney(billAmount)}
           </span>
         </div>
         {/* Desktop: close and due dates beside the bill */}
         <div className="hidden gap-5 text-right lg:flex">
-          <DateFigure label={t.accounts.closes} value={formatShortDate(credit.balanceCloseDate)} />
-          <DateFigure label={t.accounts.due} value={formatShortDate(credit.balanceDueDate)} />
+          <DateFigure label={closesLabel} value={formatShortDate(closeDate)} />
+          <DateFigure label={t.accounts.due} value={formatShortDate(dueDate)} />
         </div>
       </div>
       <Progress value={share * 100} tone={near ? 'critical' : 'accent'} label={t.accounts.limitUsed} role="meter" />
@@ -177,8 +184,8 @@ function CreditCardBlock({ account, futureInstallments }: { account: Account; fu
         {futureInstallments > 0 && ` · ${t.accounts.futureInstallments(formatMoney(futureInstallments))}`}
       </span>
       <div className="grid grid-cols-2 gap-2 rounded-sm bg-page px-3 py-2.5 lg:hidden">
-        <DateFigure label={t.accounts.closes} value={formatShortDate(credit.balanceCloseDate)} />
-        <DateFigure label={t.accounts.due} value={formatShortDate(credit.balanceDueDate)} />
+        <DateFigure label={closesLabel} value={formatShortDate(closeDate)} />
+        <DateFigure label={t.accounts.due} value={formatShortDate(dueDate)} />
       </div>
     </Link>
   )

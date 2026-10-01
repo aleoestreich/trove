@@ -139,7 +139,7 @@ describe('installments projected into months that have passed', () => {
 
   it('keeps the current month as upcoming', () => {
     const [plan] = installmentPlans([inst(9, '2026-09-10')], october)
-    expect(plan.upcoming).toEqual([{ number: 10, month: '2026-10', amount: 100_00 }])
+    expect(plan.upcoming).toEqual([{ number: 10, date: '2026-10-10', month: '2026-10', amount: 100_00 }])
     expect(plan.assumedCharged).toBe(0)
   })
 })

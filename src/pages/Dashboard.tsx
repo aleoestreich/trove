@@ -6,6 +6,7 @@ import type { Transaction } from '../data/types'
 import { balances, expensesByCategory, inMonth, totals } from '../lib/summary'
 import { balanceHistory, cashByCurrency, cashByInstitution } from '../lib/history'
 import { installmentPlans, upcomingByMonth } from '../lib/installments'
+import { currentBill } from '../lib/bills'
 import { dayOfMonth, formatFullDate, formatMonth, formatMonthName, formatMonthShort, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
 import { formatMoney, formatPercent } from '../lib/money'
 import { Badge, Card, CardTitle, IconDisc, MonthSwitcher, Overline, PageHeader, Progress, SeeAll, Swatch } from '../components/ui'
@@ -225,18 +226,21 @@ export function Dashboard() {
         {/* 4. Coming up */}
         <Card className="flex flex-col gap-2 lg:order-2 lg:col-span-4">
           <CardTitle subtitle={t.overview.openCardBills}>{t.overview.comingUp}</CardTitle>
-          {cards.map((c) => (
-            <Link key={c.id} to={`/transactions?m=all&a=${c.id}`} className="flex min-h-[60px] items-center gap-3 border-b border-line active:bg-track">
-              <InstitutionBadge institution={institutionsById.get(c.institutionId)!} size={36} />
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-[15px] font-medium text-ink lg:text-sm">{t.cardOf(institutionsById.get(c.institutionId)!.name)}</span>
-                {c.creditData?.balanceDueDate && (
-                  <span className="text-[13px] text-muted">{t.overview.due(formatShortDate(c.creditData.balanceDueDate))}</span>
-                )}
-              </span>
-              <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(c.balance)}</span>
-            </Link>
-          ))}
+          {cards.map((c) => {
+            // The bill from the billing cycle; the balance only when the bank gives no closing date.
+            const bill = currentBill(c, transactions, plans)
+            const dueDate = bill ? bill.dueDate : c.creditData?.balanceDueDate
+            return (
+              <Link key={c.id} to={`/transactions?m=all&a=${c.id}`} className="flex min-h-[60px] items-center gap-3 border-b border-line active:bg-track">
+                <InstitutionBadge institution={institutionsById.get(c.institutionId)!} size={36} />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-[15px] font-medium text-ink lg:text-sm">{t.cardOf(institutionsById.get(c.institutionId)!.name)}</span>
+                  {dueDate && <span className="text-[13px] text-muted">{t.overview.due(formatShortDate(dueDate))}</span>}
+                </span>
+                <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(bill ? bill.amount : c.balance)}</span>
+              </Link>
+            )
+          })}
           <Link to="/installments" className="flex min-h-16 items-center gap-3 active:bg-track lg:mt-auto lg:rounded-md lg:bg-page lg:p-3.5">
             <IconDisc icon="installments" size="sm" tone="accent" />
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">

@@ -141,6 +141,9 @@ const en = {
     signOut: 'Sign out',
     nearLimit: 'Near limit',
     currentBill: 'Current bill',
+    /** A bill that has closed and is waiting to be paid. */
+    closedBill: 'Closed bill',
+    closed: 'Closed',
     limitUsed: 'Limit used',
     used: 'Used',
     available: 'Available',
@@ -309,6 +312,8 @@ const ptBR: Messages = {
     signOut: 'Sair',
     nearLimit: 'Perto do limite',
     currentBill: 'Fatura atual',
+    closedBill: 'Fatura fechada',
+    closed: 'Fechou em',
     limitUsed: 'Limite usado',
     used: 'Usado',
     available: 'Disponível',
