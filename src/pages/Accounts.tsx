@@ -10,6 +10,7 @@ import { Badge, PageHeader, Progress } from '../components/ui'
 import { InstitutionBadge } from '../components/BankBadge'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n/I18nProvider'
+import { accountLabel } from '../lib/accountLabel'
 import { isDeployed } from '../lib/useIsDesktop'
 import { ConnectMeuPluggy } from '../components/ConnectMeuPluggy'
 
@@ -43,7 +44,7 @@ export function Accounts() {
               to={`/transactions?m=all&a=${a.id}`}
               className="flex min-h-14 items-center justify-between gap-3 border-t border-line px-4 active:bg-track lg:min-h-[52px] lg:px-5 lg:hover:bg-page"
             >
-              <span className="text-sm text-ink-2">{a.name}</span>
+              <span className="text-sm text-ink-2">{accountLabel(a, t)}</span>
               <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(a.balance)}</span>
             </Link>
           ),
@@ -101,7 +102,7 @@ function ForeignBlock({ account }: { account: Account }) {
       className="flex flex-col gap-1 border-t border-line p-4 active:bg-track lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:px-5 lg:hover:bg-page"
     >
       <span className="flex flex-col gap-1 lg:gap-0.5">
-        <span className="text-xs leading-4 text-muted">{account.name}</span>
+        <span className="text-xs leading-4 text-muted">{accountLabel(account, t)}</span>
         <span className="tabular text-2xl leading-[30px] font-bold tracking-[-0.01em] text-ink lg:text-[26px] lg:leading-8">
           {formatMoney(foreign.balance, foreign.currency)}
         </span>
@@ -129,7 +130,7 @@ function CreditCardBlock({ account, futureInstallments }: { account: Account; fu
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="inline-flex items-center gap-2 text-sm text-ink-2">
           <Icon name="card" className="size-[18px]" strokeWidth={1.75} />
-          {account.name}
+          {accountLabel(account, t)}
         </span>
         {near && (
           <Badge tone="critical" icon="alert">

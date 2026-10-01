@@ -89,14 +89,35 @@ const BANKS: [RegExp, string][] = [
 
 /** The bank behind a Meu Pluggy account: a known name, else the legal name before " - " or " (". */
 export function bankOf(account: Pick<PluggyAccount, 'name' | 'marketingName'>): string | null {
-  const text = `${account.name} ${account.marketingName ?? ''}`
+  return knownBankOf(account) ?? legalNameOf(account)
+}
+
+/** A well-known bank named in the account's legal or marketing name. */
+function knownBankOf(account: Pick<PluggyAccount, 'name' | 'marketingName'>): string | null {
+  const text = `${account.name ?? ''} ${account.marketingName ?? ''}`
   for (const [re, name] of BANKS) if (re.test(text)) return name
-  const legal = account.name
+  return null
+}
+
+/** Wise names each of its balances by currency only: "USD", "BRL", "EUR"… */
+const isCurrencyName = (a: Pick<PluggyAccount, 'name'>) => /^[A-Z]{3}$/.test((a.name ?? '').trim())
+
+/** "Cooperativa X de Crédito Ltda. - Conta" -> "Cooperativa X de Crédito". Never a currency code. */
+function legalNameOf(account: Pick<PluggyAccount, 'name'>): string | null {
+  if (isCurrencyName(account)) return null
+  const legal = (account.name ?? '')
     .split(/\s+-\s+|\s*\(/)[0]
     .replace(/[\s,]+(S\.?\s?\/?A\.?|Ltda\.?)$/i, '')
     .trim()
   return legal || null
 }
+
+/**
+ * Meu Pluggy doesn't give Wise's bank name: Wise has one checking account per
+ * currency, each named just "USD", "BRL"… So an item with a currency-named
+ * account, or a USD account (the owner's USD is at Wise), is Wise.
+ */
+const wiseBank = (a: PluggyAccount) => (isCurrencyName(a) || (a.currencyCode || '').toUpperCase() === 'USD' ? 'Wise' : null)
 
 /** Account types in the order used to name an item's bank: checking first. */
 const NAMING_ORDER = ['CHECKING_ACCOUNT', 'SAVINGS_ACCOUNT', 'CREDIT_CARD']
@@ -107,9 +128,13 @@ export function itemBankName(accounts: PluggyAccount[]): string | null {
     const i = NAMING_ORDER.indexOf(a.subtype)
     return i === -1 ? NAMING_ORDER.length : i
   }
-  for (const a of [...accounts].sort((x, y) => rank(x) - rank(y))) {
-    const bank = bankOf(a)
-    if (bank) return bank
+  const ranked = [...accounts].sort((x, y) => rank(x) - rank(y))
+  // A known bank anywhere beats the Wise rule, which beats a legal name.
+  for (const find of [knownBankOf, wiseBank, legalNameOf]) {
+    for (const a of ranked) {
+      const bank = find(a)
+      if (bank) return bank
+    }
   }
   return null
 }
@@ -117,8 +142,12 @@ export function itemBankName(accounts: PluggyAccount[]): string | null {
 /** "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)" -> "Conta Pré-paga". */
 function shortAccountName(a: PluggyAccount): string {
   if (a.marketingName) return a.marketingName
-  const kind = /\(([^()]+)\)\s*$/.exec(a.name)?.[1]?.trim()
-  return kind || a.name
+  const name = (a.name ?? '').trim()
+  // No name, or just the account's own currency ("USD" on a USD account, as
+  // Wise sends them): empty, and the app shows "USD balance" / "Saldo em USD".
+  if (name.toUpperCase() === (a.currencyCode || 'BRL').toUpperCase()) return ''
+  const kind = /\(([^()]+)\)\s*$/.exec(name)?.[1]?.trim()
+  return kind || name
 }
 
 // ---------------------------------------------------------------------------
