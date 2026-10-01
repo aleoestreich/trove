@@ -17,7 +17,7 @@ const inst = (number: number, date: string, amount: number): Transaction => ({
 describe('installmentPlans', () => {
   // 4.299,90 in 12x: first installment 358,38, the rest 358,32.
   const charged = [inst(1, '2026-04-14', 358_38), inst(2, '2026-05-14', 358_32), inst(3, '2026-06-14', 358_32)]
-  const [plan] = installmentPlans(charged)
+  const [plan] = installmentPlans(charged, new Date(2026, 5, 20))
 
   it('rebuilds the purchase from its charged installments', () => {
     expect(plan.charged).toBe(3)
@@ -67,7 +67,8 @@ describe('installments whose description carries the number ("LOJA EXEMPLO 04/10
     status: 'POSTED',
     installment: { number, total: 10, totalAmount: 10 * 150_00, purchaseDate: date },
   })
-  const plans = installmentPlans([inst(4, '2026-05-28'), inst(5, '2026-07-02'), inst(6, '2026-08-01')])
+  const today = new Date(2026, 7, 15)
+  const plans = installmentPlans([inst(4, '2026-05-28'), inst(5, '2026-07-02'), inst(6, '2026-08-01')], today)
 
   it('counts 04/10, 05/10 and 06/10 as one purchase', () => {
     expect(plans).toHaveLength(1)
@@ -81,7 +82,7 @@ describe('installments whose description carries the number ("LOJA EXEMPLO 04/10
   })
 
   it('keeps two purchases apart when the same shop has the same installment twice', () => {
-    const two = installmentPlans([inst(5, '2026-07-02', 'a5'), inst(6, '2026-08-01', 'a6'), inst(5, '2026-08-01', 'b5'), inst(6, '2026-09-01', 'b6')])
+    const two = installmentPlans([inst(5, '2026-07-02', 'a5'), inst(6, '2026-08-01', 'a6'), inst(5, '2026-08-01', 'b5'), inst(6, '2026-09-01', 'b6')], new Date(2026, 8, 15))
     expect(two).toHaveLength(2)
     expect(two.reduce((s, p) => s + p.remaining, 0)).toBe(2 * 4 * 150_00)
   })
@@ -98,6 +99,48 @@ describe('installments whose description carries the number ("LOJA EXEMPLO 04/10
     expect(d('Geladeira (3 de 12)', 3, 12)).toBe('Geladeira')
     expect(d('LOJA 14/18', 4, 18)).toBe('LOJA 14/18') // a different number is left alone
     expect(d('Geladeira', 3, 12)).toBe('Geladeira')
+  })
+})
+
+describe('installments projected into months that have passed', () => {
+  // The latest installment found is 4/10 in May; it's now October. 5/10 to
+  // 8/10 would have been billed June to September: they count as charged.
+  const inst = (number: number, date: string): Transaction => ({
+    id: `p${number}`,
+    accountId: 'card',
+    date,
+    description: 'LOJA EXEMPLO',
+    amount: -100_00,
+    categoryId: 'shopping',
+    status: 'POSTED',
+    installment: { number, total: 10, totalAmount: 1_000_00, purchaseDate: '2026-02-10' },
+  })
+  const october = new Date(2026, 9, 1)
+
+  it('never projects an installment into a past month', () => {
+    const [plan] = installmentPlans([inst(3, '2026-04-10'), inst(4, '2026-05-10')], october)
+    expect(plan.upcoming.map((u) => [u.number, u.month])).toEqual([
+      [9, '2026-10'],
+      [10, '2026-11'],
+    ])
+    expect(upcomingByMonth([plan]).every((m) => m.month >= '2026-10')).toBe(true)
+  })
+
+  it('counts those installments as charged, so only what is still due is owed', () => {
+    const [plan] = installmentPlans([inst(3, '2026-04-10'), inst(4, '2026-05-10')], october)
+    expect(plan).toMatchObject({ charged: 8, assumedCharged: 4, remaining: 200_00 })
+    expect(plan.chargedAmount + plan.remaining).toBe(plan.totalAmount)
+  })
+
+  it('moves a purchase whose last installment month has passed to paid off', () => {
+    const [plan] = installmentPlans([inst(7, '2026-05-10')], october)
+    expect(plan).toMatchObject({ charged: 10, remaining: 0, upcoming: [] })
+  })
+
+  it('keeps the current month as upcoming', () => {
+    const [plan] = installmentPlans([inst(9, '2026-09-10')], october)
+    expect(plan.upcoming).toEqual([{ number: 10, month: '2026-10', amount: 100_00 }])
+    expect(plan.assumedCharged).toBe(0)
   })
 })
 

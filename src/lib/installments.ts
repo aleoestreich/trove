@@ -1,5 +1,5 @@
 import type { Cents, Transaction } from '../data/types'
-import { addMonths, monthKey } from './dates'
+import { addMonths, monthKey, toISO } from './dates'
 
 export interface UpcomingInstallment {
   number: number
@@ -24,6 +24,11 @@ export interface InstallmentPlan {
   /** Amount still to be charged (positive). */
   remaining: Cents
   upcoming: UpcomingInstallment[]
+  /**
+   * Installments counted as charged because their month has passed, though
+   * they weren't found in the data (included in `charged`).
+   */
+  assumedCharged: number
 }
 
 
@@ -70,8 +75,14 @@ function splitPurchases(txs: Transaction[]): Transaction[][] {
  * number, total count, total amount, purchase date), so it works on real data.
  * Installments are matched by card, description (without "04/18") and count,
  * not by purchase date or total, which can differ between installments.
+ *
+ * Installments are projected one per month from the latest one found. Any that
+ * would fall before `today`'s month have been billed already (banks charge
+ * every month), even if they weren't matched in the data: they count as
+ * charged, so nothing is "upcoming" in a past month.
  */
-export function installmentPlans(transactions: Transaction[]): InstallmentPlan[] {
+export function installmentPlans(transactions: Transaction[], today: Date = new Date()): InstallmentPlan[] {
+  const thisMonth = monthKey(toISO(today))
   const groups = new Map<string, Transaction[]>()
   for (const t of transactions) {
     if (!t.installment) continue
@@ -101,14 +112,18 @@ export function installmentPlans(transactions: Transaction[]): InstallmentPlan[]
     // Split what's left evenly; the first upcoming installment absorbs rounding.
     const left = total - charged
     const each = left > 0 ? Math.floor(remaining / left) : 0
-    const upcoming: UpcomingInstallment[] = []
+    const projected: UpcomingInstallment[] = []
     for (let n = charged + 1; n <= total; n++) {
-      upcoming.push({
+      projected.push({
         number: n,
         month: monthKey(addMonths(latest.date, n - charged)),
         amount: n === charged + 1 ? remaining - each * (left - 1) : each,
       })
     }
+    // Months already passed: billed, so charged rather than upcoming.
+    const past = projected.filter((u) => u.month < thisMonth)
+    const upcoming = projected.filter((u) => u.month >= thisMonth)
+    const pastAmount = past.reduce((sum, u) => sum + u.amount, 0)
 
     plans.push({
       key,
@@ -118,10 +133,11 @@ export function installmentPlans(transactions: Transaction[]): InstallmentPlan[]
       purchaseDate,
       totalAmount,
       count: total,
-      charged,
-      chargedAmount,
-      remaining,
+      charged: charged + past.length,
+      chargedAmount: chargedAmount + pastAmount,
+      remaining: remaining - pastAmount,
       upcoming,
+      assumedCharged: past.length,
     })
   }
   // Active first (most still to pay), then finished, newest purchase first.
