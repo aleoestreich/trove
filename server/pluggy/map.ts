@@ -49,6 +49,70 @@ function color(primary: string | null | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
+// Banks
+//
+// Meu Pluggy gathers accounts from many banks under one item, whose connector
+// is "MeuPluggy". The real bank is only in each account's name, e.g.
+// "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)". Those
+// accounts are grouped by bank; other items stay one institution each.
+
+/** True for the Meu Pluggy connector (the same match as connectToken.ts). */
+export function isMeuPluggy(item: PluggyItem): boolean {
+  return /^meu\s*pluggy$/i.test(item.connector.name.trim())
+}
+
+/** Well-known names, matched on the account's legal or marketing name. First match wins. */
+const BANKS: [RegExp, string][] = [
+  [/\bnu\s*(pagamentos|bank|financeira|invest)|\bnubank\b/i, 'Nubank'],
+  [/\bita[uú]/i, 'Itaú'],
+  [/\b(banco\s+)?inter\b/i, 'Inter'],
+  [/\bwise\b/i, 'Wise'],
+  [/\bbradesco\b/i, 'Bradesco'],
+  [/\bsantander\b/i, 'Santander'],
+  [/\bcaixa\s+econ[oô]mica\b/i, 'Caixa'],
+  [/\bbanco do brasil\b/i, 'Banco do Brasil'],
+  [/\bc6\b/i, 'C6 Bank'],
+  [/\bbtg\b/i, 'BTG Pactual'],
+  [/\bxp\s+(investimentos|inc)\b|\bbanco xp\b/i, 'XP'],
+  [/\bmercado\s*pago\b/i, 'Mercado Pago'],
+  [/\bpicpay\b/i, 'PicPay'],
+  [/\bpagseguro\b|\bpagbank\b/i, 'PagBank'],
+  [/\bneon\b/i, 'Neon'],
+  [/\bsicoob\b/i, 'Sicoob'],
+  [/\bsicredi\b/i, 'Sicredi'],
+  [/\bbanrisul\b/i, 'Banrisul'],
+  [/\bsafra\b/i, 'Safra'],
+  [/\bwill\s*bank\b/i, 'Will Bank'],
+  [/\bbanco original\b/i, 'Banco Original'],
+]
+
+/** The bank behind a Meu Pluggy account: a known name, else the legal name before " - " or " (". */
+export function bankOf(account: Pick<PluggyAccount, 'name' | 'marketingName'>): string | null {
+  const text = `${account.name} ${account.marketingName ?? ''}`
+  for (const [re, name] of BANKS) if (re.test(text)) return name
+  const legal = account.name
+    .split(/\s+-\s+|\s*\(/)[0]
+    .replace(/[\s,]+(S\.?\s?\/?A\.?|Ltda\.?)$/i, '')
+    .trim()
+  return legal || null
+}
+
+/** "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)" -> "Conta Pré-paga". */
+function shortAccountName(a: PluggyAccount): string {
+  if (a.marketingName) return a.marketingName
+  const kind = /\(([^()]+)\)\s*$/.exec(a.name)?.[1]?.trim()
+  return kind || a.name
+}
+
+const slug = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+
+// ---------------------------------------------------------------------------
 // Categories
 
 /** Keyword rules on Pluggy's category name (English or Portuguese), first match wins. */
@@ -103,7 +167,17 @@ export function toSnapshot(data: PluggyData): Snapshot {
   const { rates } = data
   const itemById = new Map(data.items.map((i) => [i.id, i]))
 
-  const institutions: Institution[] = data.items.map((i) => ({ id: i.id, name: i.connector.name, color: color(i.connector.primaryColor) }))
+  // One institution per item, except Meu Pluggy: one per bank, in the order accounts arrive.
+  const institutions: Institution[] = []
+  const institutionOf = new Map<string, string>()
+  for (const a of data.accounts) {
+    const item = itemById.get(a.itemId)
+    if (!item) continue
+    const bank = isMeuPluggy(item) ? bankOf(a) : null
+    const id = bank ? `${item.id}:${slug(bank) || 'bank'}` : item.id
+    institutionOf.set(a.id, id)
+    if (!institutions.some((i) => i.id === id)) institutions.push({ id, name: bank ?? item.connector.name, color: color(item.connector.primaryColor) })
+  }
 
   const accountCurrency = new Map<string, string>()
   const accounts: Account[] = data.accounts
@@ -114,8 +188,8 @@ export function toSnapshot(data: PluggyData): Snapshot {
       const rate = rateOf(currency, rates)
       const account: Account = {
         id: a.id,
-        institutionId: a.itemId,
-        name: a.marketingName || a.name,
+        institutionId: institutionOf.get(a.id)!,
+        name: isMeuPluggy(itemById.get(a.itemId)!) ? shortAccountName(a) : a.marketingName || a.name,
         type: a.type,
         subtype: a.subtype,
         balance: cents(a.balance * rate),
