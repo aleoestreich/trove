@@ -65,7 +65,11 @@ export async function finance(request: Request, config: PluggyConfig | null, dep
     const from = historyStart(now)
     const transactions = (await Promise.all(accounts.map((a) => client.getTransactions(a.id, from)))).flat()
     if (summary) return json(200, summarize(items, accounts, transactions))
-    const currencies = [...accounts.map((a) => a.currencyCode), ...transactions.map((t) => t.currencyCode)].filter(Boolean)
+    // Rates only for what's shown: empty, hidden balances (e.g. a Wise EUR
+    // account at zero) don't need one, so they can't fail the load.
+    const withTransactions = new Set(transactions.map((t) => t.accountId))
+    const shown = accounts.filter((a) => !isEmptyBankAccount(a, withTransactions))
+    const currencies = [...shown.map((a) => a.currencyCode), ...transactions.map((t) => t.currencyCode)].filter(Boolean)
     const rates = await ratesToBRL(currencies, fetchFn)
     const body = JSON.stringify(toSnapshot({ items, accounts, transactions, rates, fetchedAt: now.toISOString() }))
     cache = { at: Date.now(), body }

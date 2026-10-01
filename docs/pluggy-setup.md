@@ -156,10 +156,13 @@ Nothing else is stored. You can see these logs in Vercel → **Logs**.
     account's** bank (then savings, then any account): known banks by name
     (Nubank, Itaú, Wise…), others by their legal name. Account names are
     shortened to the part in brackets ("Conta Pré-paga");
-  - **USD accounts are Wise.** Meu Pluggy sends the owner's Wise USD account
-    without a bank name, so an item whose accounts don't name a known bank
-    but include a USD account is called "Wise". An account without a name
-    shows as "USD balance" / "Saldo em USD";
+  - **Wise.** Meu Pluggy doesn't give Wise's bank name: Wise has one
+    checking account per currency, each named just "USD", "BRL", "EUR"…
+    An item whose accounts don't name a known bank but have a currency-code
+    name (or a USD account) is called "Wise". Such accounts show as
+    "USD balance" / "Saldo em USD", and so on. Exchange rates are only
+    fetched for accounts that are shown, so an empty EUR or GBP balance
+    can't make the load fail;
   - bank accounts at zero with no transactions in the last 6 months are
     left out (cards always stay). The summary marks them `hiddenAsEmpty`.
 - `api/connect-token.ts` → `server/pluggy/connectToken.ts`: `POST` (behind

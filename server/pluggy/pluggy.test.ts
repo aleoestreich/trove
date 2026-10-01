@@ -250,6 +250,31 @@ describe('Meu Pluggy: one group per item, named after its checking account', () 
     expect(itemBankName([acc('b', 'x', 'Banco Inter S.A. (Conta Corrente)'), acc('u', 'x', '', { currencyCode: 'USD' })])).toBe('Inter')
   })
 
+  it('names a Wise item from its currency-named checking accounts ("USD", "BRL"…)', () => {
+    const s = snap(
+      [meuItem('nu'), meuItem('wise')],
+      [
+        acc('nu-chk', 'nu', 'Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)'),
+        acc('w-brl', 'wise', 'BRL', { balance: 320.5 }),
+        acc('w-usd', 'wise', 'USD', { currencyCode: 'USD', balance: 2500 }),
+        acc('w-eur', 'wise', 'EUR', { currencyCode: 'EUR', balance: 0 }), // empty: hidden
+      ],
+    )
+    expect(s.institutions.map((i) => [i.id, i.name])).toEqual([
+      ['nu', 'Nubank'],
+      ['wise', 'Wise'],
+    ])
+    expect(s.accounts.filter((a) => a.institutionId === 'wise').map((a) => [a.id, a.name, a.foreign?.currency ?? 'BRL'])).toEqual([
+      ['w-brl', '', 'BRL'], // shown as "Saldo em BRL"
+      ['w-usd', '', 'USD'], // shown as "Saldo em USD"
+    ])
+  })
+
+  it('never uses a currency code as a bank name', () => {
+    expect(itemBankName([acc('b', 'x', 'BRL')])).toBe('Wise')
+    expect(bankOf({ name: 'EUR' })).toBeNull()
+  })
+
   it('leaves items from other connectors named after the connector', () => {
     expect(toSnapshot(data([])).institutions).toEqual([{ id: 'item-1', name: 'Nubank', color: '#8a05be' }])
   })
@@ -369,17 +394,19 @@ describe('GET /api/finance', () => {
   afterEach(() => vi.restoreAllMocks())
 
   /** Fake Pluggy + exchange-rate service. */
-  function fakeUpstream(opts: { failAccounts?: boolean } = {}) {
+  function fakeUpstream(opts: { failAccounts?: boolean; extraAccounts?: PluggyAccount[] } = {}) {
     return vi.fn(async (input: string | URL | Request) => {
       const url = new URL(String(input))
       if (url.hostname === 'economia.awesomeapi.com.br') return Response.json({ USDBRL: { bid: '5.5' } })
       if (url.pathname === '/auth') return Response.json({ apiKey: 'KEY' })
       if (url.pathname === '/items/item-1') return Response.json(item)
       if (url.pathname === '/accounts') {
-        return opts.failAccounts ? new Response('down', { status: 500 }) : Response.json({ results: [checking, usd], page: 1, total: 2, totalPages: 1 })
+        const results = [checking, usd, ...(opts.extraAccounts ?? [])]
+        return opts.failAccounts ? new Response('down', { status: 500 }) : Response.json({ results, page: 1, total: results.length, totalPages: 1 })
       }
       if (url.pathname === '/v2/transactions') {
         const acc = url.searchParams.get('accountId')!
+        if (opts.extraAccounts?.some((a) => a.id === acc)) return Response.json({ results: [], next: null })
         return Response.json({ results: [tx({ id: `t-${acc}`, accountId: acc, category: 'Groceries', description: 'Pão de Açúcar' })], next: null })
       }
       return new Response('not found', { status: 404 })
@@ -387,6 +414,16 @@ describe('GET /api/finance', () => {
   }
   const req = (q = '') => new Request(`https://trove.vercel.app/api/finance${q}`)
   const now = () => new Date(2026, 8, 29)
+
+  it('does not ask for exchange rates of hidden, empty balances (e.g. a Wise EUR account at zero)', async () => {
+    const eur: PluggyAccount = { id: 'acc-eur', itemId: 'item-1', type: 'BANK', subtype: 'CHECKING_ACCOUNT', name: 'EUR', balance: 0, currencyCode: 'EUR' }
+    const fetchFn = fakeUpstream({ extraAccounts: [eur] })
+    const res = await finance(req(), config, { fetch: fetchFn as typeof fetch, now })
+    expect(res.status).toBe(200)
+    const rateUrls = fetchFn.mock.calls.map(([u]) => String(u)).filter((u) => u.includes('awesomeapi'))
+    expect(rateUrls).toEqual(['https://economia.awesomeapi.com.br/json/last/USD-BRL'])
+    expect((await res.json()).accounts.map((a: { id: string }) => a.id)).not.toContain('acc-eur')
+  })
 
   it('returns 503 when Pluggy is not configured (the app then shows demo data)', async () => {
     const res = await finance(req(), null)
