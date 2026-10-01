@@ -53,6 +53,18 @@ can sign in. Local development
 (`npm run dev`) has no login. Setup and troubleshooting:
 [docs/auth0-setup.md](docs/auth0-setup.md).
 
+## Bank logos
+
+Banks show as rounded-square badges (`src/components/BankBadge.tsx`) tinted
+with their colour token: Nubank `--series-4`, Itaú `--series-2`, Santander
+`--series-5`, Wise `--series-3`. The logo is read from
+`public/banks/<bank>.svg` (`nubank`, `itau`, `santander`, `wise`) and used as
+a CSS mask, so any single-shape SVG works and takes the theme's colour. The
+SVG needs a `viewBox`, or it won't scale inside the badge. Logos fill 58% of
+the badge (Itaú 64%, since its lettering is cut out of a square). If a file is
+missing, a line icon is shown instead. Other banks get their first two letters
+in a neutral badge.
+
 ## Scripts
 
 | Command | What it does |

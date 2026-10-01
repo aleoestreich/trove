@@ -8,17 +8,20 @@ import { balanceHistory, cashByCurrency, cashByInstitution } from '../lib/histor
 import { installmentPlans, upcomingByMonth } from '../lib/installments'
 import { dayOfMonth, formatFullDate, formatMonth, formatMonthName, formatMonthShort, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
 import { formatMoney, formatPercent } from '../lib/money'
-import { Badge, Card, CardTitle, IconDisc, InstitutionBadge, MonthSwitcher, Overline, PageHeader, Progress, SeeAll, Swatch } from '../components/ui'
+import { Badge, Card, CardTitle, IconDisc, MonthSwitcher, Overline, PageHeader, Progress, SeeAll, Swatch } from '../components/ui'
+import { InstitutionBadge } from '../components/BankBadge'
 import { CashFlowChart, NetWorthChart, SpendingTrendChart, seriesColor } from '../components/charts'
 import { TransactionRow } from '../components/TransactionRow'
 import { TransactionSheet } from '../components/TransactionSheet'
 import { useI18n } from '../i18n/I18nProvider'
+import { useIsDesktop } from '../lib/useIsDesktop'
 
 const TOP_CATEGORIES = 5
 const CURRENCY_COLORS: Record<string, string> = { BRL: 'var(--series-1)', USD: 'var(--series-3)', EUR: 'var(--series-4)' }
 
 export function Dashboard() {
   const { accounts, transactions, categoriesById, institutionsById } = useData()
+  const isDesktop = useIsDesktop()
   const [params, setParams] = useSearchParams()
   const { t, categoryName, locale } = useI18n()
   const latest = monthKey(toISO(new Date()))
@@ -154,7 +157,7 @@ export function Dashboard() {
               const share = bal.cash > 0 ? (s.amount / bal.cash) * 100 : 0
               return (
                 <div key={s.id} className="flex min-h-[60px] items-center gap-3 lg:min-h-[52px]">
-                  <InstitutionBadge institution={institutionsById.get(s.id)!} size="sm" />
+                  <InstitutionBadge institution={institutionsById.get(s.id)!} size={isDesktop ? 32 : 36} />
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-[15px] font-medium text-ink lg:text-sm">
@@ -224,7 +227,7 @@ export function Dashboard() {
           <CardTitle subtitle={t.overview.openCardBills}>{t.overview.comingUp}</CardTitle>
           {cards.map((c) => (
             <Link key={c.id} to={`/transactions?m=all&a=${c.id}`} className="flex min-h-[60px] items-center gap-3 border-b border-line active:bg-track">
-              <InstitutionBadge institution={institutionsById.get(c.institutionId)!} size="sm" />
+              <InstitutionBadge institution={institutionsById.get(c.institutionId)!} size={36} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-[15px] font-medium text-ink lg:text-sm">{t.cardOf(institutionsById.get(c.institutionId)!.name)}</span>
                 {c.creditData?.balanceDueDate && (

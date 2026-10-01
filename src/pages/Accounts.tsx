@@ -6,7 +6,8 @@ import { balances } from '../lib/summary'
 import { installmentPlans, remainingByAccount } from '../lib/installments'
 import { formatShortDate } from '../lib/dates'
 import { formatMoney, formatPercent, formatRate } from '../lib/money'
-import { Badge, InstitutionBadge, PageHeader, Progress } from '../components/ui'
+import { Badge, PageHeader, Progress } from '../components/ui'
+import { InstitutionBadge } from '../components/BankBadge'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n/I18nProvider'
 import { isDeployed } from '../lib/useIsDesktop'
@@ -27,7 +28,7 @@ export function Accounts() {
     return (
       <section key={inst.id} className="overflow-hidden rounded-lg border border-line bg-surface">
         <div className="flex items-center gap-3 p-4 lg:px-5">
-          <InstitutionBadge institution={inst} />
+          <InstitutionBadge institution={inst} size={40} />
           <h2 className="min-w-0 flex-1 truncate text-base leading-[22px] font-medium text-ink">{inst.name}</h2>
           <span className="tabular text-base font-medium whitespace-nowrap text-ink lg:text-lg lg:font-bold">{formatMoney(total.net)}</span>
         </div>
