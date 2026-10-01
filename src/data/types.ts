@@ -26,6 +26,8 @@ export interface CreditData {
   balanceCloseDate: string | null
   /** Day the current bill is due (ISO date), if the bank reports it. */
   balanceDueDate: string | null
+  /** Closing and due days set by the owner; when present, the dates above come from them. */
+  userDays?: { close: number; due: number }
 }
 
 export interface Account {
