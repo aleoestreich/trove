@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
+import type { Institution } from '../data/types'
 import { installmentPlans, upcomingByMonth, type InstallmentPlan } from '../lib/installments'
 import { formatMonthShort, formatMonthYear } from '../lib/dates'
 import { formatMoney } from '../lib/money'
@@ -8,16 +10,51 @@ import { MonthBars } from '../components/charts'
 import { categoryIcon } from '../components/Icon'
 import { useAccountLabel } from '../components/TransactionRow'
 import { useI18n } from '../i18n/I18nProvider'
+import { InstitutionBadge } from '../components/BankBadge'
+import { useIsDesktop } from '../lib/useIsDesktop'
 
 /** Months shown in the "committed per month" chart. */
 const CHART_MONTHS = 7
 
+interface BankGroup {
+  institution: Institution
+  plans: InstallmentPlan[]
+  remaining: number
+}
+
+/** Plans grouped by the bank of their card: most still to pay first, then by name. */
+function groupByBank(plans: InstallmentPlan[], bankOf: (accountId: string) => Institution): BankGroup[] {
+  const groups = new Map<string, BankGroup>()
+  for (const plan of plans) {
+    const institution = bankOf(plan.accountId)
+    const g = groups.get(institution.id) ?? { institution, plans: [], remaining: 0 }
+    g.plans.push(plan)
+    g.remaining += plan.remaining
+    groups.set(institution.id, g)
+  }
+  return [...groups.values()].sort((a, b) => b.remaining - a.remaining || a.institution.name.localeCompare(b.institution.name))
+}
+
 export function Installments() {
-  const { transactions } = useData()
+  const { transactions, accountsById, institutionsById } = useData()
   const { t } = useI18n()
+  const isDesktop = useIsDesktop()
+  const [params, setParams] = useSearchParams()
   const plans = useMemo(() => installmentPlans(transactions), [transactions])
   const active = plans.filter((p) => p.remaining > 0)
   const finished = plans.filter((p) => p.remaining === 0)
+  const showPaid = params.get('view') === 'paid' && finished.length > 0
+  const bankOf = (accountId: string) => institutionsById.get(accountsById.get(accountId)!.institutionId)!
+  const groups = groupByBank(showPaid ? finished : active, bankOf)
+  const setView = (paid: boolean) =>
+    setParams(
+      (p) => {
+        if (paid) p.set('view', 'paid')
+        else p.delete('view')
+        return p
+      },
+      { replace: true },
+    )
   const months = upcomingByMonth(plans)
   const stillToPay = active.reduce((s, p) => s + p.remaining, 0)
   const lastMonth = months.at(-1)?.month
@@ -45,6 +82,33 @@ export function Installments() {
     />
   )
 
+  // In progress / Paid off. Only shown when something is paid off.
+  const tabs = finished.length > 0 && (
+    <div role="tablist" aria-label={t.installments.view} className="mt-2 flex self-start rounded-full border border-line bg-surface p-1">
+      {[false, true].map((paid) => {
+        const on = showPaid === paid
+        const count = paid ? finished.length : active.length
+        return (
+          <button
+            key={String(paid)}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            aria-controls={isDesktop ? 'installment-list-desktop' : 'installment-list'}
+            onClick={() => setView(paid)}
+            className={`inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm focus-visible:outline-2 focus-visible:outline-accent ${
+              on ? 'bg-accent-soft font-medium text-accent' : 'text-ink-2'
+            }`}
+          >
+            {paid ? t.installments.finished : t.installments.inProgress}
+            <span className={`tabular text-xs ${on ? 'text-accent' : 'text-muted'}`}>{count}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+  const noneInProgress = !showPaid && active.length === 0 && <p className="mx-1 text-sm text-muted">{t.installments.noneInProgress}</p>
+
   return (
     <>
       <PageHeader title={t.nav.installments} subtitle={t.installments.subtitle} />
@@ -62,15 +126,18 @@ export function Installments() {
           )}
         </Card>
 
-        {active.length > 0 && <h2 className="mx-1 mt-2 text-base leading-[22px] font-medium text-ink">{t.installments.purchases}</h2>}
-        {active.map((p) => (
-          <PlanCard key={p.key} plan={p} />
-        ))}
-
-        {finished.length > 0 && <h2 className="mx-1 mt-2 text-base leading-[22px] font-medium text-ink">{t.installments.finished}</h2>}
-        {finished.map((p) => (
-          <PlanCard key={p.key} plan={p} />
-        ))}
+        {tabs}
+        <div id="installment-list" role="tabpanel" className="flex flex-col gap-3">
+          {noneInProgress}
+          {groups.map((g) => (
+            <section key={g.institution.id} aria-label={g.institution.name} className="flex flex-col gap-3">
+              <BankHeader group={g} paid={showPaid} size={36} />
+              {g.plans.map((p) => (
+                <PlanCard key={p.key} plan={p} />
+              ))}
+            </section>
+          ))}
+        </div>
       </div>
 
       {/* Desktop */}
@@ -83,15 +150,38 @@ export function Installments() {
             <p className="text-xs leading-4 text-muted">{t.installments.committedNote}</p>
           </Card>
         </div>
-        {active.length > 0 && <PlanTable plans={active} />}
-        {finished.length > 0 && (
-          <>
-            <h2 className="mx-1 text-base leading-[22px] font-medium text-ink">{t.installments.finished}</h2>
-            <PlanTable plans={finished} />
-          </>
-        )}
+        {tabs}
+        <div id="installment-list-desktop" role="tabpanel" className="flex flex-col gap-5">
+          {noneInProgress}
+          {groups.map((g) => (
+            <section key={g.institution.id} aria-label={g.institution.name} className="flex flex-col gap-3">
+              <BankHeader group={g} paid={showPaid} size={32} />
+              <PlanTable plans={g.plans} />
+            </section>
+          ))}
+        </div>
       </div>
     </>
+  )
+}
+
+/** A bank's logo and name over its purchases, with what's left to pay there (or how many are paid off). */
+function BankHeader({ group, paid, size }: { group: BankGroup; paid: boolean; size: 32 | 36 }) {
+  const { t } = useI18n()
+  return (
+    <div className="mx-1 mt-2 flex items-center gap-3">
+      <InstitutionBadge institution={group.institution} size={size} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <h2 className="truncate text-base leading-[22px] font-medium text-ink">{group.institution.name}</h2>
+        <span className="text-[13px] leading-[18px] text-muted">{t.installments.bankPurchases(group.plans.length)}</span>
+      </div>
+      {!paid && (
+        <div className="flex flex-col items-end">
+          <span className="tabular text-base leading-[22px] font-medium whitespace-nowrap text-ink">{formatMoney(group.remaining)}</span>
+          <span className="text-[13px] leading-[18px] text-muted">{t.installments.bankLeft}</span>
+        </div>
+      )}
+    </div>
   )
 }
 
