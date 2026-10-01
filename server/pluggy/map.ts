@@ -51,10 +51,11 @@ function color(primary: string | null | undefined): string {
 // ---------------------------------------------------------------------------
 // Banks
 //
-// Meu Pluggy gathers accounts from many banks under one item, whose connector
-// is "MeuPluggy". The real bank is only in each account's name, e.g.
-// "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)". Those
-// accounts are grouped by bank; other items stay one institution each.
+// Every item is one institution, so a bank's checking account and credit card
+// stay together. Items from Meu Pluggy have the connector "MeuPluggy", and the
+// real bank is only in the account names, e.g. "Nu Pagamentos S.A. -
+// Instituição de Pagamento (Conta Pré-paga)": such an item is named after its
+// checking account's bank (card names often don't mention it).
 
 /** True for the Meu Pluggy connector (the same match as connectToken.ts). */
 export function isMeuPluggy(item: PluggyItem): boolean {
@@ -97,20 +98,28 @@ export function bankOf(account: Pick<PluggyAccount, 'name' | 'marketingName'>): 
   return legal || null
 }
 
+/** Account types in the order used to name an item's bank: checking first. */
+const NAMING_ORDER = ['CHECKING_ACCOUNT', 'SAVINGS_ACCOUNT', 'CREDIT_CARD']
+
+/** The bank to show for a Meu Pluggy item: from its checking account, else any account. */
+export function itemBankName(accounts: PluggyAccount[]): string | null {
+  const rank = (a: PluggyAccount) => {
+    const i = NAMING_ORDER.indexOf(a.subtype)
+    return i === -1 ? NAMING_ORDER.length : i
+  }
+  for (const a of [...accounts].sort((x, y) => rank(x) - rank(y))) {
+    const bank = bankOf(a)
+    if (bank) return bank
+  }
+  return null
+}
+
 /** "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)" -> "Conta Pré-paga". */
 function shortAccountName(a: PluggyAccount): string {
   if (a.marketingName) return a.marketingName
   const kind = /\(([^()]+)\)\s*$/.exec(a.name)?.[1]?.trim()
   return kind || a.name
 }
-
-const slug = (s: string) =>
-  s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
 
 // ---------------------------------------------------------------------------
 // Categories
@@ -177,17 +186,14 @@ export function toSnapshot(input: PluggyData): Snapshot {
   const { rates } = data
   const itemById = new Map(data.items.map((i) => [i.id, i]))
 
-  // One institution per item, except Meu Pluggy: one per bank, in the order accounts arrive.
-  const institutions: Institution[] = []
-  const institutionOf = new Map<string, string>()
-  for (const a of data.accounts) {
-    const item = itemById.get(a.itemId)
-    if (!item) continue
-    const bank = isMeuPluggy(item) ? bankOf(a) : null
-    const id = bank ? `${item.id}:${slug(bank) || 'bank'}` : item.id
-    institutionOf.set(a.id, id)
-    if (!institutions.some((i) => i.id === id)) institutions.push({ id, name: bank ?? item.connector.name, color: color(item.connector.primaryColor) })
-  }
+  // One institution per item that has visible accounts. A Meu Pluggy item is
+  // named from all its accounts (an empty, hidden checking account still names it).
+  const institutions: Institution[] = data.items
+    .filter((i) => data.accounts.some((a) => a.itemId === i.id))
+    .map((i) => {
+      const bank = isMeuPluggy(i) ? itemBankName(input.accounts.filter((a) => a.itemId === i.id)) : null
+      return { id: i.id, name: bank ?? i.connector.name, color: color(i.connector.primaryColor) }
+    })
 
   const accountCurrency = new Map<string, string>()
   const accounts: Account[] = data.accounts
@@ -198,7 +204,7 @@ export function toSnapshot(input: PluggyData): Snapshot {
       const rate = rateOf(currency, rates)
       const account: Account = {
         id: a.id,
-        institutionId: institutionOf.get(a.id)!,
+        institutionId: a.itemId,
         name: isMeuPluggy(itemById.get(a.itemId)!) ? shortAccountName(a) : a.marketingName || a.name,
         type: a.type,
         subtype: a.subtype,
