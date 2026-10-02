@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSeed } from '../data/seed'
 import type { Account, Transaction } from '../data/types'
-import { currentBill, isIdleCard } from './bills'
+import { currentBill, inBill, isIdleCard } from './bills'
 import { addMonths } from './dates'
 import { installmentPlans } from './installments'
 
@@ -38,7 +38,13 @@ describe('current card bill (from the billing cycle)', () => {
 
   it('sums what is dated in the cycle, without bill payments', () => {
     const bill = currentBill(card('2026-10-20', '2026-10-27'), txs, [], today)
-    expect(bill).toEqual({ amount: 110_00, closeDate: '2026-10-20', dueDate: '2026-10-27', closed: false, paid: 0 })
+    expect(bill).toEqual({ amount: 110_00, closeDate: '2026-10-20', fromDate: '2026-09-20', expected: 0, dueDate: '2026-10-27', closed: false, paid: 0 })
+  })
+
+  it("picks out the bill's transactions: the card's, in the cycle, without bill payments", () => {
+    const bill = currentBill(card('2026-10-20', '2026-10-27'), txs, [], today)!
+    expect(txs.filter((t) => inBill(t, 'card', bill)).map((t) => t.date)).toEqual(['2026-09-21', '2026-10-01', '2026-10-05'])
+    expect(inBill({ ...txs[1], accountId: 'other' }, 'card', bill)).toBe(false)
   })
 
   it('shows a closed bill until it is due', () => {
@@ -72,6 +78,7 @@ describe('current card bill (from the billing cycle)', () => {
     const bill = currentBill(card('2026-10-20', '2026-10-27'), [inst(5, '2026-09-10')], plans, today)!
     // 5/10 (10 Sep) belongs to the previous bill; 6/10 is expected on 10 Oct.
     expect(bill.amount).toBe(100_00)
+    expect(bill.expected).toBe(100_00)
   })
 
   describe('a closed bill that has been paid', () => {
@@ -85,7 +92,7 @@ describe('current card bill (from the billing cycle)', () => {
 
     it('moves to the next cycle once it is paid, before the due date', () => {
       const paid = [...cycleTxs, tx('2026-09-30', 500_00, 'card-payment')]
-      expect(currentBill(closedCard, paid, [], today)).toEqual({ amount: 40_00, closeDate: '2026-10-28', dueDate: '2026-11-05', closed: false, paid: 0 })
+      expect(currentBill(closedCard, paid, [], today)).toEqual({ amount: 40_00, closeDate: '2026-10-28', fromDate: '2026-09-28', expected: 0, dueDate: '2026-11-05', closed: false, paid: 0 })
     })
 
     it('allows a little rounding in the payment', () => {

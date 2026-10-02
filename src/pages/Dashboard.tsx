@@ -232,7 +232,7 @@ export function Dashboard() {
             const bill = currentBill(c, transactions, plans)
             const dueDate = bill ? bill.dueDate : c.creditData?.balanceDueDate
             return (
-              <Link key={c.id} to={`/transactions?m=all&a=${c.id}`} className="flex min-h-[60px] items-center gap-3 border-b border-line active:bg-track">
+              <Link key={c.id} to={bill ? `/transactions?bill=${c.id}` : `/transactions?m=all&a=${c.id}`} className="flex min-h-[60px] items-center gap-3 border-b border-line active:bg-track">
                 <InstitutionBadge institution={institutionsById.get(c.institutionId)!} size={36} />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-[15px] font-medium text-ink lg:text-sm">{t.cardOf(institutionsById.get(c.institutionId)!.name)}</span>

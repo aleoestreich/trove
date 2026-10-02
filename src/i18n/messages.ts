@@ -59,6 +59,11 @@ const en = {
 
   transactions: {
     search: 'Search transactions',
+    /** Chip on Transactions when opened from a card's bill. */
+    billChip: (closed: boolean, from: string, to: string) => `${closed ? 'Closed bill' : 'Current bill'} · ${from} – ${to}`,
+    billShowAll: "Show all of this card's transactions",
+    billTotal: (amount: string) => `Bill total ${amount}`,
+    billExpected: (amount: string) => `Includes ${amount} in installments that haven't posted yet.`,
     allMonths: 'All months',
     type: 'Type',
     allTypes: 'All types',
@@ -250,6 +255,10 @@ const ptBR: Messages = {
 
   transactions: {
     search: 'Buscar transações',
+    billChip: (closed, from, to) => `${closed ? 'Fatura fechada' : 'Fatura atual'} · ${from} – ${to}`,
+    billShowAll: 'Ver todas as transações deste cartão',
+    billTotal: (amount) => `Total da fatura ${amount}`,
+    billExpected: (amount) => `Inclui ${amount} em parcelas que ainda não entraram.`,
     allMonths: 'Todos os meses',
     type: 'Tipo',
     allTypes: 'Todos os tipos',
