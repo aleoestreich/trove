@@ -144,7 +144,7 @@ function CreditCardBlock({ account, label, bill, futureInstallments }: { account
   const near = share >= NEAR_LIMIT
   return (
     <Link
-      to={`/transactions?m=all&a=${account.id}`}
+      to={bill ? `/transactions?bill=${account.id}` : `/transactions?m=all&a=${account.id}`}
       className="flex flex-col gap-3 border-t border-line p-4 active:bg-track lg:px-5 lg:hover:bg-page"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">

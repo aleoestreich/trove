@@ -3,7 +3,9 @@ import { useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
 import { MONTHS_OF_HISTORY } from '../data/seed'
 import type { CategoryKind, Transaction } from '../data/types'
-import { formatDayHeading, formatMonth, lastMonths, monthKey, toISO } from '../lib/dates'
+import { formatDayHeading, formatMonth, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
+import { currentBill, inBill } from '../lib/bills'
+import { installmentPlans } from '../lib/installments'
 import { formatMoney } from '../lib/money'
 import { totals } from '../lib/summary'
 import { Icon, categoryIcon } from '../components/Icon'
@@ -72,6 +74,12 @@ function FilterChip({
   )
 }
 
+/** The day after an ISO date. */
+function nextDay(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return toISO(new Date(y, m - 1, d + 1))
+}
+
 export function Transactions() {
   const { transactions, accounts, institutionsById, categories, categoriesById } = useData()
   const [params, setParams] = useSearchParams()
@@ -95,10 +103,15 @@ export function Transactions() {
     setParams(next, { replace: true })
   }
 
-  const filtered = useMemo(
-    () => filterTransactions(transactions, (id) => categoriesById.get(id)?.kind, filters),
-    [transactions, categoriesById, params],
-  )
+  // Opened from a card's bill (?bill=<card>): that bill's transactions; type, category and search still apply.
+  const plans = useMemo(() => installmentPlans(transactions), [transactions])
+  const billCard = params.get('bill') ? accounts.find((a) => a.id === params.get('bill')) : undefined
+  const bill = billCard ? currentBill(billCard, transactions, plans) : null
+  const filtered = useMemo(() => {
+    if (!bill || !billCard) return filterTransactions(transactions, (id) => categoriesById.get(id)?.kind, filters)
+    const inCycle = transactions.filter((tx) => inBill(tx, billCard.id, bill))
+    return filterTransactions(inCycle, (id) => categoriesById.get(id)?.kind, { ...filters, month: undefined, accountId: undefined })
+  }, [transactions, categoriesById, params, bill?.closeDate])
 
   // Grouped by day, each with its net (transfers excluded). `locale`: headings are formatted text.
   const byDate = useMemo(() => {
@@ -108,7 +121,9 @@ export function Transactions() {
   }, [filtered, categoriesById, locale])
 
   const hasFilters = params.has('a') || params.has('c') || params.has('type') || params.has('q')
-  const clear = () => setParams(params.has('m') ? { m: params.get('m')! } : {}, { replace: true })
+  // Clearing keeps the month, and the bill when one is open.
+  const clear = () =>
+    setParams(Object.fromEntries(['m', 'bill'].filter((k) => params.has(k)).map((k) => [k, params.get(k)!])), { replace: true })
 
   const monthValue = params.get('m') ?? latest
   const monthLabel = filters.month ? formatMonth(filters.month) : t.transactions.allMonths
@@ -116,7 +131,9 @@ export function Transactions() {
   const account = filters.accountId ? accounts.find((a) => a.id === filters.accountId) : undefined
   const category = filters.categoryId ? categoriesById.get(filters.categoryId) : undefined
 
-  const countText = t.transactions.count(filtered.length, filters.month ? formatMonth(filters.month) : null)
+  // A bill spans two months: no month in the count or the empty message.
+  const shownMonth = bill ? undefined : filters.month
+  const countText = t.transactions.count(filtered.length, shownMonth ? formatMonth(shownMonth) : null)
   const empty = (
     <EmptyState
       icon="search"
@@ -129,7 +146,7 @@ export function Transactions() {
         )
       }
     >
-      {t.transactions.emptyBody(filters.month ? formatMonth(filters.month) : null)}
+      {t.transactions.emptyBody(shownMonth ? formatMonth(shownMonth) : null)}
     </EmptyState>
   )
 
@@ -154,6 +171,22 @@ export function Transactions() {
 
           {/* Filters: one horizontally scrollable row on phones */}
           <div className="flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:flex-wrap lg:gap-3 lg:overflow-visible lg:px-0">
+            {bill && billCard ? (
+              <span className="flex h-12 shrink-0 items-center lg:h-11">
+                <span className="inline-flex h-9 items-center gap-1 rounded-full bg-accent-soft pl-3.5 text-sm font-medium whitespace-nowrap text-accent lg:h-11 lg:pl-4">
+                  {t.transactions.billChip(bill.closed, formatShortDate(nextDay(bill.fromDate)), formatShortDate(bill.closeDate))}
+                  <button
+                    type="button"
+                    aria-label={t.transactions.billShowAll}
+                    title={t.transactions.billShowAll}
+                    onClick={() => setParams({ m: 'all', a: billCard.id }, { replace: true })}
+                    className="-my-1.5 flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-accent"
+                  >
+                    <Icon name="close" className="size-4" strokeWidth={2} />
+                  </button>
+                </span>
+              </span>
+            ) : (
             <FilterChip label={monthLabel} applied value={monthValue} onChange={(v) => set('m', v)}>
               {lastMonths(latest, MONTHS_OF_HISTORY)
                 .reverse()
@@ -164,12 +197,14 @@ export function Transactions() {
                 ))}
               <option value="all">{t.transactions.allMonths}</option>
             </FilterChip>
+            )}
             <FilterChip label={filters.kind ? kindLabel[filters.kind] : t.transactions.type} applied={!!filters.kind} value={filters.kind ?? ''} onChange={(v) => set('type', v)}>
               <option value="">{t.transactions.allTypes}</option>
               <option value="expense">{t.expenses}</option>
               <option value="income">{t.income}</option>
               <option value="transfer">{t.transfers}</option>
             </FilterChip>
+            {!bill && (
             <FilterChip
               label={account ? `${institutionsById.get(account.institutionId)!.name} · ${accountLabel(account, t)}` : t.transactions.account}
               applied={!!account}
@@ -183,6 +218,7 @@ export function Transactions() {
                 </option>
               ))}
             </FilterChip>
+            )}
             <FilterChip label={category ? categoryName(category) : t.category} applied={!!category} value={filters.categoryId ?? ''} onChange={(v) => set('c', v)}>
               <option value="">{t.transactions.allCategories}</option>
               {categories.map((c) => (
@@ -198,6 +234,14 @@ export function Transactions() {
             )}
           </div>
         </div>
+
+        {bill && billCard && (
+          <div className="flex flex-col gap-0.5 px-4 pt-1 pb-2 lg:px-0 lg:pt-0 lg:pb-0">
+            <p className="tabular text-sm font-medium text-ink">{t.transactions.billTotal(formatMoney(bill.amount + bill.paid))}</p>
+            {bill.paid > 0 && <p className="tabular text-[13px] text-muted">{t.accounts.alreadyPaid(formatMoney(bill.paid))}</p>}
+            {bill.expected > 0 && <p className="tabular text-[13px] text-muted">{t.transactions.billExpected(formatMoney(bill.expected))}</p>}
+          </div>
+        )}
 
         {desktop ? (
           <div className="flex items-start gap-5">

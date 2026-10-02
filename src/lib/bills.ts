@@ -7,6 +7,10 @@ export interface CardBill {
   amount: Cents
   /** Day this bill closes (or closed). */
   closeDate: string
+  /** The previous closing: the cycle is the days after it, up to `closeDate`. */
+  fromDate: string
+  /** Installments expected to post in the cycle that aren't in the data yet (included in `amount`). */
+  expected: Cents
   dueDate: string | null
   /** Closed but not due yet: this is the amount to pay now. */
   closed: boolean
@@ -50,12 +54,13 @@ export function currentBill(account: Account, transactions: Transaction[], plans
     const from = addMonths(close, -1) // previous closing, excluded
     const inCycle = (date: string) => date > from && date <= close
     let amount = 0
+    let expected = 0
     for (const t of own) if (t.categoryId !== 'card-payment' && inCycle(t.date)) amount -= t.amount
     for (const p of plans) {
       if (p.accountId !== account.id) continue
-      for (const u of p.upcoming) if (inCycle(u.date)) amount += u.amount
+      for (const u of p.upcoming) if (inCycle(u.date)) expected += u.amount
     }
-    return amount
+    return { amount: amount + expected, expected }
   }
   /** Bill payments on the card since `close` (up to today). */
   const paidSince = (close: string) =>
@@ -65,20 +70,25 @@ export function currentBill(account: Account, transactions: Transaction[], plans
   let k = 0
   while (k < 24 && (cycle(k).due ? cycle(k).due! < todayISO : cycle(k).close < todayISO)) k++
   let { close, due } = cycle(k)
-  let amount = billOf(close)
+  let { amount, expected } = billOf(close)
   let paid = 0
   if (close < todayISO) {
     // Closed and not due yet: if it's been paid, the next cycle is what matters now.
     paid = paidSince(close)
     if (paid >= amount - PAID_TOLERANCE) {
       ;({ close, due } = cycle(k + 1))
-      amount = billOf(close)
+      ;({ amount, expected } = billOf(close))
       paid = 0
     } else {
       amount -= paid
     }
   }
-  return { amount, closeDate: close, dueDate: due, closed: close < todayISO, paid }
+  return { amount, closeDate: close, fromDate: addMonths(close, -1), expected, dueDate: due, closed: close < todayISO, paid }
+}
+
+/** Whether a transaction is part of a bill: the card's purchases and refunds in its cycle (bill payments aren't). */
+export function inBill(t: Transaction, accountId: string, bill: CardBill): boolean {
+  return t.accountId === accountId && t.categoryId !== 'card-payment' && t.date > bill.fromDate && t.date <= bill.closeDate
 }
 
 /**
