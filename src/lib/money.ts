@@ -50,3 +50,8 @@ export function formatCompact(value: number): string {
 export function formatPercent(value: number, decimals = 0): string {
   return new Intl.NumberFormat(intlLocale(), { style: 'percent', minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value / 100)
 }
+
+/** Short money for chart labels: pt-BR "R$ 14,5 mil", en "R$14.5K". */
+export function formatCompactMoney(cents: Cents): string {
+  return new Intl.NumberFormat(intlLocale(), { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(cents / 100)
+}
