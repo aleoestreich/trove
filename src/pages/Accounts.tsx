@@ -11,7 +11,8 @@ import { Badge, PageHeader, Progress } from '../components/ui'
 import { InstitutionBadge } from '../components/BankBadge'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n/I18nProvider'
-import { accountLabel } from '../lib/accountLabel'
+import { accountType, accountTypeLabels } from '../lib/accountType'
+import { AccountTypeLabel } from '../components/AccountTypeIcon'
 import { sortForDisplay } from '../lib/accountOrder'
 import { isDeployed } from '../lib/useIsDesktop'
 import { ConnectMeuPluggy } from '../components/ConnectMeuPluggy'
@@ -33,6 +34,7 @@ export function Accounts() {
   const bankCard = (inst: (typeof institutions)[number]) => {
     // Checking first, then savings, then cards.
     const own = sortForDisplay(accounts.filter((a) => a.institutionId === inst.id))
+    const labels = accountTypeLabels(own, t)
     const total = balances(own)
     return (
       <section key={inst.id} className="overflow-hidden rounded-lg border border-line bg-surface">
@@ -44,18 +46,18 @@ export function Accounts() {
         {own.map((a) =>
           a.type === 'CREDIT' ? (
             <Fragment key={a.id}>
-              <CreditCardBlock account={a} bill={currentBill(a, transactions, plans)} futureInstallments={futureInstallments.get(a.id) ?? 0} />
+              <CreditCardBlock account={a} label={labels.get(a.id)!} bill={currentBill(a, transactions, plans)} futureInstallments={futureInstallments.get(a.id) ?? 0} />
               <CardDaysEditor account={a} />
             </Fragment>
           ) : a.foreign ? (
-            <ForeignBlock key={a.id} account={a} />
+            <ForeignBlock key={a.id} account={a} label={labels.get(a.id)!} />
           ) : (
             <Link
               key={a.id}
               to={`/transactions?m=all&a=${a.id}`}
               className="flex min-h-14 items-center justify-between gap-3 border-t border-line px-4 active:bg-track lg:min-h-[52px] lg:px-5 lg:hover:bg-page"
             >
-              <span className="text-sm text-ink-2">{accountLabel(a, t)}</span>
+              <AccountTypeLabel type={accountType(a)} label={labels.get(a.id)!} />
               <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(a.balance)}</span>
             </Link>
           ),
@@ -104,7 +106,7 @@ export function Accounts() {
 }
 
 /** A balance held in another currency: the original amount large, BRL and the rate below. */
-function ForeignBlock({ account }: { account: Account }) {
+function ForeignBlock({ account, label }: { account: Account; label: string }) {
   const { t } = useI18n()
   const foreign = account.foreign!
   return (
@@ -113,7 +115,9 @@ function ForeignBlock({ account }: { account: Account }) {
       className="flex flex-col gap-1 border-t border-line p-4 active:bg-track lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:px-5 lg:hover:bg-page"
     >
       <span className="flex flex-col gap-1 lg:gap-0.5">
-        <span className="text-xs leading-4 text-muted">{accountLabel(account, t)}</span>
+        <span className="mb-0.5">
+          <AccountTypeLabel type={accountType(account)} label={label} />
+        </span>
         <span className="tabular text-2xl leading-[30px] font-bold tracking-[-0.01em] text-ink lg:text-[26px] lg:leading-8">
           {formatMoney(foreign.balance, foreign.currency)}
         </span>
@@ -126,7 +130,7 @@ function ForeignBlock({ account }: { account: Account }) {
   )
 }
 
-function CreditCardBlock({ account, bill, futureInstallments }: { account: Account; bill: CardBill | null; futureInstallments: number }) {
+function CreditCardBlock({ account, label, bill, futureInstallments }: { account: Account; label: string; bill: CardBill | null; futureInstallments: number }) {
   const { t } = useI18n()
   const credit = account.creditData!
   // The bill from the billing cycle; the balance only when the bank gives no closing date.
@@ -144,10 +148,7 @@ function CreditCardBlock({ account, bill, futureInstallments }: { account: Accou
       className="flex flex-col gap-3 border-t border-line p-4 active:bg-track lg:px-5 lg:hover:bg-page"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-2 text-sm text-ink-2">
-          <Icon name="card" className="size-[18px]" strokeWidth={1.75} />
-          {accountLabel(account, t)}
-        </span>
+        <AccountTypeLabel type="card" label={label} />
         {near && (
           <Badge tone="critical" icon="alert">
             {t.accounts.nearLimit}
