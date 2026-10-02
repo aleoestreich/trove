@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
 import { MONTHS_OF_HISTORY } from '../data/seed'
 import type { Transaction } from '../data/types'
-import { balances, expensesByCategory, inMonth, totals } from '../lib/summary'
+import { averageIncome, balances, expensesByCategory, inMonth, totals } from '../lib/summary'
 import { balanceHistory, cashByCurrency, cashByInstitution } from '../lib/history'
 import { installmentPlans, upcomingByMonth } from '../lib/installments'
 import { currentBill, isIdleCard } from '../lib/bills'
@@ -13,6 +13,7 @@ import { Badge, Card, CardTitle, IconDisc, MonthSwitcher, Overline, PageHeader, 
 import { InstitutionBadge } from '../components/BankBadge'
 import { CashFlowChart, NetWorthChart, StackedMonthChart, seriesColor } from '../components/charts'
 import { TransactionRow } from '../components/TransactionRow'
+import { AverageIncomeCard } from '../components/AverageIncome'
 import { TransactionSheet } from '../components/TransactionSheet'
 import { useI18n } from '../i18n/I18nProvider'
 import { useIsDesktop } from '../lib/useIsDesktop'
@@ -53,6 +54,8 @@ export function Dashboard() {
   )
   // Figures for the selected month (the current one by default).
   const thisMonth = flow.find((f) => f.month === month) ?? flow[flow.length - 1]
+  // Average income: complete months; the current one is compared with it.
+  const avgIncome = useMemo(() => averageIncome(flow), [flow])
   const keptPct = thisMonth.income > 0 ? (thisMonth.net / thisMonth.income) * 100 : null
 
   // Spending trend: top categories over the period, the rest folded into "Other".
@@ -129,7 +132,7 @@ export function Dashboard() {
         </Card>
 
         {/* 2. Where the money is */}
-        <Card className="flex flex-col gap-4 lg:order-5 lg:col-span-4">
+        <Card className="flex flex-col gap-4 lg:order-6 lg:col-span-4">
           <CardTitle subtitle={t.overview.balancesNote}>{t.overview.whereMoney}</CardTitle>
           <div className="flex flex-col gap-2">
             <Overline className="lg:hidden">{t.overview.byCurrency}</Overline>
@@ -224,6 +227,13 @@ export function Dashboard() {
           )}
         </Card>
 
+        {/* 3b. Average income (desktop: full width after the two monthly charts) */}
+        {avgIncome && (
+          <Card className="lg:order-5 lg:col-span-12">
+            <AverageIncomeCard average={avgIncome} perMonth={flow} />
+          </Card>
+        )}
+
         {/* 4. Coming up */}
         <Card className="flex flex-col gap-2 lg:order-2 lg:col-span-4">
           <CardTitle subtitle={t.overview.openCardBills}>{t.overview.comingUp}</CardTitle>
@@ -267,7 +277,7 @@ export function Dashboard() {
         </Card>
 
         {/* 6. One month in detail */}
-        <Card className="flex flex-col gap-4 !pb-2 lg:order-6 lg:col-span-8 lg:!pb-5">
+        <Card className="flex flex-col gap-4 !pb-2 lg:order-7 lg:col-span-8 lg:!pb-5">
           <div className="flex items-baseline justify-between gap-3">
             <CardTitle>{t.overview.monthInDetail}</CardTitle>
             <span className="hidden text-[13px] text-muted lg:inline">{formatMonth(month)}</span>
