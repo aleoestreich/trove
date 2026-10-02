@@ -143,6 +143,8 @@ const en = {
     currentBill: 'Current bill',
     /** A bill that has closed and is waiting to be paid. */
     closedBill: 'Closed bill',
+    /** Account labels on Accounts, by kind. */
+    types: { checking: 'Checking', savings: 'Savings', usd: 'USD balance', card: 'Credit card' },
     /** Under a closed bill that's been partly paid; the amount shown is what's left. */
     alreadyPaid: (amount: string) => `${amount} already paid`,
     closed: 'Closed',
@@ -328,6 +330,7 @@ const ptBR: Messages = {
     nearLimit: 'Perto do limite',
     currentBill: 'Fatura atual',
     closedBill: 'Fatura fechada',
+    types: { checking: 'Conta corrente', savings: 'Poupança', usd: 'Saldo em dólar', card: 'Cartão de crédito' },
     alreadyPaid: (amount) => `${amount} já pago`,
     closed: 'Fechou em',
     cardDays: {
