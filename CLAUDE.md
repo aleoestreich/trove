@@ -67,4 +67,8 @@ Run `npm test` and `npm run build` before pushing.
   `server/pluggy/map.ts`; shared types come from `src/data/types.ts` and
   `src/data/categories.ts`, which must stay free of browser-only imports.
   Never log or return amounts, descriptions or credentials in errors or
-  diagnostics.
+  diagnostics. The one exception is the owner's debug screen (`#/debug`,
+  `GET /api/debug/pluggy`): it returns Pluggy's raw responses, read-only, only
+  for the configured items and their accounts, behind the login, `no-store`
+  and never logged. Its "Hide values" switch (on by default) masks them for
+  screenshots.

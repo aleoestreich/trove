@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { Accounts } from './pages/Accounts'
 import { Installments } from './pages/Installments'
+import { Debug } from './pages/Debug'
 import { Icon, type IconName } from './components/Icon'
 import { LanguageSwitch } from './components/LanguageSwitch'
 import { Wordmark } from './components/Logo'
@@ -65,14 +66,23 @@ function Shell() {
 
       <main className="px-4 pt-2 pb-6 lg:min-w-0 lg:flex-1 lg:px-10 lg:pt-8 lg:pb-12">
         <div className="lg:mx-auto lg:max-w-[1200px]">
-          <DataGate>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/transactions" element={<Transactions />} />
-              <Route path="/accounts" element={<Accounts />} />
-              <Route path="/installments" element={<Installments />} />
-            </Routes>
-          </DataGate>
+          <Routes>
+            {/* Outside DataGate: it should work even when /api/finance fails. */}
+            <Route path="/debug" element={<Debug />} />
+            <Route
+              path="*"
+              element={
+                <DataGate>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/transactions" element={<Transactions />} />
+                    <Route path="/accounts" element={<Accounts />} />
+                    <Route path="/installments" element={<Installments />} />
+                  </Routes>
+                </DataGate>
+              }
+            />
+          </Routes>
         </div>
       </main>
 
