@@ -100,6 +100,12 @@ export function Accounts() {
         )}
 
         {source === 'demo' && <p className="px-2 text-center text-xs leading-4 text-muted">{t.accounts.footer}</p>}
+
+        {isDeployed() && (
+          <Link to="/debug" className="self-center px-2 py-1 text-xs leading-4 text-muted underline">
+            {t.debug.link}
+          </Link>
+        )}
       </div>
     </>
   )

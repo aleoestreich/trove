@@ -134,6 +134,23 @@ Nothing else is stored. You can see these logs in Vercel → **Logs**.
 | Data looks out of date | Pluggy refreshes connections on its own schedule; Trove also caches for 5 minutes | Open `/api/finance?refresh` to skip Trove's cache; update the connection in the Meu Pluggy app if it's stale there |
 | A connection shows `LOGIN_ERROR` or `OUTDATED` in the summary | The bank consent expired or needs attention | Reconnect that bank in the Meu Pluggy app |
 
+## Debug screen
+
+To see exactly what Pluggy sends, open **Accounts → Pluggy debug** (or
+`/#/debug`) on the deployed site. For each item in `PLUGGY_ITEM_IDS` it calls,
+when you tap a button, one of:
+
+- `GET /items/{id}`;
+- `GET /accounts?itemId=`;
+- `GET /v2/transactions?accountId=` (one page; **Next page** follows the cursor);
+- `GET /bills?accountId=` (credit cards).
+
+It shows Pluggy's status and raw JSON. **Hide values** (on by default) masks
+amounts, descriptions and names but keeps IDs, types, dates and statuses, so
+you can share a screenshot. Turn it off only to read the values yourself.
+Nothing is stored or logged; the route is behind the login and only accepts
+the configured items and their own accounts.
+
 ## How it works (for developers)
 
 - `api/finance.ts` → `server/pluggy/finance.ts`: `GET /api/finance`, protected
@@ -143,6 +160,8 @@ Nothing else is stored. You can see these logs in Vercel → **Logs**.
   sends the API key as `X-API-KEY`, and uses `GET /items/{id}`,
   `GET /accounts?itemId=` and `GET /v2/transactions?accountId=&dateFrom=`
   with the cursor.
+- `api/debug/pluggy.ts` → `server/pluggy/debug.ts`: the debug screen's
+  read-only passthrough (`PluggyClient.raw`), limited to the four calls above.
 - `server/pluggy/map.ts`: Pluggy → Trove model:
   - signs from `DEBIT`/`CREDIT`;
   - BRL conversion, keeping the original currency;
