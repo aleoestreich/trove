@@ -3,13 +3,12 @@ import { Link } from 'react-router-dom'
 import { Card } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n/I18nProvider'
-import { redact } from '../lib/redact'
 
 /**
  * The owner's view of Pluggy's raw responses (GET /api/debug/pluggy), to check
  * what Pluggy really sends in production: per configured item, the item, its
  * accounts, and each account's transactions (page by page) and bills.
- * Nothing here is stored; "Hide values" masks amounts and names for screenshots.
+ * Nothing here is stored. Responses are shown in full, values included.
  */
 
 type Endpoint = 'item' | 'accounts' | 'transactions' | 'bills'
@@ -56,7 +55,6 @@ export function Debug() {
   const { t } = useI18n()
   const [itemIds, setItemIds] = useState<string[] | null>(null)
   const [listError, setListError] = useState<string | null>(null)
-  const [hide, setHide] = useState(true)
   const [calls, setCalls] = useState<Record<string, Call>>({})
 
   useEffect(() => {
@@ -97,14 +95,6 @@ export function Debug() {
       </div>
       <p className="text-sm leading-5 text-muted">{t.debug.intro}</p>
 
-      <label className="flex items-start gap-3 rounded-md border border-line bg-surface p-3">
-        <input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]" />
-        <span className="flex flex-col gap-0.5">
-          <span className="text-[15px] leading-5 font-medium text-ink">{t.debug.hideValues}</span>
-          <span className="text-xs leading-4 text-muted">{t.debug.hideValuesNote}</span>
-        </span>
-      </label>
-
       {listError && <p className="rounded-md bg-critical-soft p-3 text-sm leading-5 text-critical">{listError}</p>}
       {!itemIds && !listError && <p className="text-sm text-muted">{t.debug.loading}</p>}
 
@@ -122,8 +112,8 @@ export function Debug() {
               <CallButton label={t.debug.itemCall} onClick={() => run(keyOf('item', itemId), { endpoint: 'item', itemId }, 1)} />
               <CallButton label={t.debug.accountsCall} onClick={() => run(keyOf('accounts', itemId), { endpoint: 'accounts', itemId }, 1)} />
             </div>
-            <Result call={calls[keyOf('item', itemId)]} hide={hide} />
-            <Result call={accountsCall} hide={hide} />
+            <Result call={calls[keyOf('item', itemId)]} />
+            <Result call={accountsCall} />
 
             {accounts === null ? (
               <p className="text-xs leading-4 text-muted">{t.debug.accountsHint}</p>
@@ -159,8 +149,8 @@ export function Debug() {
                         />
                       )}
                     </div>
-                    <Result call={txCall} hide={hide} showPage />
-                    <Result call={calls[keyOf('bills', itemId, a.id)]} hide={hide} />
+                    <Result call={txCall} showPage />
+                    <Result call={calls[keyOf('bills', itemId, a.id)]} />
                   </div>
                 )
               })
@@ -184,7 +174,7 @@ function CallButton({ label, onClick }: { label: string; onClick: () => void }) 
   )
 }
 
-function Result({ call, hide, showPage = false }: { call?: Call; hide: boolean; showPage?: boolean }) {
+function Result({ call, showPage = false }: { call?: Call; showPage?: boolean }) {
   const { t } = useI18n()
   const [copied, setCopied] = useState(false)
   if (!call) return null
@@ -193,7 +183,7 @@ function Result({ call, hide, showPage = false }: { call?: Call; hide: boolean; 
   const reply = call.reply
   const json = reply?.json
   const ok = reply?.httpStatus === 200 && json && json.error === undefined
-  const shown = ok ? (hide ? redact(json.body) : json.body) : json
+  const shown = ok ? json.body : json
   const text = JSON.stringify(shown, null, 2) ?? ''
   const pluggyStatus = ok ? json.status : reply?.httpStatus
   const good = pluggyStatus !== undefined && pluggyStatus >= 200 && pluggyStatus < 300
