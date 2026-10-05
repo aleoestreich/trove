@@ -145,9 +145,7 @@ when you tap a button, one of:
 - `GET /v2/transactions?accountId=` (one page; **Next page** follows the cursor);
 - `GET /bills?accountId=` (credit cards).
 
-It shows Pluggy's status and raw JSON. **Hide values** (on by default) masks
-amounts, descriptions and names but keeps IDs, types, dates and statuses, so
-you can share a screenshot. Turn it off only to read the values yourself.
+It shows Pluggy's status and the full raw JSON, values included.
 Nothing is stored or logged; the route is behind the login and only accepts
 the configured items and their own accounts.
 

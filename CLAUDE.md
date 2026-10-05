@@ -70,5 +70,5 @@ Run `npm test` and `npm run build` before pushing.
   diagnostics. The one exception is the owner's debug screen (`#/debug`,
   `GET /api/debug/pluggy`): it returns Pluggy's raw responses, read-only, only
   for the configured items and their accounts, behind the login, `no-store`
-  and never logged. Its "Hide values" switch (on by default) masks them for
-  screenshots.
+  and never logged. It shows the responses in full, values included: it's
+  the owner's own data.
