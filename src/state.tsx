@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Repository } from './data/repository'
+import { SyncStartError } from './data/apiRepository'
+import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/syncProblems'
 import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, type Edit } from './data/edits'
 import type { Account, Category, Institution, Snapshot, Subcategory, SyncInfo, SyncJob } from './data/types'
@@ -37,8 +39,8 @@ export interface SyncState {
   status: 'idle' | 'syncing'
   /** While syncing: which connection (1-based) of how many, and its bank's name when known. */
   progress: { index: number; total: number; name: string | null } | null
-  /** Connections that failed in the last sync (the others were saved). */
-  failed: { id: string; name: string | null }[]
+  /** Connections that failed in the latest sync (the others were saved), with why. */
+  failed: { id: string; name: string | null; problem: SyncProblem }[]
   /** After a successful sync: new and updated transactions, for the snackbar. */
   result: { inserted: number; updated: number; at: number } | null
   /** Syncs every connection, or just `only` (Retry). */
@@ -112,7 +114,7 @@ export function DataProvider({ repository, children }: { repository: Repository;
   // closed); the app polls the job, then reloads from the database.
   const [job, setJob] = useState<SyncJob | null>(null)
   const [result, setResult] = useState<SyncState['result']>(null)
-  const [startError, setStartError] = useState<string[] | null>(null)
+  const [startError, setStartError] = useState<{ ids: string[]; problem: SyncProblem } | null>(null)
   const polling = useRef(false)
 
   const follow = useCallback(
@@ -145,9 +147,12 @@ export function DataProvider({ repository, children }: { repository: Repository;
   const hasConnections = !!snapshot?.sync
   useEffect(() => {
     if (!hasConnections) return
+    // The latest sync: follow it if it's still running; if it ended with
+    // failures (e.g. while the app was closed), show them until a sync succeeds.
     repository.syncStatus().then(
       (j) => {
         if (j && !j.done) void follow(j, true)
+        else if (j?.items.some((i) => i.status === 'failed')) setJob(j)
       },
       () => {},
     )
@@ -162,7 +167,10 @@ export function DataProvider({ repository, children }: { repository: Repository;
         await follow(await repository.startSync(only), true)
       } catch (e) {
         console.error(e)
-        setStartError(only ?? (snapshot?.sync?.connections ?? []).map((c) => c.id))
+        setStartError({
+          ids: only ?? (snapshot?.sync?.connections ?? []).map((c) => c.id),
+          problem: e instanceof SyncStartError ? problemFromStatus(e.status) : 'unknown',
+        })
       }
     },
     [repository, follow, snapshot?.sync],
@@ -170,9 +178,12 @@ export function DataProvider({ repository, children }: { repository: Repository;
 
   const syncing = useMemo<Pick<SyncState, 'status' | 'progress' | 'failed' | 'result'>>(() => {
     const names = new Map((snapshot?.sync?.connections ?? []).map((c) => [c.id, c.name]))
-    if (startError) return { status: 'idle', progress: null, failed: startError.map((id) => ({ id, name: names.get(id) ?? null })), result: null }
+    if (startError)
+      return { status: 'idle', progress: null, failed: startError.ids.map((id) => ({ id, name: names.get(id) ?? null, problem: startError.problem })), result: null }
     if (!job) return { status: 'idle', progress: null, failed: [], result }
-    const failed = job.items.filter((i) => i.status === 'failed').map((i) => ({ id: i.connectionId, name: i.name ?? names.get(i.connectionId) ?? null }))
+    const failed = job.items
+      .filter((i) => i.status === 'failed')
+      .map((i) => ({ id: i.connectionId, name: i.name ?? names.get(i.connectionId) ?? null, problem: problemFromCode(i.error) }))
     if (job.done) return { status: 'idle', progress: null, failed, result }
     const finished = job.items.filter((i) => i.status === 'ok' || i.status === 'failed').length
     const current = job.items.find((i) => i.status === 'running') ?? job.items.find((i) => i.status === 'queued')

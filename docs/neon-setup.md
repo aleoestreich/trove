@@ -160,7 +160,13 @@ database transaction:
 - each run is logged in `sync_runs` (counts and status codes only).
 
 If one connection fails, the others are still saved and the sync bar offers
-**Retry** (a new job for the failed connections). Pluggy's webhook changes nothing: data only moves on Sync.
+**Retry** (a new job for the failed connections), with the reason for each
+failure read from its error code ([Sync errors](pluggy-setup.md#sync-errors)).
+The latest job's failures are shown again when the app opens, until a later
+sync succeeds. A connection whose `bank_connections.status` needs a reconnect
+in Meu Pluggy (`LOGIN_ERROR`, `OUTDATED`…) is flagged in the sync bar and on
+its card on Accounts. Pluggy's webhook changes nothing: data only moves on
+Sync.
 
 ## Reads
 

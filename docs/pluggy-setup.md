@@ -128,8 +128,28 @@ Nothing else is stored. The logs are in Vercel → **Logs**.
 | "No exchange rate for USD (AwesomeAPI HTTP 429; …)" | None of the three free rate sources answered and no earlier rate is stored. The message names each source and its status | Retry in a minute |
 | Data looks out of date | Trove only fetches on Sync; Pluggy refreshes connections on its own schedule | **Sync now**; update the connection in the Meu Pluggy app if it's stale there |
 | "The database tables are out of date" | `db/migrations/002_categories_and_sync.sql` hasn't run | Run it in Neon's SQL Editor ([docs/neon-setup.md](neon-setup.md)) |
-| "X didn't sync. Other banks are up to date." | That connection failed in Pluggy (Vercel → Logs, or the debug screen) | **Retry**; reconnect that bank in the Meu Pluggy app if it keeps failing |
-| A connection shows `LOGIN_ERROR` or `OUTDATED` in the summary | The bank consent expired or needs attention | Reconnect that bank in the Meu Pluggy app |
+| "X didn't sync. Other banks are up to date." | That connection failed. The line under it gives the reason (see [Sync errors](#sync-errors)) | **Retry**; reconnect that bank in the Meu Pluggy app if it keeps failing |
+| "X needs to be reconnected in the Meu Pluggy app" (sync bar and the bank's card on Accounts) | The connection's status is `LOGIN_ERROR`, `OUTDATED`, `WAITING_USER_INPUT` or `WAITING_USER_ACTION`: the bank consent expired or needs attention | Reconnect that bank in the Meu Pluggy app, then **Sync now** |
+
+### Sync errors
+
+Each failed connection keeps a status code in `sync_job_items.error` (never
+values). The sync bar shows one line per reason, and the latest failures stay
+visible after reopening the app until a later sync of that connection succeeds.
+
+| Code | Line shown | Fix |
+|---|---|---|
+| `pluggy_401`, `pluggy_403` | Pluggy refused the API credentials | Check `PLUGGY_CLIENT_ID` and `PLUGGY_CLIENT_SECRET` (step 2) |
+| `pluggy_404` | Pluggy doesn't know this connection | Check `PLUGGY_ITEM_IDS` (step 4) |
+| `pluggy_429` | Pluggy is limiting requests | Retry in a few minutes |
+| other `pluggy_*` | Pluggy is unavailable | Retry later |
+| `timeout` | The sync took too long and was stopped | **Retry** |
+| a 5-character Postgres code (e.g. `42P01`) | The database refused the change | Run the pending migrations ([docs/neon-setup.md](neon-setup.md)) |
+| `error` | Unknown | Vercel → Logs |
+
+When the sync can't start at all, the reason comes from the HTTP status of
+`POST /api/sync`: no answer (network), `503` (a setting is missing), `403` (a
+connection not in `PLUGGY_ITEM_IDS`), or `5xx` (server or database).
 
 ## Debug screen
 

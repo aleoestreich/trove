@@ -136,7 +136,13 @@ export interface SyncInfo {
   /** Last time every connection synced (ISO timestamp), or null if never. */
   lastSyncedAt: string | null
   /** Each configured bank connection, in sync order. */
-  connections: { id: string; name: string | null; lastSyncedAt: string | null }[]
+  connections: {
+    id: string
+    name: string | null
+    lastSyncedAt: string | null
+    /** Pluggy's status for the connection (UPDATED, LOGIN_ERROR, OUTDATED…), null before its first sync. */
+    status: string | null
+  }[]
 }
 
 /** A background sync: one item per bank connection, worked through by the server. */

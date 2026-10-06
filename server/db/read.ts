@@ -11,14 +11,14 @@ import type { Db } from './connection.js'
 
 /** When each configured connection last synced; overall = the oldest of them (null until all have). */
 export async function readSyncInfo(db: Db, itemIds: string[]): Promise<SyncInfo> {
-  const rows = await db.query<{ id: string; bank_name: string | null; synced_at: Date }>(
-    `SELECT id, bank_name, synced_at FROM bank_connections WHERE id = ANY($1::text[])`,
+  const rows = await db.query<{ id: string; bank_name: string | null; synced_at: Date; status: string | null }>(
+    `SELECT id, bank_name, synced_at, status FROM bank_connections WHERE id = ANY($1::text[])`,
     [itemIds],
   )
   const byId = new Map(rows.rows.map((r) => [r.id, r]))
   const connections = itemIds.map((id) => {
     const r = byId.get(id)
-    return { id, name: r?.bank_name ?? null, lastSyncedAt: r ? r.synced_at.toISOString() : null }
+    return { id, name: r?.bank_name ?? null, lastSyncedAt: r ? r.synced_at.toISOString() : null, status: r?.status ?? null }
   })
   const all = connections.every((c) => c.lastSyncedAt)
   const oldest = all ? connections.map((c) => c.lastSyncedAt!).sort()[0] ?? null : null

@@ -1,6 +1,6 @@
 import { Fragment, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { useData } from '../state'
+import { useData, useSync } from '../state'
 import type { Account } from '../data/types'
 import { balances } from '../lib/summary'
 import { installmentPlans, remainingByAccount } from '../lib/installments'
@@ -18,6 +18,7 @@ import { isDeployed } from '../lib/useIsDesktop'
 import { ConnectMeuPluggy } from '../components/ConnectMeuPluggy'
 import { CardDaysEditor } from '../components/CardDaysEditor'
 import { SyncBar } from '../components/SyncBar'
+import { needsReconnect } from '../lib/syncProblems'
 
 /** Share of the limit at which a card is flagged "Near limit". */
 const NEAR_LIMIT = 0.8
@@ -31,6 +32,8 @@ export function Accounts() {
   const accounts = allAccounts.filter((a) => !isIdleCard(a, transactions, plans))
   const institutions = allInstitutions.filter((i) => accounts.some((a) => a.institutionId === i.id))
   const bal = balances(accounts)
+  // Connections Pluggy marks as needing attention (the institution ID is the connection ID).
+  const reconnect = new Set((useSync().info?.connections ?? []).filter((c) => needsReconnect(c.status)).map((c) => c.id))
 
   const bankCard = (inst: (typeof institutions)[number]) => {
     // Checking first, then savings, then cards.
@@ -44,6 +47,14 @@ export function Accounts() {
           <h2 className="min-w-0 flex-1 truncate text-base leading-[22px] font-medium text-ink">{inst.name}</h2>
           <span className="tabular text-base font-medium whitespace-nowrap text-ink lg:text-lg lg:font-bold">{formatMoney(total.net)}</span>
         </div>
+        {reconnect.has(inst.id) && (
+          <p role="status" className="flex items-start gap-2 border-t border-line bg-critical-soft px-4 py-2.5 text-[13px] leading-[18px] text-ink lg:px-5">
+            <Icon name="alert" className="mt-px size-4 shrink-0 text-critical" />
+            <span>
+              {t.sync.reconnect(inst.name)} {t.sync.reconnectNote}
+            </span>
+          </p>
+        )}
         {own.map((a) =>
           a.type === 'CREDIT' ? (
             <Fragment key={a.id}>

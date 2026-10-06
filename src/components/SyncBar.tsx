@@ -5,6 +5,7 @@ import { daysBetween, formatShortDate, formatTime, toISO } from '../lib/dates'
 import { isDeployed } from '../lib/useIsDesktop'
 import { useI18n } from '../i18n/I18nProvider'
 import { Icon, type IconName } from './Icon'
+import { needsReconnect } from '../lib/syncProblems'
 
 /** After this many days without a sync, the bar says how long it's been. */
 const STALE_DAYS = 7
@@ -12,8 +13,9 @@ const STALE_DAYS = 7
 /**
  * Sync status and the Sync button. Phones: a bar under the header on Overview
  * and Accounts (`bar`). Desktop: in the sidebar (`sidebar`).
- * States: synced (time), syncing (bank n of m, progress), partial failure
- * (Retry), stale (over 7 days), never synced (demo data), not connected.
+ * States: synced (time), syncing (bank n of m, progress), failure (with the
+ * reason per bank, and Retry), a bank to reconnect in Meu Pluggy, stale (over
+ * 7 days), never synced (demo data), not connected.
  */
 export function SyncBar({ variant = 'bar', className = '' }: { variant?: 'bar' | 'sidebar'; className?: string }) {
   const { t } = useI18n()
@@ -26,6 +28,9 @@ export function SyncBar({ variant = 'bar', className = '' }: { variant?: 'bar' |
   let tone = 'text-muted'
   let message: string
   let action: { label: string; icon: IconName; onClick?: () => void; to?: string; disabled?: boolean } | null = null
+  /** Lines under the message: why each bank failed, or what to do. */
+  let details: string[] = []
+  const toReconnect = (info?.connections ?? []).filter((c) => needsReconnect(c.status))
 
   if (!info) {
     icon = 'plug'
@@ -40,8 +45,21 @@ export function SyncBar({ variant = 'bar', className = '' }: { variant?: 'bar' |
     icon = 'alert'
     tone = 'text-critical'
     const names = failed.map((f) => f.name).filter(Boolean)
-    message = failed.length === info.connections.length || names.length < failed.length ? t.sync.failedAll : t.sync.failed(names.join(', '))
+    message = failed.length === info.connections.length || names.length < failed.length ? t.sync.failedAll : t.sync.failed(names.join(', '), names.length)
+    // One line per distinct reason; with several banks, each line names its bank.
+    const reasons = [...new Map(failed.map((f) => [`${f.name}|${f.problem}`, f])).values()]
+    const sameReason = new Set(reasons.map((f) => f.problem)).size === 1
+    // The generic message already covers a network failure.
+    details = sameReason
+      ? reasons[0].problem === 'network' ? [] : [t.sync.problems[reasons[0].problem]]
+      : reasons.map((f) => (f.name ? t.sync.problemFor(f.name, t.sync.problems[f.problem]) : t.sync.problems[f.problem]))
     action = { label: t.sync.retry, icon: 'sync', onClick: () => sync(failed.map((f) => f.id)) }
+  } else if (toReconnect.length > 0 && source !== 'demo') {
+    icon = 'alert'
+    tone = 'text-critical'
+    message = t.sync.reconnect(toReconnect.map((c) => c.name ?? '?').join(', '))
+    details = [t.sync.reconnectNote]
+    action = { label: t.sync.syncNow, icon: 'sync', onClick: () => sync() }
   } else if (source === 'demo' || !info.lastSyncedAt) {
     icon = 'plug'
     message = t.sync.neverSynced
@@ -90,8 +108,14 @@ export function SyncBar({ variant = 'bar', className = '' }: { variant?: 'bar' |
           <Icon name={icon} className={`size-[18px] shrink-0 ${syncing ? 'motion-safe:animate-spin' : ''}`} />
           <span className={`min-w-0 text-[13px] leading-[18px] ${tone === 'text-muted' ? '' : 'text-ink'}`}>{message}</span>
         </div>
+        {details.length > 0 && side && <Details lines={details} />}
         {button && <div className={side ? '-ml-3' : ''}>{button}</div>}
       </div>
+      {details.length > 0 && !side && (
+        <div className="-mt-1 pr-3.5 pb-3 pl-[42px]">
+          <Details lines={details} />
+        </div>
+      )}
       {syncing && (
         <div
           role="progressbar"
@@ -105,6 +129,18 @@ export function SyncBar({ variant = 'bar', className = '' }: { variant?: 'bar' |
         </div>
       )}
     </div>
+  )
+}
+
+function Details({ lines }: { lines: string[] }) {
+  return (
+    <ul className="flex flex-col gap-1">
+      {lines.map((l) => (
+        <li key={l} className="text-xs leading-[17px] text-ink-2">
+          {l}
+        </li>
+      ))}
+    </ul>
   )
 }
 

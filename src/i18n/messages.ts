@@ -267,7 +267,7 @@ const en = {
     stale: (days: number) => `Last synced ${days} days ago`,
     syncing: (bank: string | null, n: number, total: number) =>
       total === 1 ? `Syncing ${bank ?? 'your bank'}…` : `Syncing ${bank ?? `bank ${n}`}… ${n} of ${total} banks`,
-    failed: (banks: string) => `${banks} didn’t sync. Other banks are up to date.`,
+    failed: (banks: string, _count: number) => `${banks} didn’t sync. Other banks are up to date.`,
     failedAll: 'Couldn’t sync. Check your connection and try again.',
     neverSynced: 'Showing demo data. Sync to load your banks.',
     notConnected: 'Showing demo data. Connect Meu Pluggy to sync.',
@@ -280,6 +280,22 @@ const en = {
     view: 'View',
     progress: 'Sync progress',
     saveFailed: 'Couldn’t save that change. Showing what’s saved.',
+    /** Why a bank didn't sync, under the failure message. */
+    problems: {
+      credentials: 'Pluggy refused the API credentials. Check PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET in Vercel.',
+      notFound: 'Pluggy doesn’t know this connection. Check PLUGGY_ITEM_IDS in Vercel.',
+      rateLimited: 'Pluggy is limiting requests. Try again in a few minutes.',
+      unavailable: 'Pluggy or the bank didn’t respond. Try again later.',
+      timeout: 'It took too long and was stopped. Try again.',
+      database: 'The database refused the update. Check that the migrations in db/migrations have run.',
+      notConfigured: 'Pluggy or the database isn’t configured on the server.',
+      network: 'Couldn’t reach Trove’s server. Check the connection.',
+      unknown: 'Something went wrong. Try again.',
+    },
+    problemFor: (bank: string, reason: string) => `${bank}: ${reason}`,
+    /** A connection Pluggy marks as needing attention (expired consent…). */
+    reconnect: (banks: string) => `${banks} needs to be reconnected in the Meu Pluggy app.`,
+    reconnectNote: 'Its data stops updating until then. Reconnect it, then sync.',
   },
 }
 
@@ -535,7 +551,7 @@ const ptBR: Messages = {
     stale: (days) => `Última sincronização há ${days} dias`,
     syncing: (bank, n, total) =>
       total === 1 ? `Sincronizando ${bank ?? 'seu banco'}…` : `Sincronizando ${bank ?? `banco ${n}`}… ${n} de ${total} bancos`,
-    failed: (banks) => `${banks} não sincronizou. Os outros bancos estão atualizados.`,
+    failed: (banks, count) => `${banks} não ${count === 1 ? 'sincronizou' : 'sincronizaram'}. Os outros bancos estão atualizados.`,
     failedAll: 'Não foi possível sincronizar. Verifique sua conexão e tente de novo.',
     neverSynced: 'Mostrando dados de exemplo. Sincronize para carregar seus bancos.',
     notConnected: 'Mostrando dados de exemplo. Conecte o Meu Pluggy para sincronizar.',
@@ -548,6 +564,20 @@ const ptBR: Messages = {
     view: 'Ver',
     progress: 'Progresso da sincronização',
     saveFailed: 'Não foi possível salvar a alteração. Mostrando o que está salvo.',
+    problems: {
+      credentials: 'O Pluggy recusou as credenciais da API. Confira PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET no Vercel.',
+      notFound: 'O Pluggy não conhece esta conexão. Confira PLUGGY_ITEM_IDS no Vercel.',
+      rateLimited: 'O Pluggy está limitando as requisições. Tente de novo em alguns minutos.',
+      unavailable: 'O Pluggy ou o banco não respondeu. Tente de novo mais tarde.',
+      timeout: 'Demorou demais e foi interrompida. Tente de novo.',
+      database: 'O banco de dados recusou a atualização. Confira se as migrações de db/migrations foram executadas.',
+      notConfigured: 'O Pluggy ou o banco de dados não está configurado no servidor.',
+      network: 'Não foi possível acessar o servidor do Trove. Verifique a conexão.',
+      unknown: 'Algo deu errado. Tente de novo.',
+    },
+    problemFor: (bank, reason) => `${bank}: ${reason}`,
+    reconnect: (banks) => `${banks} precisa ser reconectado no app Meu Pluggy.`,
+    reconnectNote: 'Os dados param de atualizar até lá. Reconecte e depois sincronize.',
   },
 }
 
