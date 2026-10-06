@@ -57,8 +57,9 @@ but then the database is billed and managed through Vercel. Both ways work.
 
 ## The tables
 
-The tables follow Pluggy's model: an item has accounts, and an account has
-transactions and, for cards, bills. Each table is keyed by Pluggy's own IDs, so
+The tables follow Pluggy's model: a bank connection (Pluggy calls it an
+*item*) has accounts, and an account has transactions and, for cards, monthly
+bills. Each table is keyed by Pluggy's own IDs, so
 a sync is an *upsert*: insert a row, or update it if that ID already exists.
 
 Money is stored as integer cents (`bigint`), as in the app. Each Pluggy row also
@@ -67,11 +68,11 @@ today can be read later without fetching it from Pluggy again.
 
 | Table | Key | Holds |
 |---|---|---|
-| `items` | `id` (Pluggy item ID) | One per bank connection: connector, Trove's bank name, status, last refresh |
-| `accounts` | `id` (Pluggy account ID) → `items` | Type, name, currency, balance; for cards: limit, available, minimum payment, close and due dates, brand |
+| `bank_connections` | `id` (Pluggy item ID) | One per bank connected in Meu Pluggy: connector, Trove's bank name, status, last refresh |
+| `accounts` | `id` (Pluggy account ID) → `bank_connections` | Type, name, currency, balance; for cards: limit, available, minimum payment, close and due dates, brand |
 | `account_balances` | (`account_id`, `as_of`) | One balance per account per day. Pluggy only gives today's balance, so this builds the history |
-| `bills` | `id` (Pluggy bill ID) → `accounts` | Card bills: due date, total, minimum payment, finance charges |
-| `transactions` | `id` (Pluggy transaction ID) → `accounts` | Date, description, type, amount (and in the account's currency), status, operation type, Pluggy's category, installment *n* of *N*, purchase date and total, merchant, payment method, `bill_id`, `provider_id` |
+| `card_bills` | `id` (Pluggy bill ID) → `accounts` | A card's monthly statements: due date, total, minimum payment, finance charges. The card itself is a row in `accounts` |
+| `transactions` | `id` (Pluggy transaction ID) → `accounts` | Date, description, type, amount (and in the account's currency), status, operation type, Pluggy's category, installment *n* of *N*, purchase date and total, merchant, payment method, `card_bill_id`, `provider_id` |
 | `category_overrides` | `transaction_id` → `transactions` | Your category for a transaction (today saved per phone) |
 | `card_settings` | `account_id` → `accounts` | Your closing and due days per card (today saved per phone) |
 | `sync_runs` | generated `id` | When each sync ran, what triggered it, how many rows changed, and errors as status codes only |
@@ -82,4 +83,4 @@ come back under a new ID once it posts. When a sync no longer finds the old one,
 it sets `removed_at` and the app hides it.
 
 Use the debug screen (`/#/debug`) to confirm that `id` stays the same across
-syncs and to see when `provider_id` and `bill_id` are filled in.
+syncs and to see when `provider_id` and `card_bill_id` (Pluggy's `billId`) are filled in.

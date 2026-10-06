@@ -1,16 +1,17 @@
 -- Trove's database (Postgres on Neon). Run once in Neon's SQL Editor; see
 -- docs/neon-setup.md. Safe to run again: every statement is IF NOT EXISTS.
 --
--- Shape: Pluggy's own model (item -> account -> transaction, plus card bills),
+-- Shape: Pluggy's model (connection -> account -> transaction, plus card
+-- bills),
 -- keyed by Pluggy's IDs, so a sync is an upsert. Money is integer cents
 -- (bigint), as in the app; Pluggy's decimal amounts are converted on write.
 -- Each Pluggy row also keeps its full JSON in `raw`, so a field we don't map
 -- today can be used later without fetching it again (Pluggy only returns about
 -- the last 12 months; this database is what keeps older history).
 
--- One connection in Meu Pluggy (one per bank).
-CREATE TABLE IF NOT EXISTS items (
-  id                text PRIMARY KEY,            -- Pluggy item.id
+-- One connection in Meu Pluggy (one per bank). The bank's accounts hang off it.
+CREATE TABLE IF NOT EXISTS bank_connections (
+  id                text PRIMARY KEY,            -- Pluggy item.id (Pluggy calls a connection an "item")
   connector_id      integer NOT NULL,
   connector_name    text NOT NULL,               -- "MeuPluggy" for every Meu Pluggy item
   bank_name         text,                        -- Trove's name for it (see server/pluggy/map.ts)
@@ -25,7 +26,7 @@ CREATE TABLE IF NOT EXISTS items (
 -- Checking, savings and credit-card accounts.
 CREATE TABLE IF NOT EXISTS accounts (
   id                      text PRIMARY KEY,      -- Pluggy account.id
-  item_id                 text NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  connection_id           text NOT NULL REFERENCES bank_connections(id) ON DELETE CASCADE,  -- Pluggy account.itemId
   type                    text NOT NULL,         -- BANK | CREDIT
   subtype                 text NOT NULL,         -- CHECKING_ACCOUNT | SAVINGS_ACCOUNT | CREDIT_CARD
   name                    text NOT NULL,
@@ -44,7 +45,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   raw                     jsonb NOT NULL,
   synced_at               timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS accounts_item_idx ON accounts (item_id);
+CREATE INDEX IF NOT EXISTS accounts_connection_idx ON accounts (connection_id);
 
 -- Pluggy only reports today's balance; one row per account per day builds the
 -- balance and limit history.
@@ -56,8 +57,9 @@ CREATE TABLE IF NOT EXISTS account_balances (
   PRIMARY KEY (account_id, as_of)
 );
 
--- Credit-card bills (GET /bills?accountId=), when the bank sends them.
-CREATE TABLE IF NOT EXISTS bills (
+-- Monthly statements of a credit-card account (GET /bills?accountId=), when
+-- the bank sends them. The card itself is a row in accounts.
+CREATE TABLE IF NOT EXISTS card_bills (
   id                     text PRIMARY KEY,       -- Pluggy bill.id
   account_id             text NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   due_date               date NOT NULL,
@@ -69,12 +71,12 @@ CREATE TABLE IF NOT EXISTS bills (
   raw                    jsonb NOT NULL,
   synced_at              timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS bills_account_due_idx ON bills (account_id, due_date);
+CREATE INDEX IF NOT EXISTS card_bills_account_due_idx ON card_bills (account_id, due_date);
 
 CREATE TABLE IF NOT EXISTS transactions (
   id                     text PRIMARY KEY,       -- Pluggy transaction.id
   account_id             text NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  bill_id                text,                   -- creditCardMetadata.billId (no FK: the bill may not be synced yet)
+  card_bill_id           text,                   -- creditCardMetadata.billId (no FK: the bill may not be synced yet)
   provider_id            text,                   -- the bank's own ID, when sent
   date                   timestamptz NOT NULL,
   booked_on              date NOT NULL,          -- `date` as a day in America/Sao_Paulo
@@ -110,7 +112,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   removed_at             timestamptz
 );
 CREATE INDEX IF NOT EXISTS transactions_account_date_idx ON transactions (account_id, booked_on DESC);
-CREATE INDEX IF NOT EXISTS transactions_bill_idx ON transactions (bill_id) WHERE bill_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS transactions_card_bill_idx ON transactions (card_bill_id) WHERE card_bill_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS transactions_provider_idx ON transactions (account_id, provider_id) WHERE provider_id IS NOT NULL;
 
 -- Trove's own data, today saved per device in localStorage.
@@ -136,7 +138,7 @@ CREATE TABLE IF NOT EXISTS card_settings (
 -- amounts, descriptions or credentials.
 CREATE TABLE IF NOT EXISTS sync_runs (
   id                     bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  item_id                text REFERENCES items(id) ON DELETE CASCADE,
+  connection_id          text REFERENCES bank_connections(id) ON DELETE CASCADE,
   trigger                text NOT NULL,          -- webhook | manual | schedule
   started_at             timestamptz NOT NULL DEFAULT now(),
   finished_at            timestamptz,
@@ -150,7 +152,7 @@ CREATE TABLE IF NOT EXISTS sync_runs (
 CREATE TABLE IF NOT EXISTS webhook_events (
   event_id      text PRIMARY KEY,                -- Pluggy eventId
   event         text NOT NULL,                   -- item/updated, transactions/created…
-  item_id       text,
+  connection_id text,                            -- Pluggy itemId
   received_at   timestamptz NOT NULL DEFAULT now(),
   processed_at  timestamptz
 );
