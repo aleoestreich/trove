@@ -7,9 +7,10 @@
 // value of PLUGGY_WEBHOOK_SECRET (a Vercel environment variable). Fails
 // closed: no secret configured -> 503; wrong or missing header -> 401.
 //
-// Pluggy requires a 2XX within 5 seconds, and Trove keeps no database, so the
-// work here is small and synchronous: refresh Trove's cache when data changed,
-// and log what happened (event type and IDs only; never amounts or messages).
+// Pluggy requires a 2XX within 5 seconds. Trove's data only changes on Sync
+// (server/db/sync.ts), so the work here is small: drop the
+// live-read cache used by /api/finance?summary, and log what happened (event
+// type and IDs only; never amounts or messages).
 
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { clearFinanceCache } from './finance.js'

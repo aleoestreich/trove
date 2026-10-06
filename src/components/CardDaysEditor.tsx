@@ -8,7 +8,7 @@ import { Icon } from './Icon'
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
 
 /**
- * Under a card on Accounts: its closing and due days, which the owner can set
+ * Under a card on Accounts: its closing and due days, which can be set by hand
  * when the bank doesn't report them (or reports wrong ones). Saved on this
  * device; the bill and dates then follow them.
  */
@@ -30,7 +30,7 @@ export function CardDaysEditor({ account }: { account: Account }) {
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="inline-flex min-h-11 items-center gap-2 self-start rounded-sm text-left text-sm font-medium text-accent focus-visible:outline-2 focus-visible:outline-accent"
+          className="inline-flex min-h-12 items-center gap-2 self-start rounded-sm text-left text-sm font-medium text-accent focus-visible:outline-2 focus-visible:outline-accent"
         >
           <Icon name="installments" className="size-[18px]" strokeWidth={1.9} />
           {user ? (

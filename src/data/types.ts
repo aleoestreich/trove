@@ -26,7 +26,7 @@ export interface CreditData {
   balanceCloseDate: string | null
   /** Day the current bill is due (ISO date), if the bank reports it. */
   balanceDueDate: string | null
-  /** Closing and due days set by the owner; when present, the dates above come from them. */
+  /** Closing and due days set by hand; when present, the dates above come from them. */
   userDays?: { close: number; due: number }
 }
 
@@ -51,12 +51,29 @@ export interface Account {
   creditData?: CreditData
 }
 
+/** What a transaction counts as: income, an expense, or money moving between connected accounts. */
 export type CategoryKind = 'income' | 'expense' | 'transfer'
 
+/** A category's type: transfers have no category. */
+export type CategoryType = 'expense' | 'income'
+
+/** Categories, stored in the database (seeded from the defaults in the app's language). */
 export interface Category {
   id: string
   name: string
-  kind: CategoryKind
+  type: CategoryType
+  /** One of the 24 colour keys (src/data/categoryCatalog.ts); the CSS token is --cat-<color>. */
+  color: string
+  /** An icon key: a file name in src/assets/icons/categories/. */
+  icon: string
+  sortOrder: number
+}
+
+export interface Subcategory {
+  id: string
+  categoryId: string
+  name: string
+  sortOrder: number
 }
 
 export interface Transaction {
@@ -69,7 +86,18 @@ export interface Transaction {
   amount: Cents
   /** Original amount when the transaction happened in another currency. */
   foreign?: { currency: CurrencyCode; amount: Cents }
-  categoryId: string
+  /** Null: uncategorized (or a transfer, which never has a category). */
+  categoryId: string | null
+  /** Always one of `categoryId`'s subcategories. */
+  subcategoryId?: string | null
+  /**
+   * Money moving between connected accounts: "own" (a transfer or a
+   * currency conversion) or "card-payment" (paying a card's bill). Never
+   * income or an expense, and never categorized.
+   */
+  transfer?: 'own' | 'card-payment'
+  /** Hidden: left out of every total, chart, average and the list. */
+  hidden?: boolean
   status: 'POSTED' | 'PENDING'
   /**
    * Credit-card installment purchase ("parcelado"), mirroring Pluggy's
@@ -87,7 +115,7 @@ export interface Transaction {
   }
 }
 
-/** Where the data came from: hardcoded demo data or the owner's banks via Pluggy. */
+/** Where the data came from: hardcoded demo data or the connected banks via Pluggy. */
 export type DataSource = 'demo' | 'pluggy'
 
 /** Everything the app shows, loaded in one go through the Repository. */
@@ -95,10 +123,29 @@ export interface Snapshot {
   institutions: Institution[]
   accounts: Account[]
   categories: Category[]
+  subcategories: Subcategory[]
   transactions: Transaction[]
   source: DataSource
   /** When the data was fetched (ISO timestamp); only for live data. */
   fetchedAt?: string
+  /** Live data: when each bank connection last synced. */
+  sync?: SyncInfo
+}
+
+export interface SyncInfo {
+  /** Last time every connection synced (ISO timestamp), or null if never. */
+  lastSyncedAt: string | null
+  /** Each configured bank connection, in sync order. */
+  connections: { id: string; name: string | null; lastSyncedAt: string | null }[]
+}
+
+/** The result of syncing one bank connection. */
+export interface SyncResult {
+  connectionId: string
+  name: string | null
+  inserted: number
+  updated: number
+  removed: number
 }
 
 /** Months of history the app shows (charts, month filters) and the server fetches. */

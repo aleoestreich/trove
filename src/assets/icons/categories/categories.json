@@ -1,0 +1,766 @@
+{
+  "colors": {
+    "navy": {
+      "token": "cat-navy",
+      "name": {
+        "en": "Navy",
+        "pt": "Marinho"
+      },
+      "light": "#2B4C9B",
+      "dark": "#7A97E0"
+    },
+    "blue": {
+      "token": "cat-blue",
+      "name": {
+        "en": "Blue",
+        "pt": "Azul"
+      },
+      "light": "#3D5AFE",
+      "dark": "#6F7EFF"
+    },
+    "indigo": {
+      "token": "cat-indigo",
+      "name": {
+        "en": "Indigo",
+        "pt": "Índigo"
+      },
+      "light": "#5B4BDB",
+      "dark": "#8F82F2"
+    },
+    "violet": {
+      "token": "cat-violet",
+      "name": {
+        "en": "Violet",
+        "pt": "Violeta"
+      },
+      "light": "#A34BFF",
+      "dark": "#B07BFF"
+    },
+    "purple": {
+      "token": "cat-purple",
+      "name": {
+        "en": "Purple",
+        "pt": "Roxo"
+      },
+      "light": "#7E3FBF",
+      "dark": "#A97FE0"
+    },
+    "lavender": {
+      "token": "cat-lavender",
+      "name": {
+        "en": "Lavender",
+        "pt": "Lavanda"
+      },
+      "light": "#8A73C9",
+      "dark": "#B7A6EA"
+    },
+    "magenta": {
+      "token": "cat-magenta",
+      "name": {
+        "en": "Magenta",
+        "pt": "Magenta"
+      },
+      "light": "#C2389E",
+      "dark": "#DE6FC2"
+    },
+    "pink": {
+      "token": "cat-pink",
+      "name": {
+        "en": "Pink",
+        "pt": "Rosa"
+      },
+      "light": "#E0518F",
+      "dark": "#E8709F"
+    },
+    "raspberry": {
+      "token": "cat-raspberry",
+      "name": {
+        "en": "Raspberry",
+        "pt": "Framboesa"
+      },
+      "light": "#B8336A",
+      "dark": "#E06894"
+    },
+    "coral": {
+      "token": "cat-coral",
+      "name": {
+        "en": "Coral",
+        "pt": "Coral"
+      },
+      "light": "#F0643A",
+      "dark": "#F4805C"
+    },
+    "rust": {
+      "token": "cat-rust",
+      "name": {
+        "en": "Rust",
+        "pt": "Ferrugem"
+      },
+      "light": "#C2551F",
+      "dark": "#E8804F"
+    },
+    "orange": {
+      "token": "cat-orange",
+      "name": {
+        "en": "Orange",
+        "pt": "Laranja"
+      },
+      "light": "#D9791A",
+      "dark": "#E08A3A"
+    },
+    "amber": {
+      "token": "cat-amber",
+      "name": {
+        "en": "Amber",
+        "pt": "Âmbar"
+      },
+      "light": "#B58900",
+      "dark": "#D6AC2A"
+    },
+    "olive": {
+      "token": "cat-olive",
+      "name": {
+        "en": "Olive",
+        "pt": "Oliva"
+      },
+      "light": "#7A8B1E",
+      "dark": "#A6B84E"
+    },
+    "lime": {
+      "token": "cat-lime",
+      "name": {
+        "en": "Lime",
+        "pt": "Lima"
+      },
+      "light": "#6AA40F",
+      "dark": "#86BC2E"
+    },
+    "green": {
+      "token": "cat-green",
+      "name": {
+        "en": "Green",
+        "pt": "Verde"
+      },
+      "light": "#2F9E44",
+      "dark": "#4DB561"
+    },
+    "forest": {
+      "token": "cat-forest",
+      "name": {
+        "en": "Forest",
+        "pt": "Floresta"
+      },
+      "light": "#2E7040",
+      "dark": "#62A874"
+    },
+    "mint": {
+      "token": "cat-mint",
+      "name": {
+        "en": "Mint",
+        "pt": "Menta"
+      },
+      "light": "#12A383",
+      "dark": "#4DBF9F"
+    },
+    "teal": {
+      "token": "cat-teal",
+      "name": {
+        "en": "Teal",
+        "pt": "Petróleo"
+      },
+      "light": "#0E9AA7",
+      "dark": "#2FB3BF"
+    },
+    "sky": {
+      "token": "cat-sky",
+      "name": {
+        "en": "Sky",
+        "pt": "Céu"
+      },
+      "light": "#1C8CD9",
+      "dark": "#4AA5E6"
+    },
+    "steel": {
+      "token": "cat-steel",
+      "name": {
+        "en": "Steel",
+        "pt": "Aço"
+      },
+      "light": "#4E6E8E",
+      "dark": "#8AA8C6"
+    },
+    "brown": {
+      "token": "cat-brown",
+      "name": {
+        "en": "Brown",
+        "pt": "Marrom"
+      },
+      "light": "#8B5E3C",
+      "dark": "#BE9270"
+    },
+    "slate": {
+      "token": "cat-slate",
+      "name": {
+        "en": "Slate",
+        "pt": "Ardósia"
+      },
+      "light": "#6B7280",
+      "dark": "#8A90A0"
+    },
+    "graphite": {
+      "token": "cat-graphite",
+      "name": {
+        "en": "Graphite",
+        "pt": "Grafite"
+      },
+      "light": "#4A4A63",
+      "dark": "#A9A9C0"
+    }
+  },
+  "icons": [
+    {
+      "group": "home",
+      "groupName": {
+        "en": "Home & bills",
+        "pt": "Casa e contas"
+      },
+      "suggestedColor": "blue",
+      "icons": [
+        {
+          "key": "home",
+          "label": "Home"
+        },
+        {
+          "key": "bolt",
+          "label": "Electricity"
+        },
+        {
+          "key": "droplet",
+          "label": "Water"
+        },
+        {
+          "key": "flame",
+          "label": "Gas"
+        },
+        {
+          "key": "wifi",
+          "label": "Internet"
+        },
+        {
+          "key": "phone",
+          "label": "Phone"
+        }
+      ]
+    },
+    {
+      "group": "food",
+      "groupName": {
+        "en": "Food & drink",
+        "pt": "Comida e bebida"
+      },
+      "suggestedColor": "orange",
+      "icons": [
+        {
+          "key": "cart",
+          "label": "Groceries"
+        },
+        {
+          "key": "fork",
+          "label": "Restaurant"
+        },
+        {
+          "key": "coffee",
+          "label": "Coffee"
+        },
+        {
+          "key": "pizza",
+          "label": "Fast food"
+        },
+        {
+          "key": "beer",
+          "label": "Bar"
+        },
+        {
+          "key": "delivery",
+          "label": "Delivery"
+        }
+      ]
+    },
+    {
+      "group": "transport",
+      "groupName": {
+        "en": "Transport",
+        "pt": "Transporte"
+      },
+      "suggestedColor": "sky",
+      "icons": [
+        {
+          "key": "car",
+          "label": "Car"
+        },
+        {
+          "key": "bus",
+          "label": "Bus"
+        },
+        {
+          "key": "fuel",
+          "label": "Fuel"
+        },
+        {
+          "key": "parking",
+          "label": "Parking"
+        }
+      ]
+    },
+    {
+      "group": "shopping",
+      "groupName": {
+        "en": "Shopping",
+        "pt": "Compras"
+      },
+      "suggestedColor": "pink",
+      "icons": [
+        {
+          "key": "bag",
+          "label": "Shopping"
+        },
+        {
+          "key": "shirt",
+          "label": "Clothing"
+        },
+        {
+          "key": "package",
+          "label": "Online orders"
+        },
+        {
+          "key": "gift",
+          "label": "Gifts"
+        },
+        {
+          "key": "lipstick",
+          "label": "Beauty"
+        },
+        {
+          "key": "laptop",
+          "label": "Electronics"
+        }
+      ]
+    },
+    {
+      "group": "health",
+      "groupName": {
+        "en": "Health & care",
+        "pt": "Saúde e cuidados"
+      },
+      "suggestedColor": "coral",
+      "icons": [
+        {
+          "key": "heart",
+          "label": "Health"
+        },
+        {
+          "key": "pill",
+          "label": "Pharmacy"
+        },
+        {
+          "key": "stethoscope",
+          "label": "Doctor"
+        },
+        {
+          "key": "tooth",
+          "label": "Dentist"
+        },
+        {
+          "key": "dumbbell",
+          "label": "Gym"
+        },
+        {
+          "key": "scissors",
+          "label": "Hair & beauty"
+        }
+      ]
+    },
+    {
+      "group": "family",
+      "groupName": {
+        "en": "Family & pets",
+        "pt": "Família e pets"
+      },
+      "suggestedColor": "violet",
+      "icons": [
+        {
+          "key": "users",
+          "label": "Family"
+        },
+        {
+          "key": "stroller",
+          "label": "Kids"
+        },
+        {
+          "key": "paw",
+          "label": "Pets"
+        },
+        {
+          "key": "backpack",
+          "label": "School"
+        }
+      ]
+    },
+    {
+      "group": "learn",
+      "groupName": {
+        "en": "Education & work",
+        "pt": "Educação e trabalho"
+      },
+      "suggestedColor": "teal",
+      "icons": [
+        {
+          "key": "book",
+          "label": "Books"
+        },
+        {
+          "key": "cap",
+          "label": "Courses"
+        },
+        {
+          "key": "briefcase",
+          "label": "Work"
+        },
+        {
+          "key": "monitor",
+          "label": "Software"
+        }
+      ]
+    },
+    {
+      "group": "fun",
+      "groupName": {
+        "en": "Leisure",
+        "pt": "Lazer"
+      },
+      "suggestedColor": "green",
+      "icons": [
+        {
+          "key": "game",
+          "label": "Games"
+        },
+        {
+          "key": "film",
+          "label": "Cinema"
+        },
+        {
+          "key": "music",
+          "label": "Music"
+        },
+        {
+          "key": "repeat",
+          "label": "Subscriptions"
+        },
+        {
+          "key": "ball",
+          "label": "Sports"
+        }
+      ]
+    },
+    {
+      "group": "travel",
+      "groupName": {
+        "en": "Travel",
+        "pt": "Viagem"
+      },
+      "suggestedColor": "amber",
+      "icons": [
+        {
+          "key": "plane",
+          "label": "Flights"
+        },
+        {
+          "key": "suitcase",
+          "label": "Luggage"
+        },
+        {
+          "key": "beach",
+          "label": "Vacation"
+        }
+      ]
+    },
+    {
+      "group": "money",
+      "groupName": {
+        "en": "Money & finance",
+        "pt": "Dinheiro e finanças"
+      },
+      "suggestedColor": "mint",
+      "icons": [
+        {
+          "key": "coin",
+          "label": "Money"
+        },
+        {
+          "key": "banknote",
+          "label": "Cash"
+        },
+        {
+          "key": "bank",
+          "label": "Bank"
+        },
+        {
+          "key": "card",
+          "label": "Card"
+        },
+        {
+          "key": "piggy",
+          "label": "Savings"
+        },
+        {
+          "key": "chart",
+          "label": "Investments"
+        },
+        {
+          "key": "receipt",
+          "label": "Bills"
+        },
+        {
+          "key": "shield",
+          "label": "Insurance"
+        }
+      ]
+    },
+    {
+      "group": "other",
+      "groupName": {
+        "en": "Other",
+        "pt": "Outros"
+      },
+      "suggestedColor": "slate",
+      "icons": [
+        {
+          "key": "star",
+          "label": "Favourites"
+        },
+        {
+          "key": "more",
+          "label": "Other"
+        }
+      ]
+    }
+  ],
+  "defaultCategories": [
+    {
+      "id": "home",
+      "type": "expense",
+      "color": "blue",
+      "icon": "home",
+      "name": {
+        "en": "Home",
+        "pt": "Moradia"
+      },
+      "subcategories": [
+        {
+          "en": "Rent",
+          "pt": "Aluguel"
+        },
+        {
+          "en": "Condo fee",
+          "pt": "Condomínio"
+        },
+        {
+          "en": "Electricity",
+          "pt": "Energia"
+        },
+        {
+          "en": "Internet",
+          "pt": "Internet"
+        }
+      ]
+    },
+    {
+      "id": "groceries",
+      "type": "expense",
+      "color": "green",
+      "icon": "cart",
+      "name": {
+        "en": "Groceries",
+        "pt": "Mercado"
+      },
+      "subcategories": [
+        {
+          "en": "Supermarket",
+          "pt": "Supermercado"
+        },
+        {
+          "en": "Bakery",
+          "pt": "Padaria"
+        }
+      ]
+    },
+    {
+      "id": "restaurants",
+      "type": "expense",
+      "color": "orange",
+      "icon": "fork",
+      "name": {
+        "en": "Restaurants",
+        "pt": "Restaurantes"
+      },
+      "subcategories": [
+        {
+          "en": "Delivery",
+          "pt": "Delivery"
+        },
+        {
+          "en": "Dining out",
+          "pt": "Comer fora"
+        },
+        {
+          "en": "Coffee",
+          "pt": "Café"
+        }
+      ]
+    },
+    {
+      "id": "transport",
+      "type": "expense",
+      "color": "sky",
+      "icon": "bus",
+      "name": {
+        "en": "Transport",
+        "pt": "Transporte"
+      },
+      "subcategories": [
+        {
+          "en": "Ride apps",
+          "pt": "Apps de corrida"
+        },
+        {
+          "en": "Fuel",
+          "pt": "Combustível"
+        },
+        {
+          "en": "Parking",
+          "pt": "Estacionamento"
+        }
+      ]
+    },
+    {
+      "id": "shopping",
+      "type": "expense",
+      "color": "pink",
+      "icon": "bag",
+      "name": {
+        "en": "Shopping",
+        "pt": "Compras"
+      },
+      "subcategories": [
+        {
+          "en": "Electronics",
+          "pt": "Eletrônicos"
+        },
+        {
+          "en": "Appliances",
+          "pt": "Eletrodomésticos"
+        },
+        {
+          "en": "Clothing",
+          "pt": "Roupas"
+        }
+      ]
+    },
+    {
+      "id": "subscriptions",
+      "type": "expense",
+      "color": "violet",
+      "icon": "repeat",
+      "name": {
+        "en": "Subscriptions",
+        "pt": "Assinaturas"
+      },
+      "subcategories": [
+        {
+          "en": "Streaming",
+          "pt": "Streaming"
+        },
+        {
+          "en": "Software",
+          "pt": "Software"
+        }
+      ]
+    },
+    {
+      "id": "health",
+      "type": "expense",
+      "color": "coral",
+      "icon": "heart",
+      "name": {
+        "en": "Health",
+        "pt": "Saúde"
+      },
+      "subcategories": [
+        {
+          "en": "Pharmacy",
+          "pt": "Farmácia"
+        },
+        {
+          "en": "Doctor",
+          "pt": "Médico"
+        }
+      ]
+    },
+    {
+      "id": "travel",
+      "type": "expense",
+      "color": "teal",
+      "icon": "plane",
+      "name": {
+        "en": "Travel",
+        "pt": "Viagem"
+      },
+      "subcategories": [
+        {
+          "en": "Flights",
+          "pt": "Passagens"
+        },
+        {
+          "en": "Hotels",
+          "pt": "Hospedagem"
+        }
+      ]
+    },
+    {
+      "id": "salary",
+      "type": "income",
+      "color": "mint",
+      "icon": "briefcase",
+      "name": {
+        "en": "Salary",
+        "pt": "Salário"
+      },
+      "subcategories": [
+        {
+          "en": "Base salary",
+          "pt": "Salário base"
+        },
+        {
+          "en": "On-call",
+          "pt": "Sobreaviso"
+        }
+      ]
+    },
+    {
+      "id": "freelance",
+      "type": "income",
+      "color": "lime",
+      "icon": "laptop",
+      "name": {
+        "en": "Freelance",
+        "pt": "Freelance"
+      },
+      "subcategories": [
+        {
+          "en": "Clients",
+          "pt": "Clientes"
+        }
+      ]
+    }
+  ]
+}

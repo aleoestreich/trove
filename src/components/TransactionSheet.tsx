@@ -1,27 +1,29 @@
-import { useEffect, useRef } from 'react'
-import type { CategoryKind, Transaction } from '../data/types'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import type { Category, Transaction } from '../data/types'
 import { useData } from '../state'
+import { newId } from '../data/edits'
 import { addMonths, formatFullDate, formatMonthYear } from '../lib/dates'
 import { formatMoney, formatRate } from '../lib/money'
-import { Icon, categoryIcon } from './Icon'
-import { IconDisc } from './ui'
+import { kindOf } from '../lib/summary'
+import { Icon } from './Icon'
+import { CategoryBadge, TransactionBadge, catInk, catTint, catVar } from './CategoryBadge'
 import { useAccountLabel } from './TransactionRow'
 import { useI18n } from '../i18n/I18nProvider'
 
-
 /**
- * Transaction details: amount, facts and category chips (tap one to
- * recategorise). Phones show it in a bottom sheet (`sheet`); the desktop
- * Transactions page shows it in a side panel (`panel`).
+ * Transaction details: amount, facts, the category in two steps (category,
+ * then subcategory) and the "Hide this transaction" switch. Changes save at
+ * once. Phones show it in a bottom sheet (`sheet`); the desktop Transactions
+ * page shows it in a side panel (`panel`).
  */
 function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose(): void; variant: 'sheet' | 'panel' }) {
-  const { categories, categoriesById, setCategory, transactions } = useData()
+  const { categories, categoriesById, subcategories, edit, transactions } = useData()
   const { t, categoryName } = useI18n()
   const accountLabel = useAccountLabel()
   const closeRef = useRef<HTMLButtonElement>(null)
-  const current = transactions.find((t) => t.id === tx.id) ?? tx
-  const category = categoriesById.get(current.categoryId)
-  const kind: CategoryKind = category?.kind ?? (current.amount > 0 ? 'income' : 'expense')
+  const current = transactions.find((x) => x.id === tx.id) ?? tx
+  const category = current.categoryId ? categoriesById.get(current.categoryId) : undefined
+  const kind = kindOf(current, categoriesById)
 
   const panel = variant === 'panel'
 
@@ -46,17 +48,24 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
   }
   if (current.status === 'PENDING') details.push({ label: t.transactions.status, value: t.pending })
 
-  // Same kind first (an expense is recategorised as another expense), then the rest.
-  const options = [...categories.filter((c) => c.kind === kind), ...categories.filter((c) => c.kind !== kind)]
+  // Categories of the transaction's type (money in: income; out: expense), plus its own if it's of the other type.
+  const type = current.amount > 0 ? 'income' : 'expense'
+  // The chosen one first, so it's in view; the order is kept while the sheet is open.
+  const [first] = useState(category?.id)
+  const matching = categories.filter((c) => c.type === type || c.id === category?.id)
+  const options = [...matching.filter((c) => c.id === first), ...matching.filter((c) => c.id !== first)]
 
   const amount = current.foreign
     ? formatMoney(current.foreign.amount, current.foreign.currency, { signed: kind !== 'transfer' })
     : formatMoney(kind === 'transfer' ? Math.abs(current.amount) : current.amount, 'BRL', { signed: kind !== 'transfer' })
 
+  const setCategory = (c: Category) =>
+    edit({ op: 'categorize', transactionId: current.id, categoryId: c.id === category?.id ? null : c.id, subcategoryId: null })
+
   return (
     <>
       <div className="flex items-center gap-3 pt-1 pb-3 lg:pt-0">
-        <IconDisc icon={categoryIcon(current.categoryId)} size="lg" />
+        <TransactionBadge tx={current} categoriesById={categoriesById} size={44} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h2 className="truncate text-lg leading-6 font-medium text-ink">{current.description}</h2>
           <span className="text-[13px] leading-[18px] text-muted">{accountLabel(current.accountId)}</span>
@@ -65,16 +74,16 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
           ref={closeRef}
           type="button"
           onClick={onClose}
-          className={`flex shrink-0 items-center justify-center rounded-full text-ink-2 hover:bg-track active:bg-track ${panel ? 'size-10' : '-mr-2 size-12'}`}
+          className="-mr-2 flex size-12 shrink-0 items-center justify-center rounded-full text-ink-2 hover:bg-track active:bg-track"
           aria-label={t.close}
         >
-          <Icon name="close" className={panel ? 'size-5' : 'size-[22px]'} strokeWidth={2} />
+          <Icon name="close" className="size-[22px]" strokeWidth={2} />
         </button>
       </div>
 
       <div className={`flex flex-col gap-0.5 ${panel ? 'pt-4 pb-3' : 'pt-1 pb-3'}`}>
         <span
-          className={`tabular font-bold tracking-[-0.02em] ${panel ? 'text-[30px] leading-[38px]' : 'text-[32px] leading-10'} ${kind === 'income' ? 'text-income' : kind === 'transfer' ? 'text-muted' : 'text-ink'}`}
+          className={`tabular font-bold tracking-[-0.02em] ${panel ? 'text-[30px] leading-[38px]' : 'text-[32px] leading-10'} ${kind === 'income' ? 'text-income' : kind === 'transfer' ? 'text-muted' : 'text-ink'} ${current.hidden ? 'opacity-60' : ''}`}
         >
           {amount}
         </span>
@@ -90,31 +99,195 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
         ))}
       </dl>
 
-      <h3 id={`${variant}-category`} className="label-caps pt-4 pb-2">
-        {t.category}
+      {current.transfer ? (
+        <p className="mt-3 text-[13px] leading-[18px] text-muted">{t.transactions.transferNote}</p>
+      ) : (
+        <>
+          <h3 id={`${variant}-category`} className="label-caps pt-4 pb-2">
+            {t.category}
+          </h3>
+          {options.length === 0 ? (
+            <p className="text-[13px] text-muted">{t.transactions.noCategoriesOfType(type === 'income' ? t.income.toLowerCase() : t.expenses.toLowerCase())}</p>
+          ) : (
+            <div
+              role="radiogroup"
+              aria-labelledby={`${variant}-category`}
+              className={`-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:-mx-5 lg:px-5 ${panel ? 'lg:flex-wrap lg:overflow-visible' : ''}`}
+            >
+              {options.map((c) => {
+                const on = c.id === category?.id
+                const style: CSSProperties = on ? { borderColor: catVar(c.color), background: `color-mix(in srgb, ${catVar(c.color)} 10%, var(--surface))` } : {}
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => setCategory(c)}
+                    style={style}
+                    className={`inline-flex h-12 shrink-0 items-center gap-2 rounded-full pr-3.5 pl-2 text-sm font-medium whitespace-nowrap ${
+                      on ? 'border-[1.5px] text-ink' : 'border border-line bg-surface text-ink-2 hover:bg-track'
+                    }`}
+                  >
+                    <CategoryBadge category={c} size={28} />
+                    {categoryName(c)}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {category && (
+            <SubcategoryPicker
+              variant={variant}
+              category={category}
+              current={current.subcategoryId ?? null}
+              options={subcategories.filter((x) => x.categoryId === category.id)}
+              onPick={(id) => edit({ op: 'categorize', transactionId: current.id, categoryId: category.id, subcategoryId: id === current.subcategoryId ? null : id })}
+              onAdd={(name) => {
+                const id = newId()
+                edit({ op: 'createSubcategory', subcategory: { id, categoryId: category.id, name } })
+                edit({ op: 'categorize', transactionId: current.id, categoryId: category.id, subcategoryId: id })
+              }}
+            />
+          )}
+        </>
+      )}
+
+      <HideSwitch hidden={!!current.hidden} onChange={(hidden) => edit({ op: 'hide', transactionId: current.id, hidden })} />
+    </>
+  )
+}
+
+/** The chosen category's subcategories (tap the selected one again to clear it), and "+ New" to add one inline. */
+function SubcategoryPicker({
+  variant,
+  category,
+  current,
+  options,
+  onPick,
+  onAdd,
+}: {
+  variant: 'sheet' | 'panel'
+  category: Category
+  current: string | null
+  options: { id: string; name: string }[]
+  onPick(id: string): void
+  onAdd(name: string): void
+}) {
+  const { t } = useI18n()
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  // 40px chips with a 48px touch area.
+  const chip = 'relative inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium before:absolute before:inset-x-0 before:-inset-y-1'
+
+  const submit = () => {
+    const n = name.trim().replace(/\s+/g, ' ')
+    if (!n) return setError(t.categoriesPage.nameRequired)
+    if (options.some((o) => o.name.localeCompare(n, undefined, { sensitivity: 'base' }) === 0)) return setError(t.categoriesPage.nameTaken)
+    onAdd(n)
+    setAdding(false)
+    setName('')
+    setError(null)
+  }
+
+  return (
+    <>
+      <h3 id={`${variant}-subcategory`} className="label-caps pt-4 pb-2">
+        {t.transactions.subcategory}
       </h3>
-      <div role="radiogroup" aria-labelledby={`${variant}-category`} className={`flex flex-wrap ${panel ? 'gap-1.5' : 'gap-2'}`}>
-        {options.map((c) => {
-          const on = c.id === current.categoryId
+      <div role="radiogroup" aria-labelledby={`${variant}-subcategory`} className="flex flex-wrap gap-2">
+        {options.map((o) => {
+          const on = o.id === current
           return (
             <button
-              key={c.id}
+              key={o.id}
               type="button"
               role="radio"
               aria-checked={on}
-              onClick={() => setCategory(current.id, c.id)}
-              className={`inline-flex items-center gap-1.5 rounded-full border font-medium ${
-                panel ? 'h-9 px-3 text-[13px]' : 'h-12 pr-3.5 pl-3 text-sm'
-              } ${on ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-surface text-ink-2 hover:bg-track'}`}
+              onClick={() => onPick(o.id)}
+              className={`${chip} ${on ? 'border-[1.5px]' : 'border border-line bg-surface text-ink-2 hover:bg-track'}`}
+              style={on ? { borderColor: catVar(category.color), background: catTint(category.color, 14), color: catInk(category.color) } : undefined}
             >
-              {!panel && <Icon name={on ? 'check' : categoryIcon(c.id)} className="size-[18px]" />}
-              {categoryName(c)}
+              {on && <Icon name="check" className="size-4" strokeWidth={2.4} />}
+              {o.name}
             </button>
           )
         })}
+        {!adding && (
+          <button type="button" onClick={() => setAdding(true)} className={`${chip} border border-dashed border-line pr-3.5 pl-2.5 text-accent hover:bg-track`}>
+            <Icon name="plus" className="size-4" strokeWidth={2.2} />
+            {t.transactions.newSubcategory}
+          </button>
+        )}
       </div>
-      {kind === 'transfer' && <p className="mt-3 text-[13px] leading-[18px] text-muted">{t.transactions.transferNote}</p>}
+      {adding && (
+        <form
+          className="mt-2 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            submit()
+          }}
+        >
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              setError(null)
+            }}
+            aria-label={t.transactions.subcategoryName}
+            aria-invalid={!!error}
+            placeholder={t.transactions.subcategoryName}
+            maxLength={40}
+            className={`h-12 min-w-0 flex-1 rounded-md border bg-surface px-3 text-[15px] text-ink placeholder:text-muted ${error ? 'border-critical' : 'border-line'}`}
+          />
+          <button type="submit" className="h-12 shrink-0 rounded-md bg-accent px-4 text-sm font-medium text-surface">
+            {t.transactions.add}
+          </button>
+          <button
+            type="button"
+            aria-label={t.close}
+            onClick={() => {
+              setAdding(false)
+              setName('')
+              setError(null)
+            }}
+            className="flex size-12 shrink-0 items-center justify-center rounded-md text-ink-2 hover:bg-track"
+          >
+            <Icon name="close" className="size-5" />
+          </button>
+        </form>
+      )}
+      {error && <p className="mt-1.5 text-xs text-critical">{error}</p>}
     </>
+  )
+}
+
+/** "Hide this transaction": a switch row with its explanation. */
+function HideSwitch({ hidden, onChange }: { hidden: boolean; onChange(hidden: boolean): void }) {
+  const { t } = useI18n()
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={hidden}
+      onClick={() => onChange(!hidden)}
+      className="mt-4 flex min-h-16 w-full items-center gap-3 rounded-md bg-page px-3.5 py-2.5 text-left"
+    >
+      <Icon name="eyeOff" className="size-[22px] shrink-0 text-ink-2" strokeWidth={1.8} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-[15px] leading-5 font-medium text-ink">{t.transactions.hide}</span>
+        <span className="text-xs leading-[17px] text-muted">{t.transactions.hideNote}</span>
+      </span>
+      <span
+        aria-hidden
+        className={`flex h-8 w-[52px] shrink-0 items-center rounded-full border-2 px-1 transition-colors ${hidden ? 'justify-end border-accent bg-accent' : 'border-muted bg-track'}`}
+      >
+        <span className={`rounded-full transition-all ${hidden ? 'size-6 bg-surface' : 'size-4 bg-muted'}`} />
+      </span>
+    </button>
   )
 }
 

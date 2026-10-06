@@ -28,10 +28,10 @@ export function LanguageSwitch() {
             aria-label={labels[l].name}
             title={labels[l].name}
             onClick={() => setLocale(l)}
-            className={`group relative flex h-12 items-center focus-visible:outline-none ${i === 0 ? 'pl-0.5' : 'pr-1'}`}
+            className={`group relative flex h-12 items-center focus-visible:outline-none min-w-11 justify-center ${i === 0 ? 'pl-0.5' : 'pr-1'}`}
           >
             <span
-              className={`inline-flex h-[26px] min-w-[34px] items-center justify-center rounded-full px-2 text-xs leading-none tracking-[0.08em] group-focus-visible:outline-2 group-focus-visible:outline-accent ${
+              className={`inline-flex h-[26px] min-w-[38px] items-center justify-center rounded-full px-2 text-xs leading-none tracking-[0.08em] group-focus-visible:outline-2 group-focus-visible:outline-accent ${
                 active ? 'bg-accent-soft font-bold text-accent' : 'font-medium text-muted'
               }`}
             >

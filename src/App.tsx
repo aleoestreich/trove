@@ -1,12 +1,15 @@
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
-import { DataGate, DataProvider, useDataSource } from './state'
+import { DataGate, DataProvider, useDataSource, useSync } from './state'
 import { createMockRepository } from './data/mockRepository'
-import { createPluggyRepository, withDemoFallback } from './data/pluggyRepository'
+import { createApiRepository, withDemoFallback } from './data/apiRepository'
 import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { Accounts } from './pages/Accounts'
 import { Installments } from './pages/Installments'
 import { Debug } from './pages/Debug'
+import { Categories } from './pages/Categories'
+import { HiddenTransactions } from './pages/Transactions'
+import { Snackbar, SyncBar } from './components/SyncBar'
 import { Icon, type IconName } from './components/Icon'
 import { LanguageSwitch } from './components/LanguageSwitch'
 import { Wordmark } from './components/Logo'
@@ -14,15 +17,16 @@ import { I18nProvider, useI18n } from './i18n/I18nProvider'
 import type { Messages } from './i18n/messages'
 import { isDeployed } from './lib/useIsDesktop'
 
-// Deployed: the owner's data via Pluggy (demo data until Pluggy is configured).
+// Deployed: data from the database via /api (demo data until configured and synced).
 // Local development: demo data.
-const repository = isDeployed() ? withDemoFallback(createPluggyRepository(), createMockRepository()) : createMockRepository()
+const repository = isDeployed() ? withDemoFallback(createApiRepository(), createMockRepository()) : createMockRepository()
 
 const tabs: { to: string; label: keyof Messages['nav']; icon: IconName }[] = [
   { to: '/', label: 'overview', icon: 'overview' },
   { to: '/transactions', label: 'transactions', icon: 'transactions' },
   { to: '/accounts', label: 'accounts', icon: 'accounts' },
   { to: '/installments', label: 'installments', icon: 'installments' },
+  { to: '/categories', label: 'categories', icon: 'tabCategories' },
 ]
 
 export function App() {
@@ -78,6 +82,8 @@ function Shell() {
                     <Route path="/transactions" element={<Transactions />} />
                     <Route path="/accounts" element={<Accounts />} />
                     <Route path="/installments" element={<Installments />} />
+                    <Route path="/transactions/hidden" element={<HiddenTransactions />} />
+                    <Route path="/categories" element={<Categories />} />
                   </Routes>
                 </DataGate>
               }
@@ -90,7 +96,7 @@ function Shell() {
         aria-label={t.mainNav}
         className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[480px] border-t border-line bg-surface pt-1.5 pb-[calc(16px+env(safe-area-inset-bottom))] lg:hidden"
       >
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-5">
           {tabs.map((tab) => (
             <NavLink
               key={tab.to}
@@ -102,16 +108,17 @@ function Shell() {
             >
               {({ isActive }) => (
                 <>
-                  <span className={`flex h-[30px] w-14 items-center justify-center rounded-full ${isActive ? 'bg-accent-soft' : ''}`}>
+                  <span className={`flex h-[30px] w-[52px] items-center justify-center rounded-full ${isActive ? 'bg-accent-soft' : ''}`}>
                     <Icon name={tab.icon} className="size-[22px]" />
                   </span>
-                  <span className={`max-w-full truncate text-xs leading-4 ${isActive ? 'font-medium' : ''}`}>{t.nav[tab.label]}</span>
+                  <span className={`max-w-full truncate text-[11px] leading-4 ${isActive ? 'font-medium' : ''}`}>{t.nav[tab.label]}</span>
                 </>
               )}
             </NavLink>
           ))}
         </div>
       </nav>
+      <Snackbar />
     </div>
   )
 }
@@ -120,6 +127,7 @@ function Shell() {
 function Sidebar() {
   const { t } = useI18n()
   const isDemo = useDataSource() === 'demo'
+  const syncInfo = useSync().info
   return (
     <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col gap-7 overflow-y-auto border-r border-line bg-surface px-4 pt-7 pb-6 lg:flex">
       <div className="px-3">
@@ -141,7 +149,8 @@ function Sidebar() {
         ))}
       </nav>
       <div className="mt-auto flex flex-col gap-4 px-1">
-        {isDemo && (
+        <SyncBar variant="sidebar" />
+        {isDemo && !syncInfo && (
           <div className="flex flex-col gap-1 rounded-md bg-page p-3">
             <span className="inline-flex h-[22px] items-center self-start rounded-full border border-line bg-surface px-2 text-[11px] font-medium text-ink-2">
               {t.demoData}

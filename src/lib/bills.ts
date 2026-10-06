@@ -55,7 +55,7 @@ export function currentBill(account: Account, transactions: Transaction[], plans
     const inCycle = (date: string) => date > from && date <= close
     let amount = 0
     let expected = 0
-    for (const t of own) if (t.categoryId !== 'card-payment' && inCycle(t.date)) amount -= t.amount
+    for (const t of own) if (t.transfer !== 'card-payment' && inCycle(t.date)) amount -= t.amount
     for (const p of plans) {
       if (p.accountId !== account.id) continue
       for (const u of p.upcoming) if (inCycle(u.date)) expected += u.amount
@@ -64,7 +64,7 @@ export function currentBill(account: Account, transactions: Transaction[], plans
   }
   /** Bill payments on the card since `close` (up to today). */
   const paidSince = (close: string) =>
-    own.filter((t) => t.categoryId === 'card-payment' && t.amount > 0 && t.date > close && t.date <= todayISO).reduce((sum, t) => sum + t.amount, 0)
+    own.filter((t) => t.transfer === 'card-payment' && t.amount > 0 && t.date > close && t.date <= todayISO).reduce((sum, t) => sum + t.amount, 0)
 
   // Move past bills that are already due (or closed, without a due date). Bounded.
   let k = 0
@@ -88,7 +88,7 @@ export function currentBill(account: Account, transactions: Transaction[], plans
 
 /** Whether a transaction is part of a bill: the card's purchases and refunds in its cycle (bill payments aren't). */
 export function inBill(t: Transaction, accountId: string, bill: CardBill): boolean {
-  return t.accountId === accountId && t.categoryId !== 'card-payment' && t.date > bill.fromDate && t.date <= bill.closeDate
+  return t.accountId === accountId && t.transfer !== 'card-payment' && t.date > bill.fromDate && t.date <= bill.closeDate
 }
 
 /**

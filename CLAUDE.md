@@ -18,7 +18,11 @@ roadmap and `README.md` for how to run it.
   is merged.
 - **PRs:** fill in every section of `pull_request_template.md`, keeping its
   headings.
-- **No real financial data in the repo or on GitHub.** The owner's merchants,
+- **Writing tone:** titles, descriptions, commit messages, docs, READMEs and
+  comments are impersonal and technical. Describe the system and the change
+  ("Sync never overwrites stored categories"), not a person ("the owner",
+  "you", "your").
+- **No real financial data in the repo or on GitHub.** Real merchants,
   amounts, balances, account names and screenshots are shared only to show a
   bug. Never copy them into PR titles or descriptions, commit messages, code,
   comments, tests, fixtures or docs. Describe the problem in general terms and
@@ -37,7 +41,18 @@ Run `npm test` and `npm run build` before pushing.
 - **Money** is integer cents (`Cents`) in BRL. Foreign amounts keep their
   original value in `foreign`. Never use floats for money.
 - **Data** goes through the `Repository` interface (`src/data/repository.ts`).
-  The domain types mirror Pluggy (Item → Account → Transaction).
+  The domain types mirror Pluggy (Item → Account → Transaction). Every change
+  made in the app is an `Edit` (`src/data/edits.ts`): the app applies it at
+  once with `applyEdit`, and the server applies the same rules in SQL
+  (`server/db/categories.ts`); keep the two in step, with tests on both.
+- **Categories** are stored in the database (seeded once from
+  `src/data/categoryCatalog.ts`, in the app's language). A transaction has a
+  category and subcategory (or none), a `transfer` kind (own transfer or card
+  bill payment, which never have a category) and a `hidden` flag. Hidden
+  transactions are left out of every total, chart, average, category
+  breakdown and installments total (balances and card bills still include
+  them: those are the bank's figures). Category colours are the `--cat-*`
+  tokens; icons come from `src/assets/icons/` through `Icon`/`CategoryIcon`.
 - **Text** shown in the UI lives in `src/i18n/messages.ts`, in both `en` and
   `pt-BR` (Brazilian Portuguese). Never hardcode UI strings. Format money and
   dates with the helpers in `src/lib/money.ts` and `src/lib/dates.ts`, which
@@ -55,8 +70,14 @@ Run `npm test` and `npm run build` before pushing.
   managed only in Auth0 (its user list, sign-ups disabled). Never hardcode
   emails, user IDs or secrets in code, docs or config; secrets are Vercel
   environment variables.
-- **Real data:** `/api/finance` reads Pluggy live (`server/pluggy/`, setup in
-  `docs/pluggy-setup.md`). Pluggy credentials and item IDs are Vercel
+- **Real data:** every screen reads Trove's database (Neon, `server/db/`,
+  setup in `docs/neon-setup.md`); it only changes on Sync,
+  which fetches one connection at a time from Pluggy (`server/db/sync.ts`) and
+  never overwrites a stored category, subcategory or hidden flag. The
+  database URL is a Vercel environment variable only (`DATABASE_URL` or
+  `TROVE_DATABASE_DATABASE_URL`); schema changes go in `db/migrations/` and
+  `db/schema.sql`. Pluggy itself: `server/pluggy/`, setup in
+  `docs/pluggy-setup.md`. Pluggy credentials and item IDs are Vercel
   environment variables only. Access must stay on Pluggy's free path for
   individuals (the "Access your data" tutorial, via Meu Pluggy); never suggest
   connecting banks directly or a paid plan. Pluggy Connect is only opened
@@ -67,8 +88,7 @@ Run `npm test` and `npm run build` before pushing.
   `server/pluggy/map.ts`; shared types come from `src/data/types.ts` and
   `src/data/categories.ts`, which must stay free of browser-only imports.
   Never log or return amounts, descriptions or credentials in errors or
-  diagnostics. The one exception is the owner's debug screen (`#/debug`,
+  diagnostics. The one exception is the debug screen (`#/debug`,
   `GET /api/debug/pluggy`): it returns Pluggy's raw responses, read-only, only
   for the configured items and their accounts, behind the login, `no-store`
-  and never logged. It shows the responses in full, values included: it's
-  the owner's own data.
+  and never logged. It shows the responses in full, values included.

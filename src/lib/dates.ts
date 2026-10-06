@@ -101,3 +101,14 @@ export function formatDayHeading(iso: string): string {
 export function formatMonthName(key: string): string {
   return fmt({ month: 'long' }).format(parse(key))
 }
+
+/** A moment's time of day, "08:12", in the device's time zone. */
+export function formatTime(at: Date): string {
+  return new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }).format(at)
+}
+
+/** Whole calendar days between two moments, in the device's time zone (0 = same day). */
+export function daysBetween(earlier: Date, later: Date): number {
+  const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
+  return Math.round((day(later) - day(earlier)) / 86_400_000)
+}

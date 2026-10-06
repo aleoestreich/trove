@@ -6,19 +6,21 @@ import { bankOf, brazilDate, categoryFor, itemBankName, toSnapshot, type PluggyD
 import { clearRateCache, ratesToBRL } from './rates.js'
 import { clearFinanceCache, finance, historyStart } from './finance.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
-import { categories } from '../../src/data/categories.js'
+import { defaultCategories } from '../../src/data/edits.js'
+import type { Transaction } from '../../src/data/types.js'
 
 const config: PluggyConfig = { clientId: 'cid', clientSecret: 'super-secret', itemIds: ['item-1'], baseUrl: 'https://api.pluggy.ai' }
-const categoriesById = new Map(categories.map((c) => [c.id, c]))
+const categoriesById = new Map(defaultCategories('en', (c, i) => `${c}-${i}`).categories.map((c) => [c.id, c]))
 
-/** Income and expenses the way the app counts them (src/lib/summary.ts): transfers excluded. */
-function totals(txs: { amount: number; categoryId: string }[]) {
+/** Income and expenses the way the app counts them (src/lib/summary.ts): transfers excluded, uncategorized by sign. */
+function totals(txs: Transaction[]) {
   let income = 0
   let expenses = 0
   for (const t of txs) {
-    const kind = categoriesById.get(t.categoryId)?.kind
-    if (kind === 'income') income += t.amount
-    else if (kind === 'expense') expenses -= t.amount
+    if (t.transfer || t.hidden) continue
+    const type = (t.categoryId && categoriesById.get(t.categoryId)?.type) || (t.amount > 0 ? 'income' : 'expense')
+    if (type === 'income') income += t.amount
+    else expenses -= t.amount
   }
   return { income, expenses, net: income - expenses }
 }
@@ -382,9 +384,13 @@ describe('mapping to Trove', () => {
       // A Pix to someone else stays an expense.
       tx({ id: 'pix-friend', type: 'DEBIT', amount: 42, category: 'Transfer - PIX' }),
     ]))
-    const cat = (id: string) => s.transactions.find((t) => t.id === id)!.categoryId
-    expect([cat('bill-out'), cat('bill-in'), cat('pix-out'), cat('pix-in'), cat('pix-friend')]).toEqual([
-      'card-payment', 'card-payment', 'transfer', 'transfer', 'other-expense',
+    const of = (id: string) => {
+      const t = s.transactions.find((x) => x.id === id)!
+      return t.transfer ?? t.categoryId
+    }
+    // Transfers have no category; the Pix to someone else is an uncategorized expense.
+    expect([of('bill-out'), of('bill-in'), of('pix-out'), of('pix-in'), of('pix-friend'), of('salary')]).toEqual([
+      'card-payment', 'card-payment', 'own', 'own', null, 'salary',
     ])
     expect(totals(s.transactions)).toEqual({ income: 1000000, expenses: 4200, net: 995800 })
   })

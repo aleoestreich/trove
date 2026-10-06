@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { messages } from './messages'
 import { setActiveLocale } from './locale'
-import { categories } from '../data/seed'
 import { formatCompact, formatMoney, formatRate } from '../lib/money'
 import { formatDay, formatMonth, formatMonthYear, formatShortDate } from '../lib/dates'
 
@@ -15,13 +14,6 @@ function keys(obj: object, prefix = ''): string[] {
 describe('messages', () => {
   it('pt-BR has exactly the same keys as English', () => {
     expect(keys(messages['pt-BR']).sort()).toEqual(keys(messages.en).sort())
-  })
-
-  it('translates every category in both languages', () => {
-    for (const c of categories) {
-      expect(messages.en.categories[c.id], c.id).toBeTruthy()
-      expect(messages['pt-BR'].categories[c.id], c.id).toBeTruthy()
-    }
   })
 
   it('handles singular and plural', () => {

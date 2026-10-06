@@ -1,24 +1,24 @@
 # Trove
 
-See all your bank accounts, credit cards, income and expenses in one place.
-It's built mobile-first and can be installed on an Android phone.
+Personal finance app that aggregates Brazilian bank accounts, credit cards,
+income and expenses. Mobile-first; installable on Android.
 
-**Status:** the deployed site is private (Auth0 login) and shows your real
-accounts from Meu Pluggy once configured. Local development runs on demo data.
-See [PLAN.md](PLAN.md).
+**Status:** the deployed site is private (Auth0 login) and reads its data from
+a Postgres database filled from Meu Pluggy on Sync. Local development runs on
+demo data. Roadmap: [PLAN.md](PLAN.md).
 
-## Run it
+## Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the URL Vite prints (http://localhost:5173).
+The dev server is at the URL Vite prints (http://localhost:5173).
 
-### On your Android phone (tested at Galaxy S25+ size)
+### On an Android phone (tested at Galaxy S25+ size)
 
-1. Connect your computer and phone to the same Wi-Fi.
+1. Put the computer and the phone on the same Wi-Fi network.
 2. Run `npm run dev`. Vite prints a **Network** URL, such as
    `http://192.168.0.12:5173`.
 3. Open that URL on the phone.
@@ -26,57 +26,58 @@ Open the URL Vite prints (http://localhost:5173).
    - **Samsung Internet:** menu (☰) → **Add page to** → **Home screen**.
    - **Chrome:** ⋮ menu → **Add to Home screen**.
 
-The app follows the phone's light/dark setting. If Windows Firewall or macOS
+The app follows the system light/dark setting. If Windows Firewall or macOS
 blocks the connection, allow Node.js on private networks.
 
 ## Languages
 
-The app is in English and Brazilian Portuguese (PT-BR). Switch with the
-🇺🇸 | 🇧🇷 flag switch in the header; the choice is saved on the device. On
-first launch it follows the phone's language. Text, category names, money
-(`R$ 1.234,56` / `R$1,234.56`) and dates follow the language. Transaction
-descriptions and account names come from the banks and are shown as-is.
-Strings live in `src/i18n/messages.ts`.
+English and Brazilian Portuguese (PT-BR), switched in the header and saved on
+the device. On first launch the device language is used. UI text, money
+(`R$ 1.234,56` / `R$1,234.56`) and dates follow the language. Category names
+are stored as entered (the defaults are seeded in the language active on first
+run). Transaction descriptions and account names are shown as the banks send
+them. Strings live in `src/i18n/messages.ts`.
 
-## Real data (Meu Pluggy)
+## Data
 
-On the deployed site, Trove shows your real accounts, read live from Pluggy
-(Meu Pluggy) by the server. Until Pluggy is configured it shows demo data.
-Local development always uses demo data. Setup:
-[docs/pluggy-setup.md](docs/pluggy-setup.md).
-
-A Postgres database on Neon will keep the history beyond Pluggy's window. Its
-tables and setup are in [docs/neon-setup.md](docs/neon-setup.md).
+- **Deployed site:** every screen reads Trove's database (Postgres on Neon).
+  The database only changes on **Sync**, which fetches each Meu Pluggy
+  connection in turn, and on edits made in the app (categories, hidden
+  transactions). Setup: [docs/neon-setup.md](docs/neon-setup.md) and
+  [docs/pluggy-setup.md](docs/pluggy-setup.md).
+- **Until configured or synced:** demo data, with a Sync or Connect prompt.
+- **Local development:** demo data; edits are kept in localStorage.
 
 ## Login (deployed site only)
 
 The site on Vercel is private: every request goes through `middleware.ts`,
-and only users in the Auth0 tenant (just the owner, with sign-ups disabled)
-can sign in. Local development
-(`npm run dev`) has no login. Setup and troubleshooting:
-[docs/auth0-setup.md](docs/auth0-setup.md).
+and only users in the Auth0 tenant (a single user, with sign-ups disabled)
+can sign in. Local development (`npm run dev`) has no login. Setup and
+troubleshooting: [docs/auth0-setup.md](docs/auth0-setup.md).
 
-## Bank logos
+## Icons and bank badges
 
-Banks show as rounded-square badges (`src/components/BankBadge.tsx`) tinted
+The icon pack lives in `src/assets/icons/` (see its README): UI icons
+(`ui/`), the 54 category icons (`categories/`), bank glyphs and brand files.
+`src/components/Icon.tsx` draws them in the current text colour.
+`categories/categories.json` also holds the 24 category colours (CSS tokens
+`--cat-*`, light and dark) and the default categories; after updating it, run
+`node scripts/category-catalog.mjs` to regenerate `src/data/categoryCatalog.ts`.
+
+Banks show as rounded-square badges (`src/components/BankBadge.tsx`) holding
+Trove's own outline glyph (`ui/bank-*.svg`, not the official logos), tinted
 with their colour token: Nubank `--series-4`, Itaú `--series-2`, Santander
-`--series-5`, Wise `--series-3`. The logo is read from
-`public/banks/<bank>.svg` (`nubank`, `itau`, `santander`, `wise`) and used as
-a CSS mask, so any single-shape SVG works and takes the theme's colour. The
-SVG needs a `viewBox`, or it won't scale inside the badge. Logos fill 58% of
-the badge (Itaú 64%, since its lettering is cut out of a square; Nubank 68%,
-since its "nu" is wide and short). If a file is
-missing, a line icon is shown instead. Other banks get their first two letters
-in a neutral badge.
+`--series-5`, Wise `--series-3`. Other banks get their first two letters in a
+neutral badge. Categories are circles (`CategoryBadge`).
 
 ## Scripts
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Starts the dev server, reachable on your LAN |
-| `npm test` | Runs the unit tests (money math, summaries, demo data) |
-| `npm run build` | Typechecks and builds to `dist/` |
-| `npm run preview` | Serves the production build, reachable on your LAN |
+| `npm run dev` | Starts the dev server, reachable on the LAN |
+| `npm test` | Runs the unit tests; the database tests also run when `TEST_DATABASE_URL` points at a disposable Postgres |
+| `npm run build` | Typechecks (app and server) and builds to `dist/` |
+| `npm run preview` | Serves the production build, reachable on the LAN |
 
 ## Demo data
 
@@ -91,44 +92,53 @@ current month always has transactions.
 | Wise | BRL balance + USD balance, shown in USD and converted to BRL |
 
 It covers salary, freelance income paid in USD, rent, bills, card purchases,
-installment purchases (parcelas, active and paid off), transfers and Pix between accounts, and
-card bill payments.
+installment purchases (parcelas, active and paid off), transfers and Pix
+between accounts, and card bill payments.
 
 ## How the numbers work
 
 - Money is stored as integer cents in BRL. Foreign-currency balances and
   transactions also keep their original amount, e.g. `US$ 1.800,00` next to
   `R$ 9.810,00`.
-- **Transfers between your own accounts and card bill payments are not income
-  or expenses.** This way a card purchase is counted once, when it happens,
-  and not again when the bill is paid.
+- **Transfers between connected accounts and card bill payments are neither
+  income nor expenses**, and have no category. A card purchase is counted
+  once, when it happens, not again when the bill is paid.
+- A transaction counts as income or an expense by its category's type;
+  uncategorized ones count by sign.
+- **Hidden transactions** are left out of every total, chart, average,
+  category breakdown and installments total. Balances, net worth and card
+  bills still include them, as they are the bank's figures.
 - Net worth = money in accounts − open credit card bills. Its history is
   rebuilt from today's balances minus the transactions since each month end.
 - **Installments (parcelas):** each installment is charged in its own bill and
-  counts as an expense in the month it's charged, the same way the bank bills
-  it. Installments not charged yet still reduce the card's available limit
+  counts as an expense in the month it's charged, as the bank bills it.
+  Installments not charged yet still reduce the card's available limit
   (available = limit − open bill − future installments). The Installments tab
-  shows every purchase's progress (e.g. 3/10) and how much is already
-  committed in each future bill.
-- If you change a transaction's category, the change is saved in the
-  browser's localStorage.
+  shows each purchase's progress (e.g. 3/10) and the amount already committed
+  in each future bill.
 
 ## Project layout
 
 ```
 src/
-  data/types.ts           domain model (mirrors Pluggy's Item/Account/Transaction)
-  data/seed.ts            hardcoded demo data
-  data/repository.ts      data-access interface the UI uses
-  data/mockRepository.ts  demo data (local development, or until Pluggy is set up)
-  data/pluggyRepository.ts  live data from /api/finance (deployed site)
-  i18n/                   EN / PT-BR strings and the language switch
-  lib/                    money, dates, income/expense summaries, installment plans
-  pages/                  Overview, Transactions, Installments, Accounts
-  components/             shared UI
-middleware.ts             Vercel middleware: only the signed-in owner gets the app
-api/auth/                 login, callback and logout (Vercel Functions)
-server/auth/              login logic, encrypted cookies, tests
-api/finance.ts            your accounts and transactions from Pluggy
-server/pluggy/            Pluggy client, mapping to Trove's model, exchange rates, tests
+  data/types.ts            domain model (mirrors Pluggy's Item/Account/Transaction)
+  data/edits.ts            changes to categories and transactions, and their rules
+  data/categoryCatalog.ts  colours, icons and default categories (generated)
+  data/seed.ts             demo data
+  data/repository.ts       data-access interface the UI uses
+  data/mockRepository.ts   demo data, edits in localStorage
+  data/apiRepository.ts    database-backed data via /api (deployed site)
+  i18n/                    EN / PT-BR strings and the language switch
+  lib/                     money, dates, summaries, bills, installment plans
+  pages/                   Overview, Transactions, Accounts, Installments, Categories
+  components/              shared UI
+  assets/icons/            icon pack
+middleware.ts              Vercel middleware: only signed-in users reach the app
+api/auth/                  login, callback and logout (Vercel Functions)
+api/finance.ts             the app's data, read from the database
+api/edits.ts, api/sync.ts  saving edits; syncing one connection from Meu Pluggy
+server/auth/               login logic, encrypted cookies, tests
+server/db/                 database access: read, edits, sync, tests
+server/pluggy/             Pluggy client, mapping to Trove's model, exchange rates, tests
+db/                        schema and migrations
 ```

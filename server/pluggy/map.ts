@@ -9,13 +9,13 @@
 //   in `foreign`.
 // - Pluggy's category names are matched to Trove's categories; anything
 //   unknown falls back to "Other income" / "Other expenses".
-// - Money moved between the owner's own accounts is marked as a transfer so it
+// - Money moved between connected accounts is marked as a transfer so it
 //   isn't counted as income or expense: Pluggy's "same person transfer" and
 //   "credit card payment" categories, plus generic transfers that have a
 //   matching opposite transaction (same amount, same day) in another account.
 
-import { categories } from '../../src/data/categories.js'
-import type { Account, Cents, Institution, Snapshot, Transaction } from '../../src/data/types.js'
+import { fromGuess } from '../../src/data/categories.js'
+import type { Account, Category, Cents, Institution, Snapshot, Subcategory, Transaction } from '../../src/data/types.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
 
 export interface PluggyData {
@@ -25,6 +25,15 @@ export interface PluggyData {
   /** BRL per 1 unit of each non-BRL currency present. */
   rates: Record<string, number>
   fetchedAt: string
+  /** Stored categories and edits, from the database. */
+  owner?: OwnerData
+}
+
+export interface OwnerData {
+  categories: Category[]
+  subcategories: Subcategory[]
+  /** Per transaction, as stored: its category (the guess at first sync, or a later edit) and whether it's hidden. */
+  stored: Map<string, { categoryId: string | null; subcategoryId: string | null; hidden: boolean }>
 }
 
 const cents = (n: number): Cents => Math.round(n * 100)
@@ -115,7 +124,7 @@ function legalNameOf(account: Pick<PluggyAccount, 'name'>): string | null {
 /**
  * Meu Pluggy doesn't give Wise's bank name: Wise has one checking account per
  * currency, each named just "USD", "BRL"… So an item with a currency-named
- * account, or a USD account (the owner's USD is at Wise), is Wise.
+ * account, or a USD account (the USD account is at Wise), is Wise.
  */
 const wiseBank = (a: PluggyAccount) => (isCurrencyName(a) || (a.currencyCode || '').toUpperCase() === 'USD' ? 'Wise' : null)
 
@@ -190,8 +199,7 @@ function pairOwnTransfers(txs: Transaction[], genericIds: Set<string>) {
     const key = `${t.date}|${Math.abs(t.amount)}`
     const twin = (open.get(key) ?? []).find((o) => o.accountId !== t.accountId && Math.sign(o.amount) === -Math.sign(t.amount))
     if (twin) {
-      twin.categoryId = 'transfer'
-      t.categoryId = 'transfer'
+      for (const x of [twin, t]) Object.assign(x, { categoryId: null, subcategoryId: null, transfer: 'own' })
       open.set(key, open.get(key)!.filter((o) => o !== twin))
     } else {
       open.set(key, [...(open.get(key) ?? []), t])
@@ -264,6 +272,8 @@ export function toSnapshot(input: PluggyData): Snapshot {
     })
 
   const genericTransfers = new Set<string>()
+  // Guesses only point at categories that exist (a default one may have been deleted).
+  const known = data.owner ? new Set(data.owner.categories.map((c) => c.id)) : undefined
   const transactions: Transaction[] = data.transactions
     .filter((t) => accountCurrency.has(t.accountId))
     .map((t) => {
@@ -274,15 +284,20 @@ export function toSnapshot(input: PluggyData): Snapshot {
       const inAccountCurrency =
         txCur === accCur ? Math.abs(t.amount) : Math.abs(t.amountInAccountCurrency ?? (t.amount * rateOf(txCur, rates)) / rateOf(accCur, rates))
       const factor = rateOf(accCur, rates)
+      const guess = categoryFor(t)
       const tx: Transaction = {
         id: t.id,
         accountId: t.accountId,
         date: brazilDate(t.date),
         description: t.description,
         amount: sign * cents(inAccountCurrency * factor),
-        categoryId: categoryFor(t),
+        ...fromGuess(guess, known),
         status: t.status === 'PENDING' ? 'PENDING' : 'POSTED',
       }
+      // What's stored wins over the guess (it's the guess from the first sync, or a later edit).
+      const stored = data.owner?.stored.get(t.id)
+      if (stored && !tx.transfer) Object.assign(tx, { categoryId: stored.categoryId, subcategoryId: stored.subcategoryId })
+      if (stored?.hidden) tx.hidden = true
       if (txCur !== 'BRL') tx.foreign = { currency: txCur, amount: sign * cents(Math.abs(t.amount)) }
       else if (accCur !== 'BRL') tx.foreign = { currency: accCur, amount: sign * cents(inAccountCurrency) }
 
@@ -297,7 +312,7 @@ export function toSnapshot(input: PluggyData): Snapshot {
           purchaseDate: m.purchaseDate ? brazilDate(m.purchaseDate) : tx.date,
         }
       }
-      if (tx.categoryId.startsWith('other-') && GENERIC_TRANSFER.test(t.category ?? '')) genericTransfers.add(tx.id)
+      if (guess.startsWith('other-') && GENERIC_TRANSFER.test(t.category ?? '')) genericTransfers.add(tx.id)
       return tx
     })
 
@@ -306,5 +321,13 @@ export function toSnapshot(input: PluggyData): Snapshot {
   pairOwnTransfers(transactions, genericTransfers)
   transactions.reverse()
 
-  return { institutions, accounts, categories, transactions, source: 'pluggy', fetchedAt: data.fetchedAt }
+  return {
+    institutions,
+    accounts,
+    categories: data.owner?.categories ?? [],
+    subcategories: data.owner?.subcategories ?? [],
+    transactions,
+    source: 'pluggy',
+    fetchedAt: data.fetchedAt,
+  }
 }

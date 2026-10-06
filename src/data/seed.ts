@@ -6,12 +6,12 @@
 
 import type { Account, Cents, Institution, Snapshot, Transaction } from './types'
 import { MONTHS_OF_HISTORY } from './types'
-import { categories } from './categories'
+import { fromGuess } from './categories'
 import { convertToBRL, toCents } from '../lib/money'
 import { dayOfMonth, toISO } from '../lib/dates'
 
 export type { Snapshot } from './types'
-export { MONTHS_OF_HISTORY, categories }
+export { MONTHS_OF_HISTORY }
 
 
 /** USD -> BRL rate today, and for each earlier month (index 0 = current month). */
@@ -102,9 +102,11 @@ export function buildSeed(today: Date = new Date()): Snapshot {
 
   const txs: Transaction[] = []
   let seq = 0
-  const add = (t: Omit<Transaction, 'id' | 'status'> & { status?: Transaction['status'] }) => {
+  // `categoryId` here is a guess ID ("food", "transfer"…), turned into the
+  // categories the way the Pluggy mapping does it.
+  const add = (t: Omit<Transaction, 'id' | 'status' | 'categoryId'> & { categoryId: string; status?: Transaction['status'] }) => {
     if (t.date > todayISO) return
-    txs.push({ status: 'POSTED', ...t, id: `tx-${++seq}` })
+    txs.push({ status: 'POSTED', ...t, ...fromGuess(t.categoryId), id: `tx-${++seq}` })
   }
   const transfer = (from: string, to: string, date: string, amount: Cents, description: string) => {
     add({ accountId: from, date, description, amount: -amount, categoryId: 'transfer' })
@@ -277,5 +279,41 @@ export function buildSeed(today: Date = new Date()): Snapshot {
 
   txs.sort((a, b) => (a.date === b.date ? b.id.localeCompare(a.id, undefined, { numeric: true }) : b.date.localeCompare(a.date)))
 
-  return { institutions, accounts, categories, transactions: txs, source: 'demo' }
+  // The categories come from the demo repository (stored and editable).
+  return { institutions, accounts, categories: [], subcategories: [], transactions: txs, source: 'demo' }
+}
+
+/**
+ * Demo subcategories by description: the default subcategory's English name
+ * (src/data/categoryCatalog.ts), so the demo shows them in use.
+ */
+export const DEMO_SUBCATEGORIES: Record<string, string> = {
+  'Pão de Açúcar': 'Supermarket',
+  Carrefour: 'Supermarket',
+  Hortifruti: 'Supermarket',
+  'Padaria Bella Vista': 'Bakery',
+  iFood: 'Delivery',
+  'Coco Bambu': 'Dining out',
+  'Uber *Trip': 'Ride apps',
+  '99 Tecnologia': 'Ride apps',
+  'Shell Select': 'Fuel',
+  'Posto Ipiranga': 'Fuel',
+  'Aluguel - Imobiliária Lopes': 'Rent',
+  'Condomínio Ed. Aurora': 'Condo fee',
+  'Enel Distribuição SP': 'Electricity',
+  'Vivo Fibra': 'Internet',
+  'Netflix.com': 'Streaming',
+  Spotify: 'Streaming',
+  GitHub: 'Software',
+  Figma: 'Software',
+  AWS: 'Software',
+  'Google One': 'Software',
+  Drogasil: 'Pharmacy',
+  'Dell Computadores': 'Electronics',
+  'Magazine Luiza': 'Appliances',
+  Renner: 'Clothing',
+  Zara: 'Clothing',
+  'LATAM Airlines': 'Flights',
+  'Salário - Acme Tecnologia Ltda': 'Base salary',
+  'Northwind Inc. - Invoice': 'Clients',
 }

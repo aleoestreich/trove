@@ -1,19 +1,98 @@
 import type { Repository } from './repository'
-import { buildSeed } from './seed'
-import { applyOverrides, clearOverrides, saveOverride } from './overrides'
+import { DEMO_SUBCATEGORIES, buildSeed } from './seed'
+import { applyEdit, defaultCategories } from './edits'
+import { DEFAULT_CATEGORIES } from './categoryCatalog'
+import { getLocale } from '../i18n/locale'
+import type { Category, Snapshot, Subcategory } from './types'
 
-/** Hardcoded demo data. Category edits are kept in localStorage. */
+const KEY = 'trove.demoOwner'
+
+/** What the database would hold for the demo: categories and each transaction's category. */
+interface DemoOwner {
+  categories: Category[]
+  subcategories: Subcategory[]
+  stored: Record<string, { categoryId: string | null; subcategoryId: string | null; hidden: boolean }>
+}
+
+function read(): DemoOwner | null {
+  try {
+    const raw = JSON.parse(localStorage.getItem(KEY) ?? 'null') as DemoOwner | null
+    return raw && Array.isArray(raw.categories) && Array.isArray(raw.subcategories) && raw.stored ? raw : null
+  } catch {
+    return null
+  }
+}
+
+function write(owner: DemoOwner) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(owner))
+  } catch {
+    // Storage unavailable (private mode): edits last until reload.
+  }
+}
+
+/** First run: the default categories in the current language, and demo subcategories by description. */
+function initialOwner(seed: Snapshot): DemoOwner {
+  const { categories, subcategories } = defaultCategories(getLocale() === 'pt-BR' ? 'pt' : 'en', (c, i) => `${c}-${i}`)
+  const stored: DemoOwner['stored'] = {}
+  for (const t of seed.transactions) {
+    const en = DEMO_SUBCATEGORIES[t.description]
+    const def = DEFAULT_CATEGORIES.find((c) => c.id === t.categoryId)
+    const index = def ? def.subcategories.findIndex((s) => s.en === en) : -1
+    if (t.categoryId && index >= 0) stored[t.id] = { categoryId: t.categoryId, subcategoryId: `${t.categoryId}-${index}`, hidden: false }
+  }
+  return { categories, subcategories, stored }
+}
+
+/** The seed with the stored categories; guesses only point at categories that still exist. */
+function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
+  const known = new Set(owner.categories.map((c) => c.id))
+  return {
+    ...seed,
+    categories: owner.categories,
+    subcategories: owner.subcategories,
+    transactions: seed.transactions.map((t) => {
+      if (t.transfer) return t
+      const s = owner.stored[t.id]
+      if (s) return { ...t, categoryId: s.categoryId, subcategoryId: s.subcategoryId, hidden: s.hidden || undefined }
+      return t.categoryId && !known.has(t.categoryId) ? { ...t, categoryId: null } : t
+    }),
+  }
+}
+
+/** Demo data. Categories and edits are kept in this browser's localStorage. */
 export function createMockRepository(today: Date = new Date()): Repository {
+  const load = (): Snapshot => {
+    const seed = buildSeed(today)
+    let owner = read()
+    if (!owner) {
+      owner = initialOwner(seed)
+      write(owner)
+    }
+    return withOwner(seed, owner)
+  }
   return {
     async load() {
-      return applyOverrides(buildSeed(today))
+      return load()
     },
-    async setTransactionCategory(transactionId, categoryId) {
-      saveOverride(transactionId, categoryId)
+    async edit(e) {
+      const next = applyEdit(load(), e)
+      const stored: DemoOwner['stored'] = {}
+      for (const t of next.transactions) {
+        if (!t.transfer) stored[t.id] = { categoryId: t.categoryId, subcategoryId: t.subcategoryId ?? null, hidden: !!t.hidden }
+      }
+      write({ categories: next.categories, subcategories: next.subcategories, stored })
+    },
+    async sync() {
+      throw new Error('Demo data has nothing to sync.')
     },
   }
 }
 
 export function resetMockData() {
-  clearOverrides()
+  try {
+    localStorage.removeItem(KEY)
+  } catch {
+    // ignore
+  }
 }

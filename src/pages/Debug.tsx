@@ -5,7 +5,7 @@ import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n/I18nProvider'
 
 /**
- * The owner's view of Pluggy's raw responses (GET /api/debug/pluggy), to check
+ * A view of Pluggy's raw responses (GET /api/debug/pluggy), to check
  * what Pluggy really sends in production: per configured item, the item, its
  * accounts, and each account's transactions (page by page) and bills.
  * Nothing here is stored. Responses are shown in full, values included.
