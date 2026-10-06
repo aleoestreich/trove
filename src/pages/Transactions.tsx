@@ -20,6 +20,7 @@ export interface TransactionFilters {
   month?: string
   accountId?: string
   categoryId?: string
+  subcategoryId?: string
   kind?: CategoryKind
   query?: string
 }
@@ -35,6 +36,7 @@ export function filterTransactions(
       (!f.month || monthKey(t.date) === f.month) &&
       (!f.accountId || t.accountId === f.accountId) &&
       (!f.categoryId || t.categoryId === f.categoryId) &&
+      (!f.subcategoryId || t.subcategoryId === f.subcategoryId) &&
       (!f.kind || kindOf(t.categoryId) === f.kind) &&
       (!q || t.description.toLowerCase().includes(q)),
   )
@@ -81,7 +83,7 @@ function nextDay(iso: string): string {
 }
 
 export function Transactions() {
-  const { transactions, accounts, institutionsById, categories, categoriesById } = useData()
+  const { transactions, accounts, institutionsById, categories, categoriesById, subcategories, subcategoriesById } = useData()
   const [params, setParams] = useSearchParams()
   const [selected, setSelected] = useState<Transaction | null>(null)
   const { t, categoryName, locale } = useI18n()
@@ -92,6 +94,7 @@ export function Transactions() {
     month: params.get('m') === 'all' ? undefined : (params.get('m') ?? latest),
     accountId: params.get('a') ?? undefined,
     categoryId: params.get('c') ?? undefined,
+    subcategoryId: params.get('s') ?? undefined,
     kind: (params.get('type') as CategoryKind | null) ?? undefined,
     query: params.get('q') ?? undefined,
   }
@@ -100,6 +103,18 @@ export function Transactions() {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
     else next.delete(key)
+    // A subcategory belongs to the category filter: changing the category clears it.
+    if (key === 'c') next.delete('s')
+    setParams(next, { replace: true })
+  }
+  /** The category filter's value: "category" or "category|subcategory". */
+  const setCategoryFilter = (value: string) => {
+    const [c, s] = value.split('|')
+    const next = new URLSearchParams(params)
+    if (c) next.set('c', c)
+    else next.delete('c')
+    if (s) next.set('s', s)
+    else next.delete('s')
     setParams(next, { replace: true })
   }
 
@@ -130,6 +145,7 @@ export function Transactions() {
   const kindLabel = { expense: t.expenses, income: t.income, transfer: t.transfers }
   const account = filters.accountId ? accounts.find((a) => a.id === filters.accountId) : undefined
   const category = filters.categoryId ? categoriesById.get(filters.categoryId) : undefined
+  const subcategory = filters.subcategoryId ? subcategoriesById.get(filters.subcategoryId) : undefined
 
   // A bill spans two months: no month in the count or the empty message.
   const shownMonth = bill ? undefined : filters.month
@@ -219,13 +235,26 @@ export function Transactions() {
               ))}
             </FilterChip>
             )}
-            <FilterChip label={category ? categoryName(category) : t.category} applied={!!category} value={filters.categoryId ?? ''} onChange={(v) => set('c', v)}>
+            <FilterChip
+              label={category ? (subcategory ? `${categoryName(category)} › ${subcategory.name}` : categoryName(category)) : t.category}
+              applied={!!category}
+              value={filters.categoryId ? `${filters.categoryId}${filters.subcategoryId ? `|${filters.subcategoryId}` : ''}` : ''}
+              onChange={setCategoryFilter}
+            >
               <option value="">{t.transactions.allCategories}</option>
-              {categories.map((c) => (
+              {categories.flatMap((c) => [
                 <option key={c.id} value={c.id}>
                   {categoryName(c)}
-                </option>
-              ))}
+                </option>,
+                ...subcategories
+                  .filter((s) => s.categoryId === c.id)
+                  .map((s) => (
+                    <option key={s.id} value={`${c.id}|${s.id}`}>
+                      {'\u00a0\u00a0\u00a0'}
+                      {s.name}
+                    </option>
+                  )),
+              ])}
             </FilterChip>
             {hasFilters && (
               <button type="button" className="h-12 shrink-0 px-2 text-sm font-medium text-accent lg:h-11" onClick={clear}>
@@ -309,7 +338,7 @@ function TransactionTable({
 }) {
   const columns = columnsFor(narrow)
   const optional = narrow ? 'hidden xl:block' : ''
-  const { categoriesById } = useData()
+  const { categoriesById, subcategoriesById } = useData()
   const { t, categoryName } = useI18n()
   const accountLabel = useAccountLabel()
   return (
@@ -347,7 +376,7 @@ function TransactionTable({
                 className={`${columns} min-h-14 w-full items-center border-b border-line py-2 text-left ${on ? 'bg-accent-faint' : 'hover:bg-page'}`}
               >
                 <span role="cell" className="flex min-w-0 items-center gap-3">
-                  <IconDisc icon={categoryIcon(tx.categoryId)} size="sm" />
+                  <IconDisc icon={categoryIcon(tx.categoryId, categoriesById)} size="sm" />
                   <span className="min-w-0 truncate text-sm font-medium text-ink">{tx.description}</span>
                   {tx.installment && (
                     <span className="tabular inline-flex h-[22px] shrink-0 items-center rounded-full bg-track px-[7px] text-xs font-medium text-ink-2">
@@ -361,6 +390,7 @@ function TransactionTable({
                 </span>
                 <span role="cell" className={`truncate text-[13px] text-ink-2 ${optional}`}>
                   {categoryName(category)}
+                  {tx.subcategoryId && subcategoriesById.has(tx.subcategoryId) && ` › ${subcategoriesById.get(tx.subcategoryId)!.name}`}
                 </span>
                 <span role="cell">
                   <Amount cents={tx.amount} foreign={tx.foreign} transfer={category?.kind === 'transfer'} className="[&>span:first-child]:text-sm" />

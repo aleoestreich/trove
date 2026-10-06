@@ -47,6 +47,32 @@ export function expensesByCategory(transactions: Transaction[], categoriesById: 
     .sort((a, b) => b.amount - a.amount)
 }
 
+export interface SubcategoryTotal {
+  /** null: the category's expenses without a subcategory. */
+  subcategoryId: string | null
+  amount: Cents
+}
+
+/**
+ * One category's expenses split by subcategory, largest first, with what has
+ * no subcategory as `null`. Empty when none of them has a subcategory.
+ */
+export function expensesBySubcategory(transactions: Transaction[], categoryId: string): SubcategoryTotal[] {
+  const sums = new Map<string | null, Cents>()
+  let anySub = false
+  for (const t of transactions) {
+    if (t.categoryId !== categoryId) continue
+    if (t.subcategoryId) anySub = true
+    const key = t.subcategoryId ?? null
+    sums.set(key, (sums.get(key) ?? 0) - t.amount)
+  }
+  if (!anySub) return []
+  return [...sums]
+    .map(([subcategoryId, amount]) => ({ subcategoryId, amount }))
+    .filter((s) => s.amount > 0)
+    .sort((a, b) => (a.subcategoryId === null ? 1 : b.subcategoryId === null ? -1 : b.amount - a.amount))
+}
+
 export interface Balances {
   /** Money in bank accounts (BRL, foreign balances converted). */
   cash: Cents

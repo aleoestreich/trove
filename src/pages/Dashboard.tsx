@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
 import { MONTHS_OF_HISTORY } from '../data/seed'
 import type { Transaction } from '../data/types'
-import { averageIncome, balances, expensesByCategory, inMonth, totals } from '../lib/summary'
+import { averageIncome, balances, expensesByCategory, expensesBySubcategory, inMonth, totals } from '../lib/summary'
 import { balanceHistory, cashByCurrency, cashByInstitution } from '../lib/history'
 import { installmentPlans, upcomingByMonth } from '../lib/installments'
 import { currentBill, isIdleCard } from '../lib/bills'
@@ -22,7 +22,7 @@ const TOP_CATEGORIES = 5
 const CURRENCY_COLORS: Record<string, string> = { BRL: 'var(--series-1)', USD: 'var(--series-3)', EUR: 'var(--series-4)' }
 
 export function Dashboard() {
-  const { accounts, transactions, categoriesById, institutionsById } = useData()
+  const { accounts, transactions, categoriesById, subcategoriesById, institutionsById } = useData()
   const isDesktop = useIsDesktop()
   const [params, setParams] = useSearchParams()
   const { t, categoryName, locale } = useI18n()
@@ -302,22 +302,41 @@ export function Dashboard() {
               {byCategory.length === 0 && <p className="text-sm text-muted">{t.overview.noExpenses}</p>}
               {byCategory.map(({ category, amount }) => {
                 const share = monthTotals.expenses > 0 ? (amount / monthTotals.expenses) * 100 : 0
+                const subs = expensesBySubcategory(monthTxs, category.id)
                 return (
-                  <Link
-                    key={category.id}
-                    to={`/transactions?m=${month}&c=${category.id}`}
-                    className="-mx-1 flex min-h-11 flex-col justify-center gap-1.5 rounded-sm px-1 active:bg-track lg:min-h-10 lg:hover:bg-track"
-                  >
-                    <span className="flex items-baseline gap-2">
-                      <span className="inline-flex min-w-0 flex-1 items-center gap-2 text-sm text-ink">
-                        <Swatch color={categoryColor(category.id)} />
-                        <span className="truncate">{categoryName(category)}</span>
+                  <Fragment key={category.id}>
+                    <Link
+                      to={`/transactions?m=${month}&c=${category.id}`}
+                      className="-mx-1 flex min-h-11 flex-col justify-center gap-1.5 rounded-sm px-1 active:bg-track lg:min-h-10 lg:hover:bg-track"
+                    >
+                      <span className="flex items-baseline gap-2">
+                        <span className="inline-flex min-w-0 flex-1 items-center gap-2 text-sm text-ink">
+                          <Swatch color={categoryColor(category.id)} />
+                          <span className="truncate">{categoryName(category)}</span>
+                        </span>
+                        <span className="tabular text-[13px] text-muted lg:text-xs">{formatPercent(share)}</span>
+                        <span className="tabular w-[92px] text-right text-sm font-medium text-ink">{formatMoney(amount)}</span>
                       </span>
-                      <span className="tabular text-[13px] text-muted lg:text-xs">{formatPercent(share)}</span>
-                      <span className="tabular w-[92px] text-right text-sm font-medium text-ink">{formatMoney(amount)}</span>
-                    </span>
-                    <Progress value={share} height={4} tone={categoryColor(category.id)} />
-                  </Link>
+                      <Progress value={share} height={4} tone={categoryColor(category.id)} />
+                    </Link>
+                    {subs.length > 0 && (
+                      <ul className="mb-1 ml-[18px] flex flex-col border-l border-line pl-3">
+                        {subs.map((sub) => (
+                          <li key={sub.subcategoryId ?? 'none'}>
+                            <Link
+                              to={`/transactions?m=${month}&c=${category.id}${sub.subcategoryId ? `&s=${sub.subcategoryId}` : ''}`}
+                              className="-mx-1 flex min-h-9 items-center gap-2 rounded-sm px-1 text-[13px] active:bg-track lg:hover:bg-track"
+                            >
+                              <span className={`min-w-0 flex-1 truncate ${sub.subcategoryId ? 'text-ink-2' : 'text-muted'}`}>
+                                {sub.subcategoryId ? (subcategoriesById.get(sub.subcategoryId)?.name ?? '') : t.categoryEditor.noSubcategory}
+                              </span>
+                              <span className="tabular text-ink-2">{formatMoney(sub.amount)}</span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Fragment>
                 )
               })}
             </div>

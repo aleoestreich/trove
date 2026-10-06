@@ -13,6 +13,10 @@ const paths = {
   chevronDown: 'M6 9l6 6 6-6',
   search: 'M4 11a7 7 0 1 0 14 0a7 7 0 1 0-14 0 M20 20l-3.6-3.6',
   close: 'M6 6l12 12 M18 6L6 18',
+  plus: 'M12 5v14 M5 12h14',
+  trash: 'M4 7h16 M10 11v6 M14 11v6 M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12 M9 7V4h6v3',
+  pencil: 'M4 20h4L19 9l-4-4L4 16Z M14 6l4 4',
+  tag: 'M3 12V4h8l10 10-8 8Z M7.5 7.5h.01',
   check: 'M5 12l5 5L20 7',
   card: 'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z M3 10h18 M7 15h3',
   trendUp: 'M4 16l5-5 4 4 7-7 M15 8h5v5',
@@ -83,6 +87,16 @@ const categoryIcons: Record<string, IconName> = {
   'card-payment': 'card',
 }
 
-export function categoryIcon(categoryId: string | undefined): IconName {
-  return (categoryId && categoryIcons[categoryId]) || 'other'
+/** Icons the owner can pick for a category they create. */
+export const pickableCategoryIcons: IconName[] = [
+  'transport', 'home', 'utilities', 'groceries', 'restaurants', 'shopping', 'health', 'leisure', 'travel',
+  'education', 'subscriptions', 'taxes', 'card', 'salary', 'freelance', 'investments', 'income', 'other',
+]
+
+/** A category's icon: built-in ones by ID, the owner's by the icon they picked. */
+export function categoryIcon(categoryId: string | undefined, categoriesById?: Map<string, { icon?: string }>): IconName {
+  if (!categoryId) return 'other'
+  const picked = categoriesById?.get(categoryId)?.icon
+  if (picked && picked in paths) return picked as IconName
+  return categoryIcons[categoryId] || 'other'
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSeed, categories } from '../data/seed'
 import type { Transaction } from '../data/types'
-import { balances, expensesByCategory, totals, averageIncome } from './summary'
+import { balances, expensesByCategory, expensesBySubcategory, totals, averageIncome } from './summary'
 import { formatMoney, convertToBRL } from './money'
 import { lastMonths } from './dates'
 import { filterTransactions } from '../pages/Transactions'
@@ -39,6 +39,29 @@ describe('expensesByCategory', () => {
       ['groceries', 50_00],
       ['food', 25_00],
     ])
+  })
+})
+
+describe('expensesBySubcategory', () => {
+  it('splits a category by subcategory, largest first, with the rest last', () => {
+    const r = expensesBySubcategory(
+      [tx(-100_00, 'transport', { subcategoryId: 'fuel' }), tx(-30_00, 'transport'), tx(-150_00, 'transport', { subcategoryId: 'parking' }), tx(-99_00, 'food', { subcategoryId: 'x' })],
+      'transport',
+    )
+    expect(r).toEqual([
+      { subcategoryId: 'parking', amount: 150_00 },
+      { subcategoryId: 'fuel', amount: 100_00 },
+      { subcategoryId: null, amount: 30_00 },
+    ])
+  })
+
+  it('is empty when none has a subcategory', () => {
+    expect(expensesBySubcategory([tx(-30_00, 'transport')], 'transport')).toEqual([])
+  })
+
+  it('filters transactions by subcategory', () => {
+    const list = [tx(-1, 'transport', { subcategoryId: 'fuel' }), tx(-2, 'transport')]
+    expect(filterTransactions(list, () => 'expense', { categoryId: 'transport', subcategoryId: 'fuel' })).toHaveLength(1)
   })
 })
 

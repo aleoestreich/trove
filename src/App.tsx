@@ -7,6 +7,7 @@ import { Transactions } from './pages/Transactions'
 import { Accounts } from './pages/Accounts'
 import { Installments } from './pages/Installments'
 import { Debug } from './pages/Debug'
+import { Categories } from './pages/Categories'
 import { Icon, type IconName } from './components/Icon'
 import { LanguageSwitch } from './components/LanguageSwitch'
 import { Wordmark } from './components/Logo'
@@ -78,6 +79,7 @@ function Shell() {
                     <Route path="/transactions" element={<Transactions />} />
                     <Route path="/accounts" element={<Accounts />} />
                     <Route path="/installments" element={<Installments />} />
+                    <Route path="/categories" element={<Categories />} />
                   </Routes>
                 </DataGate>
               }

@@ -32,7 +32,7 @@ export function TransactionRow({
   showDate?: boolean
   className?: string
 }) {
-  const { categoriesById } = useData()
+  const { categoriesById, subcategoriesById } = useData()
   const { t } = useI18n()
   const accountLabel = useAccountLabel()
   const category = categoriesById.get(tx.categoryId)
@@ -43,10 +43,11 @@ export function TransactionRow({
       onClick={() => onSelect?.(tx)}
       className={`flex min-h-16 w-full items-center gap-3 py-2.5 text-left active:bg-track ${className}`}
     >
-      <IconDisc icon={categoryIcon(tx.categoryId)} />
+      <IconDisc icon={categoryIcon(tx.categoryId, categoriesById)} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate text-[15px] leading-5 font-medium text-ink">{tx.description}</span>
         <span className="truncate text-[13px] leading-[18px] text-muted">
+          {tx.subcategoryId && subcategoriesById.has(tx.subcategoryId) && `${subcategoriesById.get(tx.subcategoryId)!.name} · `}
           {accountLabel(tx.accountId)}
           {showDate && ` · ${formatShortDate(tx.date)}`}
           {tx.installment && (

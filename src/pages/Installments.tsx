@@ -214,6 +214,7 @@ const planColumns = 'grid grid-cols-[minmax(0,1fr)_260px_130px_140px_110px] item
 
 /** Desktop: purchases as a table with a progress column. */
 function PlanTable({ plans }: { plans: InstallmentPlan[] }) {
+  const { categoriesById } = useData()
   const { t } = useI18n()
   const accountLabel = useAccountLabel()
   return (
@@ -237,7 +238,7 @@ function PlanTable({ plans }: { plans: InstallmentPlan[] }) {
         return (
           <div key={plan.key} role="row" className={`${planColumns} min-h-[72px] py-2 ${i > 0 ? 'border-t border-line' : ''}`}>
             <span role="cell" className="flex min-w-0 items-center gap-3">
-              <IconDisc icon={categoryIcon(plan.categoryId)} />
+              <IconDisc icon={categoryIcon(plan.categoryId, categoriesById)} />
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="truncate text-[15px] font-medium text-ink">{plan.description}</span>
                 <span className="text-[13px] text-muted">{accountLabel(plan.accountId)}</span>
@@ -272,6 +273,7 @@ function PlanTable({ plans }: { plans: InstallmentPlan[] }) {
 }
 
 function PlanCard({ plan }: { plan: InstallmentPlan }) {
+  const { categoriesById } = useData()
   const { t } = useI18n()
   const accountLabel = useAccountLabel()
   const perMonth = Math.floor(plan.totalAmount / plan.count)
@@ -281,7 +283,7 @@ function PlanCard({ plan }: { plan: InstallmentPlan }) {
   return (
     <Card className="flex flex-col gap-3.5">
       <div className="flex items-center gap-3">
-        <IconDisc icon={categoryIcon(plan.categoryId)} />
+        <IconDisc icon={categoryIcon(plan.categoryId, categoriesById)} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-base leading-[22px] font-medium text-ink">{plan.description}</span>
           <span className="text-[13px] leading-[18px] text-muted">{accountLabel(plan.accountId)}</span>

@@ -57,6 +57,17 @@ export interface Category {
   id: string
   name: string
   kind: CategoryKind
+  /** Icon name (src/components/Icon.tsx) for categories the owner created; built-in ones have a fixed icon. */
+  icon?: string
+  /** Created by the owner (name shown as typed, in any language). */
+  custom?: boolean
+}
+
+/** A finer split of a category, created by the owner (e.g. Transport → Fuel). */
+export interface Subcategory {
+  id: string
+  categoryId: string
+  name: string
 }
 
 export interface Transaction {
@@ -70,6 +81,8 @@ export interface Transaction {
   /** Original amount when the transaction happened in another currency. */
   foreign?: { currency: CurrencyCode; amount: Cents }
   categoryId: string
+  /** Set by the owner; always one of `categoryId`'s subcategories. */
+  subcategoryId?: string
   status: 'POSTED' | 'PENDING'
   /**
    * Credit-card installment purchase ("parcelado"), mirroring Pluggy's

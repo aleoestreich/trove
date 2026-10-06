@@ -1,6 +1,7 @@
 import type { Repository } from './repository'
 import { buildSeed } from './seed'
 import { applyOverrides, clearOverrides, saveOverride } from './overrides'
+import { clearUserCategories } from './userCategories'
 
 /** Hardcoded demo data. Category edits are kept in localStorage. */
 export function createMockRepository(today: Date = new Date()): Repository {
@@ -16,4 +17,5 @@ export function createMockRepository(today: Date = new Date()): Repository {
 
 export function resetMockData() {
   clearOverrides()
+  clearUserCategories()
 }

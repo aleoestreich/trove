@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Repository } from './data/repository'
 import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
 import type { Snapshot } from './data/seed'
-import type { Account, Category, Institution } from './data/types'
+import type { Account, Category, CategoryKind, Institution, Subcategory } from './data/types'
+import * as userCategories from './data/userCategories'
 import { useI18n } from './i18n/I18nProvider'
 import { Button, EmptyState } from './components/ui'
 
@@ -10,9 +11,27 @@ interface AppData extends Snapshot {
   accountsById: Map<string, Account>
   categoriesById: Map<string, Category>
   institutionsById: Map<string, Institution>
+  /** The owner's subcategories, under built-in and own categories. */
+  subcategories: Subcategory[]
+  subcategoriesById: Map<string, Subcategory>
   setCategory(transactionId: string, categoryId: string): void
+  /** Set (or clear, with null) a transaction's subcategory; saved on this device. */
+  setSubcategory(transactionId: string, subcategoryId: string | null): void
+  /** Create, change and delete the owner's categories and subcategories; saved on this device. */
+  categoryEditor: CategoryEditor
   /** Set (or clear, with null) a card's closing and due days; saved on this device. */
   setCardDays(accountId: string, days: CardDays | null): void
+}
+
+export interface CategoryEditor {
+  /** The new category, or null when the name is empty or taken. */
+  addCategory(name: string, kind: Exclude<CategoryKind, 'transfer'>, icon: string): Category | null
+  updateCategory(id: string, changes: { name?: string; icon?: string }): boolean
+  deleteCategory(id: string): void
+  /** The new subcategory, or null when the name is empty or already in that category. */
+  addSubcategory(categoryId: string, name: string): Subcategory | null
+  renameSubcategory(id: string, name: string): boolean
+  deleteSubcategory(id: string): void
 }
 
 const DataContext = createContext<AppData | null>(null)
@@ -44,8 +63,15 @@ export function DataProvider({ repository, children }: { repository: Repository;
     })
   }, [repository, attempt])
 
+  // Bumped after each change to the owner's categories, so they're re-applied.
+  const [categoriesVersion, setCategoriesVersion] = useState(0)
+  const bump = useCallback(() => setCategoriesVersion((n) => n + 1), [])
+
   const setCategory = useCallback(
     (transactionId: string, categoryId: string) => {
+      // A subcategory belongs to its category: moving the transaction clears it.
+      userCategories.saveSubcategory(transactionId, null)
+      bump()
       setSnapshot((s) =>
         s && {
           ...s,
@@ -54,8 +80,41 @@ export function DataProvider({ repository, children }: { repository: Repository;
       )
       void repository.setTransactionCategory(transactionId, categoryId)
     },
-    [repository],
+    [repository, bump],
   )
+
+  const setSubcategory = useCallback(
+    (transactionId: string, subcategoryId: string | null) => {
+      userCategories.saveSubcategory(transactionId, subcategoryId)
+      bump()
+    },
+    [bump],
+  )
+
+  const reload = useCallback(() => {
+    // Deleting a category can undo category changes, which the repository applied at load.
+    void repository.load().then(setSnapshot, () => {})
+  }, [repository])
+
+  const categoryEditor = useMemo<CategoryEditor>(() => {
+    const current = () => [...(snapshot?.categories ?? []), ...userCategories.readUserCategories().categories]
+    const after = <T,>(result: T) => {
+      bump()
+      return result
+    }
+    return {
+      addCategory: (name, kind, icon) => after(userCategories.addCategory(name, kind, icon, current())),
+      updateCategory: (id, changes) => after(userCategories.updateCategory(id, changes, current())),
+      deleteCategory: (id) => {
+        userCategories.deleteCategory(id)
+        bump()
+        reload()
+      },
+      addSubcategory: (categoryId, name) => after(userCategories.addSubcategory(categoryId, name)),
+      renameSubcategory: (id, name) => after(userCategories.renameSubcategory(id, name)),
+      deleteSubcategory: (id) => after(userCategories.deleteSubcategory(id)),
+    }
+  }, [snapshot?.categories, bump, reload])
 
   const [cardDays, setCardDaysState] = useState(readCardDays)
   const setCardDays = useCallback((accountId: string, days: CardDays | null) => {
@@ -65,18 +124,24 @@ export function DataProvider({ repository, children }: { repository: Repository;
 
   const value = useMemo<AppData | null>(() => {
     if (!snapshot) return null
+    // The owner's categories, subcategories and each transaction's subcategory.
+    const withCategories = userCategories.applyUserCategories(snapshot)
     // The owner's closing and due days replace the bank's dates for those cards.
     const accounts = applyCardDays(snapshot.accounts, cardDays)
     return {
-      ...snapshot,
+      ...withCategories,
       accounts,
       accountsById: new Map(accounts.map((a) => [a.id, a])),
-      categoriesById: new Map(snapshot.categories.map((c) => [c.id, c])),
+      categoriesById: new Map(withCategories.categories.map((c) => [c.id, c])),
+      subcategoriesById: new Map(withCategories.subcategories.map((s) => [s.id, s])),
       institutionsById: new Map(snapshot.institutions.map((i) => [i.id, i])),
       setCategory,
+      setSubcategory,
+      categoryEditor,
       setCardDays,
     }
-  }, [snapshot, setCategory, cardDays, setCardDays])
+    // categoriesVersion: re-apply the owner's categories after a change.
+  }, [snapshot, setCategory, setSubcategory, categoryEditor, cardDays, setCardDays, categoriesVersion])
 
   const load = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

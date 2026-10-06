@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { CategoryKind, Transaction } from '../data/types'
 import { useData } from '../state'
 import { addMonths, formatFullDate, formatMonthYear } from '../lib/dates'
@@ -15,7 +16,7 @@ import { useI18n } from '../i18n/I18nProvider'
  * Transactions page shows it in a side panel (`panel`).
  */
 function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose(): void; variant: 'sheet' | 'panel' }) {
-  const { categories, categoriesById, setCategory, transactions } = useData()
+  const { categories, categoriesById, subcategories, setCategory, setSubcategory, categoryEditor, transactions } = useData()
   const { t, categoryName } = useI18n()
   const accountLabel = useAccountLabel()
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -56,7 +57,7 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
   return (
     <>
       <div className="flex items-center gap-3 pt-1 pb-3 lg:pt-0">
-        <IconDisc icon={categoryIcon(current.categoryId)} size="lg" />
+        <IconDisc icon={categoryIcon(current.categoryId, categoriesById)} size="lg" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h2 className="truncate text-lg leading-6 font-medium text-ink">{current.description}</h2>
           <span className="text-[13px] leading-[18px] text-muted">{accountLabel(current.accountId)}</span>
@@ -90,9 +91,14 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
         ))}
       </dl>
 
-      <h3 id={`${variant}-category`} className="label-caps pt-4 pb-2">
-        {t.category}
-      </h3>
+      <div className="flex items-baseline justify-between gap-3 pt-4 pb-2">
+        <h3 id={`${variant}-category`} className="label-caps">
+          {t.category}
+        </h3>
+        <Link to="/categories" onClick={onClose} className="text-[13px] font-medium text-accent hover:underline">
+          {t.transactions.manageCategories}
+        </Link>
+      </div>
       <div role="radiogroup" aria-labelledby={`${variant}-category`} className={`flex flex-wrap ${panel ? 'gap-1.5' : 'gap-2'}`}>
         {options.map((c) => {
           const on = c.id === current.categoryId
@@ -107,13 +113,127 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
                 panel ? 'h-9 px-3 text-[13px]' : 'h-12 pr-3.5 pl-3 text-sm'
               } ${on ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-surface text-ink-2 hover:bg-track'}`}
             >
-              {!panel && <Icon name={on ? 'check' : categoryIcon(c.id)} className="size-[18px]" />}
+              {!panel && <Icon name={on ? 'check' : categoryIcon(c.id, categoriesById)} className="size-[18px]" />}
               {categoryName(c)}
             </button>
           )
         })}
       </div>
       {kind === 'transfer' && <p className="mt-3 text-[13px] leading-[18px] text-muted">{t.transactions.transferNote}</p>}
+
+      {kind !== 'transfer' && category && (
+        <SubcategoryPicker
+          variant={variant}
+          current={current.subcategoryId ?? null}
+          options={subcategories.filter((s) => s.categoryId === category.id)}
+          onPick={(id) => setSubcategory(current.id, id)}
+          onAdd={(name) => {
+            const sub = categoryEditor.addSubcategory(category.id, name)
+            if (sub) setSubcategory(current.id, sub.id)
+            return !!sub
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+/** "None", the category's subcategories, and a chip to add one on the spot. */
+function SubcategoryPicker({
+  variant,
+  current,
+  options,
+  onPick,
+  onAdd,
+}: {
+  variant: 'sheet' | 'panel'
+  current: string | null
+  options: { id: string; name: string }[]
+  onPick(id: string | null): void
+  /** False when the name is empty or already used. */
+  onAdd(name: string): boolean
+}) {
+  const { t } = useI18n()
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const [error, setError] = useState(false)
+  const panel = variant === 'panel'
+  const chip = `inline-flex items-center gap-1.5 rounded-full border font-medium ${panel ? 'h-9 px-3 text-[13px]' : 'h-12 px-3.5 text-sm'}`
+  const off = 'border-line bg-surface text-ink-2 hover:bg-track'
+  const on = 'border-accent bg-accent-soft text-accent'
+
+  const submit = () => {
+    if (onAdd(name)) {
+      setAdding(false)
+      setName('')
+      setError(false)
+    } else setError(true)
+  }
+
+  return (
+    <>
+      <h3 id={`${variant}-subcategory`} className="label-caps pt-4 pb-2">
+        {t.transactions.subcategory}
+      </h3>
+      <div role="radiogroup" aria-labelledby={`${variant}-subcategory`} className={`flex flex-wrap ${panel ? 'gap-1.5' : 'gap-2'}`}>
+        {[{ id: null as string | null, name: t.transactions.noSubcategory }, ...options].map((o) => (
+          <button
+            key={o.id ?? 'none'}
+            type="button"
+            role="radio"
+            aria-checked={current === o.id}
+            onClick={() => onPick(o.id)}
+            className={`${chip} ${current === o.id ? on : off}`}
+          >
+            {!panel && current === o.id && <Icon name="check" className="size-[18px]" />}
+            {o.name}
+          </button>
+        ))}
+        {!adding && (
+          <button type="button" onClick={() => setAdding(true)} className={`${chip} border-dashed ${off}`}>
+            <Icon name="plus" className="size-[18px]" />
+            {t.transactions.addSubcategory}
+          </button>
+        )}
+      </div>
+      {adding && (
+        <form
+          className="mt-2 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            submit()
+          }}
+        >
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              setError(false)
+            }}
+            aria-label={t.categoryEditor.subcategoryName}
+            aria-invalid={error}
+            placeholder={t.categoryEditor.subcategoryName}
+            maxLength={40}
+            className={`min-w-0 flex-1 rounded-md border bg-surface px-3 text-[15px] text-ink placeholder:text-muted ${panel ? 'h-10' : 'h-12'} ${error ? 'border-critical' : 'border-line'}`}
+          />
+          <button type="submit" className={`shrink-0 rounded-md bg-accent px-4 text-sm font-medium text-surface ${panel ? 'h-10' : 'h-12'}`}>
+            {t.categoryEditor.add}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(false)
+              setName('')
+              setError(false)
+            }}
+            className={`shrink-0 px-2 text-sm font-medium text-ink-2 ${panel ? 'h-10' : 'h-12'}`}
+          >
+            {t.categoryEditor.cancel}
+          </button>
+        </form>
+      )}
+      {error && <p className="mt-1.5 text-xs text-critical">{t.categoryEditor.nameTaken}</p>}
     </>
   )
 }

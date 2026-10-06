@@ -86,6 +86,15 @@ export function Accounts() {
           ))}
         </div>
 
+        <Link
+          to="/categories"
+          className="flex min-h-14 items-center gap-3 rounded-md border border-line bg-surface px-4 active:bg-track"
+        >
+          <Icon name="tag" className="size-5 text-ink-2" />
+          <span className="flex-1 text-[15px] font-medium text-ink">{t.categoryEditor.link}</span>
+          <Icon name="chevronRight" className="size-5 text-muted" />
+        </Link>
+
         {/* Until Pluggy is connected (demo data on the deployed site): connect Meu Pluggy. */}
         {isDeployed() && source === 'demo' && <ConnectMeuPluggy />}
 

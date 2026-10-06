@@ -21,6 +21,16 @@ export function saveOverride(transactionId: string, categoryId: string) {
   }
 }
 
+/** Drops the category changes that point at a category (when the owner deletes it). */
+export function removeOverridesTo(categoryId: string) {
+  try {
+    const kept = Object.fromEntries(Object.entries(readOverrides()).filter(([, c]) => c !== categoryId))
+    localStorage.setItem(OVERRIDES_KEY, JSON.stringify(kept))
+  } catch {
+    // Storage unavailable.
+  }
+}
+
 export function applyOverrides(snapshot: Snapshot): Snapshot {
   const overrides = readOverrides()
   return {
