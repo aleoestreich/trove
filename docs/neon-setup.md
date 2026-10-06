@@ -27,7 +27,7 @@ write the database yet: the sync comes in a later change. You can set it up now.
 ## 2. Create the tables
 
 1. In Neon, open **SQL Editor** and select the database.
-2. Paste the whole of `db/schema.sql` and **Run**. It creates 10 tables.
+2. Paste the whole of `db/schema.sql` and **Run**. It creates 12 tables.
    Running it again is safe: it skips the tables that already exist.
 
 ## 3. Give Vercel the connection string
@@ -73,7 +73,9 @@ today can be read later without fetching it from Pluggy again.
 | `account_balances` | (`account_id`, `as_of`) | One balance per account per day. Pluggy only gives today's balance, so this builds the history |
 | `card_bills` | `id` (Pluggy bill ID) → `accounts` | A card's monthly statements: due date, total, minimum payment, finance charges. The card itself is a row in `accounts` |
 | `transactions` | `id` (Pluggy transaction ID) → `accounts` | Date, description, type, amount (and in the account's currency), status, operation type, Pluggy's category, installment *n* of *N*, purchase date and total, merchant, payment method, `card_bill_id`, `provider_id` |
-| `transaction_overrides` | `transaction_id` → `transactions` | Your changes to a transaction: its category, and whether to ignore it (today saved per phone) |
+| `user_categories` | `id` | Categories you create: name, type (income or expense), icon. Built-in categories stay in the code |
+| `subcategories` | `id`; unique name per category | Subcategories under a built-in category or one of yours |
+| `transaction_overrides` | `transaction_id` → `transactions` | Your changes to a transaction: its category, subcategory, and whether to ignore it (today saved per phone) |
 | `card_settings` | `account_id` → `accounts` | Your closing and due days per card (today saved per phone) |
 | `exchange_rates` | (`currency_code`, `as_of`) | BRL per unit of a foreign currency, one per day, saved by the sync |
 | `sync_runs` | generated `id` | When each sync ran, what triggered it, how many rows changed, and errors as status codes only |
@@ -97,11 +99,11 @@ four small reads, sent to Neon in one round trip:
 1. **Connections and accounts:** `bank_connections` joined to `accounts`, a
    few rows.
 2. **Transactions shown:** live transactions (`removed_at IS NULL`) from the
-   first of the oldest month shown, newest first, with your category and
-   ignore choice from `transaction_overrides` (`LEFT JOIN`). This uses the partial index
+   first of the oldest month shown, newest first, with your category,
+   subcategory and ignore choice from `transaction_overrides` (`LEFT JOIN`). This uses the partial index
    `transactions_live_booked_idx`. The query lists its columns and leaves out
    `raw`.
-3. **Your settings:** `card_settings`.
+3. **Your settings:** `card_settings`, `user_categories` and `subcategories`.
 4. **Rates:** the latest `exchange_rates` row per currency.
 
 No call to Pluggy or to a rate service happens while you load the app. Those
@@ -124,8 +126,9 @@ The other reads:
   cycles, installment plans and monthly totals are worked out from the stored
   rows each time the app loads. Improving a rule then fixes every past
   transaction at once, with no data to migrate.
-- **Your own choices are stored.** Category changes, ignored transactions
-  and card days are what the database keeps of Trove's own data.
+- **Your own choices are stored.** Your categories and subcategories,
+  category changes, ignored transactions and card days are what the database
+  keeps of Trove's own data.
 
 ### One database per owner
 
