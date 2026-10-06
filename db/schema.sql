@@ -132,11 +132,16 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
 
 -- Trove's own data, today saved per device in localStorage.
 
--- The owner's category for a transaction (overrides Trove's guess).
-CREATE TABLE IF NOT EXISTS category_overrides (
+-- The owner's changes to a transaction: its category (replacing Trove's
+-- guess) and whether to ignore it (left out of income, expenses and the
+-- charts; balances and card bills still include it). One row per transaction
+-- the owner changed; a row with no change left is deleted.
+CREATE TABLE IF NOT EXISTS transaction_overrides (
   transaction_id  text PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE,
-  category_id     text NOT NULL,                 -- an id from src/data/categories.ts
-  updated_at      timestamptz NOT NULL DEFAULT now()
+  category_id     text,                          -- an id from src/data/categories.ts; null = Trove's guess
+  ignored         boolean NOT NULL DEFAULT false,
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  CHECK (category_id IS NOT NULL OR ignored)
 );
 
 -- Per-card closing and due days, for banks that don't send them.
