@@ -83,8 +83,11 @@ export function createMockRepository(today: Date = new Date()): Repository {
       }
       write({ categories: next.categories, subcategories: next.subcategories, stored })
     },
-    async sync() {
+    async startSync() {
       throw new Error('Demo data has nothing to sync.')
+    },
+    async syncStatus() {
+      return null
     },
   }
 }

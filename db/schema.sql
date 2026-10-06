@@ -186,6 +186,30 @@ CREATE TABLE IF NOT EXISTS sync_runs (
 -- "Last updated" and the debug screen: the latest runs per connection.
 CREATE INDEX IF NOT EXISTS sync_runs_connection_started_idx ON sync_runs (connection_id, started_at DESC);
 
+-- Background sync: one job per Sync, one item per bank connection
+-- (server/db/syncJobs.ts).
+CREATE TABLE IF NOT EXISTS sync_jobs (
+  id           text PRIMARY KEY,                -- a UUID
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  finished_at  timestamptz                      -- set when no item is queued or running
+);
+CREATE INDEX IF NOT EXISTS sync_jobs_created_idx ON sync_jobs (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS sync_job_items (
+  job_id         text NOT NULL REFERENCES sync_jobs(id) ON DELETE CASCADE,
+  connection_id  text NOT NULL,                 -- Pluggy item ID (no FK: it may not be synced yet)
+  position       smallint NOT NULL,             -- order within the job
+  status         text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'ok', 'failed')),
+  started_at     timestamptz,
+  finished_at    timestamptz,
+  inserted       integer,
+  updated        integer,
+  removed        integer,
+  error          text,                          -- a status code only, never values
+  PRIMARY KEY (job_id, connection_id)
+);
+
+
 -- Pluggy webhook deliveries, so a repeated delivery is processed once.
 CREATE TABLE IF NOT EXISTS webhook_events (
   event_id      text PRIMARY KEY,                -- Pluggy eventId

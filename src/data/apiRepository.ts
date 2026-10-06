@@ -1,5 +1,5 @@
 import type { Repository } from './repository'
-import type { Snapshot, SyncInfo, SyncResult } from './types'
+import type { Snapshot, SyncInfo, SyncJob } from './types'
 
 /** Pluggy or the database isn't configured on the server yet (see docs/pluggy-setup.md, docs/neon-setup.md). */
 export class NotConfiguredError extends Error {}
@@ -31,7 +31,7 @@ async function failure(res: Response): Promise<Error> {
 /**
  * Data from Trove's database, via the server (behind the login):
  * GET /api/finance reads it, POST /api/edits saves changes, POST /api/sync
- * fetches one bank from Meu Pluggy into it.
+ * starts a background sync and GET /api/sync reports its progress.
  */
 export function createApiRepository(fetchFn: Fetch = (...a) => fetch(...a)): Repository {
   const post = (url: string, body: unknown) =>
@@ -51,10 +51,16 @@ export function createApiRepository(fetchFn: Fetch = (...a) => fetch(...a)): Rep
       const res = await post('/api/edits', e)
       if (!res.ok) throw await failure(res)
     },
-    async sync(connectionId) {
-      const res = await post('/api/sync', { connectionId })
+    async startSync(connectionIds) {
+      const res = await post('/api/sync', connectionIds ? { connectionIds } : {})
       if (!res.ok) throw await failure(res)
-      return (await res.json()) as SyncResult
+      return (await res.json()) as SyncJob
+    },
+    async syncStatus() {
+      const res = await request(fetchFn, '/api/sync')
+      if (res.status === 503) return null
+      if (!res.ok) throw await failure(res)
+      return ((await res.json()) as { job: SyncJob | null }).job
     },
   }
 }
@@ -85,8 +91,11 @@ export function withDemoFallback(live: Repository, demo: Repository): Repository
     edit(e) {
       return (usingDemo ? demo : live).edit(e)
     },
-    sync(id) {
-      return live.sync(id)
+    startSync(ids) {
+      return live.startSync(ids)
+    },
+    syncStatus() {
+      return live.syncStatus()
     },
   }
 }

@@ -136,7 +136,7 @@ src/
 middleware.ts              Vercel middleware: only signed-in users reach the app
 api/auth/                  login, callback and logout (Vercel Functions)
 api/finance.ts             the app's data, read from the database
-api/edits.ts, api/sync.ts  saving edits; syncing one connection from Meu Pluggy
+api/edits.ts, api/sync.ts  saving edits; background sync from Meu Pluggy and its progress
 server/auth/               login logic, encrypted cookies, tests
 server/db/                 database access: read, edits, sync, tests
 server/pluggy/             Pluggy client, mapping to Trove's model, exchange rates, tests
