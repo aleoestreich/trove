@@ -90,9 +90,10 @@ No backend, no auth. It runs in the browser on hardcoded data.
     (`/api/finance?summary`);
   - confirm how Meu Pluggy reports Wise;
   - add a "last updated" indicator and a manual refresh.
-- Later, if needed: store data in Postgres (e.g. Neon on Vercel), synced by
-  Pluggy webhooks (`item/updated`, `transactions/created`) plus a daily job,
-  for full history, faster loads and category edits saved on the server.
+- In progress: store data in Postgres on Neon, synced by Pluggy webhooks
+  (`item/updated`, `transactions/created`) plus a daily job, for full history,
+  faster loads and category edits saved on the server. Schema in
+  `db/schema.sql`, setup in `docs/neon-setup.md`; the sync is next.
 
 ## Phase 3 — Authentication & security
 

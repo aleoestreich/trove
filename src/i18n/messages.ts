@@ -37,6 +37,18 @@ const en = {
     vsLastMonth: 'vs last month',
     netWorthChart: (months: number, from: string, to: string) => `Net worth over the last ${months} months, from ${from} to ${to}`,
     chartAccountsCards: (accounts: string, cards: string) => `Accounts ${accounts} · Cards −${cards}`,
+    /** Average income card. */
+    avgIncome: {
+      title: 'Average income',
+      sub: (months: number) => `Monthly average, last ${months} full ${months === 1 ? 'month' : 'months'}`,
+      perMonth: '/month',
+      range: (lowest: string, lowMonth: string, highest: string, highMonth: string) => `Lowest ${lowest} (${lowMonth}) · Highest ${highest} (${highMonth})`,
+      current: (amount: string, pct: string, above: boolean) => `This month so far: ${amount} · ${pct} ${above ? 'above' : 'below'} average`,
+      /** Nothing in yet this month: no comparison. */
+      currentNone: (amount: string) => `This month so far: ${amount}`,
+      avgLabel: (amount: string) => `avg ${amount}`,
+      chart: (average: string) => `Income per month; average ${average}`,
+    },
     whereMoney: 'Where your money is',
     balancesNote: 'Account balances, before card bills',
     byCurrency: 'By currency',
@@ -59,6 +71,11 @@ const en = {
 
   transactions: {
     search: 'Search transactions',
+    /** Chip on Transactions when opened from a card's bill. */
+    billChip: (closed: boolean, from: string, to: string) => `${closed ? 'Closed bill' : 'Current bill'} · ${from} – ${to}`,
+    billShowAll: "Show all of this card's transactions",
+    billTotal: (amount: string) => `Bill total ${amount}`,
+    billExpected: (amount: string) => `Includes ${amount} in installments that haven't posted yet.`,
     allMonths: 'All months',
     type: 'Type',
     allTypes: 'All types',
@@ -143,6 +160,10 @@ const en = {
     currentBill: 'Current bill',
     /** A bill that has closed and is waiting to be paid. */
     closedBill: 'Closed bill',
+    /** Account labels on Accounts, by kind. */
+    types: { checking: 'Checking', savings: 'Savings', usd: 'USD balance', card: 'Credit card' },
+    /** Under a closed bill that's been partly paid; the amount shown is what's left. */
+    alreadyPaid: (amount: string) => `${amount} already paid`,
     closed: 'Closed',
     /** Per-card closing and due days set by the owner. */
     cardDays: {
@@ -165,6 +186,26 @@ const en = {
     closes: 'Closes',
     due: 'Due',
     rate: (currency: string, rate: string) => `Rate 1 ${currency} = R$ ${rate}`,
+  },
+
+  debug: {
+    title: 'Pluggy debug',
+    link: 'Pluggy debug',
+    intro: "Pluggy's raw answer for each call, as the server receives it. Only you can see this page.",
+    loading: 'Loading…',
+    notConfigured: 'Pluggy is not configured on the server (PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET, PLUGGY_ITEM_IDS).',
+    failed: (status: number) => `Request failed (HTTP ${status}).`,
+    item: (n: number) => `Item ${n}`,
+    accountsHint: 'Load the accounts to see each account.',
+    itemCall: 'Item',
+    accountsCall: 'Accounts',
+    page: (n: number) => `Page ${n}`,
+    transactions: 'Transactions',
+    bills: 'Bills',
+    nextPage: 'Next page',
+    copy: 'Copy JSON',
+    copied: 'Copied',
+    status: (status: number) => `HTTP ${status}`,
   },
 
   categories: {
@@ -224,6 +265,16 @@ const ptBR: Messages = {
     vsLastMonth: 'vs. mês passado',
     netWorthChart: (months, from, to) => `Patrimônio líquido nos últimos ${months} meses, de ${from} para ${to}`,
     chartAccountsCards: (accounts, cards) => `Contas ${accounts} · Cartões −${cards}`,
+    avgIncome: {
+      title: 'Renda média',
+      sub: (months) => `Média mensal dos últimos ${months} ${months === 1 ? 'mês completo' : 'meses completos'}`,
+      perMonth: '/mês',
+      range: (lowest, lowMonth, highest, highMonth) => `Menor ${lowest} (${lowMonth}) · Maior ${highest} (${highMonth})`,
+      current: (amount, pct, above) => `Este mês até agora: ${amount} · ${pct} ${above ? 'acima' : 'abaixo'} da média`,
+      currentNone: (amount) => `Este mês até agora: ${amount}`,
+      avgLabel: (amount) => `média ${amount}`,
+      chart: (average) => `Renda por mês; média ${average}`,
+    },
     whereMoney: 'Onde está seu dinheiro',
     balancesNote: 'Saldos das contas, antes das faturas',
     byCurrency: 'Por moeda',
@@ -246,6 +297,10 @@ const ptBR: Messages = {
 
   transactions: {
     search: 'Buscar transações',
+    billChip: (closed, from, to) => `${closed ? 'Fatura fechada' : 'Fatura atual'} · ${from} – ${to}`,
+    billShowAll: 'Ver todas as transações deste cartão',
+    billTotal: (amount) => `Total da fatura ${amount}`,
+    billExpected: (amount) => `Inclui ${amount} em parcelas que ainda não entraram.`,
     allMonths: 'Todos os meses',
     type: 'Tipo',
     allTypes: 'Todos os tipos',
@@ -326,6 +381,8 @@ const ptBR: Messages = {
     nearLimit: 'Perto do limite',
     currentBill: 'Fatura atual',
     closedBill: 'Fatura fechada',
+    types: { checking: 'Conta corrente', savings: 'Poupança', usd: 'Saldo em dólar', card: 'Cartão de crédito' },
+    alreadyPaid: (amount) => `${amount} já pago`,
     closed: 'Fechou em',
     cardDays: {
       missing: 'O banco não informa a data de fechamento deste cartão, então não dá para calcular a fatura atual. Informe os dias pelo app do banco.',
@@ -347,6 +404,26 @@ const ptBR: Messages = {
     closes: 'Fecha em',
     due: 'Vence em',
     rate: (currency, rate) => `Cotação 1 ${currency} = R$ ${rate}`,
+  },
+
+  debug: {
+    title: 'Depuração do Pluggy',
+    link: 'Depuração do Pluggy',
+    intro: 'A resposta do Pluggy para cada chamada, como o servidor recebe. Só você vê esta página.',
+    loading: 'Carregando…',
+    notConfigured: 'O Pluggy não está configurado no servidor (PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET, PLUGGY_ITEM_IDS).',
+    failed: (status) => `A requisição falhou (HTTP ${status}).`,
+    item: (n) => `Item ${n}`,
+    accountsHint: 'Carregue as contas para ver cada conta.',
+    itemCall: 'Item',
+    accountsCall: 'Contas',
+    page: (n) => `Página ${n}`,
+    transactions: 'Transações',
+    bills: 'Faturas',
+    nextPage: 'Próxima página',
+    copy: 'Copiar JSON',
+    copied: 'Copiado',
+    status: (status) => `HTTP ${status}`,
   },
 
   categories: {

@@ -80,6 +80,24 @@ export class PluggyClient {
   }
 
   /**
+   * A GET as Pluggy answers it, for the owner's debug screen: the status and
+   * the parsed body, also when it's an error (4xx/5xx). Never logged.
+   */
+  async raw(path: string, params: Record<string, string | undefined> = {}): Promise<{ status: number; body: unknown }> {
+    const url = new URL(`${this.config.baseUrl}/${path}`)
+    for (const [k, v] of Object.entries(params)) if (v !== undefined) url.searchParams.set(k, v)
+    const res = await this.fetchFn(url, { headers: { 'X-API-KEY': await this.key(), Accept: 'application/json' } })
+    const text = await res.text()
+    let body: unknown = text
+    try {
+      body = JSON.parse(text)
+    } catch {
+      // Not JSON: keep the text.
+    }
+    return { status: res.status, body }
+  }
+
+  /**
    * Short-lived token that lets the browser open Pluggy Connect without ever
    * seeing the Client ID or Secret (POST /connect_token, as in the SDK).
    */

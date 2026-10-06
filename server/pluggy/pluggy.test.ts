@@ -453,7 +453,7 @@ describe('GET /api/finance', () => {
     const fetchFn = fakeUpstream({ extraAccounts: [cardAcc], bills: cardBills, cardTx: { creditCardMetadata: { billId: 'b2' } } })
     const s = await (await finance(req(), config, { fetch: fetchFn as typeof fetch, now })).json()
     const c = s.accounts.find((a: { id: string }) => a.id === 'acc-card')
-    expect(c.creditData.lastBill).toEqual({ dueDate: '2026-09-27', amount: 450_50 })
+    expect(c.creditData.lastBill).toEqual({ id: 'b2', dueDate: '2026-09-27', amount: 450_50 })
     expect(s.transactions.find((t: { id: string }) => t.id === 't-acc-card').billId).toBe('b2')
     expect(fetchFn.mock.calls.some(([u]) => String(u).includes('/bills?accountId=acc-card'))).toBe(true)
   })

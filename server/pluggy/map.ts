@@ -157,7 +157,7 @@ function latestBill(bills: PluggyBill[] | undefined, accountCurrency: string, ra
   const last = [...(bills ?? [])].filter((b) => b.dueDate).sort((x, y) => x.dueDate.localeCompare(y.dueDate)).pop()
   if (!last) return null
   const currency = (last.totalAmountCurrencyCode || accountCurrency).toUpperCase()
-  return { dueDate: brazilDate(last.dueDate), amount: cents(Math.abs(last.totalAmount) * rateOf(currency, rates)) }
+  return { id: last.id, dueDate: brazilDate(last.dueDate), amount: cents(Math.abs(last.totalAmount) * rateOf(currency, rates)) }
 }
 
 // ---------------------------------------------------------------------------
