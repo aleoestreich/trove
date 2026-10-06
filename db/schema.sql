@@ -2,8 +2,7 @@
 -- docs/neon-setup.md. Safe to run again: every statement is IF NOT EXISTS.
 --
 -- Shape: Pluggy's model (connection -> account -> transaction, plus card
--- bills),
--- keyed by Pluggy's IDs, so a sync is an upsert. Money is integer cents
+-- bills), keyed by Pluggy's IDs, so a sync is an upsert. Money is integer cents
 -- (bigint), as in the app; Pluggy's decimal amounts are converted on write.
 -- Each Pluggy row also keeps its full JSON in `raw`, so a field we don't map
 -- today can be used later without fetching it again (Pluggy only returns about
