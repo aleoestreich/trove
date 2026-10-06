@@ -21,8 +21,8 @@ interface I18n {
   locale: Locale
   setLocale(locale: Locale): void
   t: Messages
-  /** Category name in the active language (falls back to the name in the data). */
-  categoryName(category: Category | undefined): string
+  /** A category's name as stored, or "Uncategorized". */
+  categoryName(category: Category | null | undefined): string
 }
 
 const I18nContext = createContext<I18n | null>(null)
@@ -61,7 +61,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<I18n>(() => {
     const t = messages[locale]
-    return { locale, setLocale, t, categoryName: (c) => (c ? (t.categories[c.id] ?? c.name) : '') }
+    return { locale, setLocale, t, categoryName: (c) => (c ? c.name : t.transactions.uncategorized) }
   }, [locale, setLocale])
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>

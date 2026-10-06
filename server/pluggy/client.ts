@@ -80,7 +80,7 @@ export class PluggyClient {
   }
 
   /**
-   * A GET as Pluggy answers it, for the owner's debug screen: the status and
+   * A GET as Pluggy answers it, for the debug screen: the status and
    * the parsed body, also when it's an error (4xx/5xx). Never logged.
    */
   async raw(path: string, params: Record<string, string | undefined> = {}): Promise<{ status: number; body: unknown }> {

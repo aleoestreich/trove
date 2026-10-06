@@ -15,7 +15,7 @@ export interface InstallmentPlan {
   key: string
   accountId: string
   description: string
-  categoryId: string
+  categoryId: string | null
   purchaseDate: string
   totalAmount: Cents
   count: number
@@ -87,7 +87,8 @@ export function installmentPlans(transactions: Transaction[], today: Date = new 
   const thisMonth = monthKey(toISO(today))
   const groups = new Map<string, Transaction[]>()
   for (const t of transactions) {
-    if (!t.installment) continue
+    // Hidden purchases are left out (and with them, their future installments).
+    if (!t.installment || t.hidden) continue
     const key = `${t.accountId}|${purchaseDescription(t).toLowerCase()}|${t.installment.total}`
     groups.set(key, [...(groups.get(key) ?? []), t])
   }

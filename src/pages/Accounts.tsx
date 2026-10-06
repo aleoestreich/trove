@@ -17,6 +17,7 @@ import { sortForDisplay } from '../lib/accountOrder'
 import { isDeployed } from '../lib/useIsDesktop'
 import { ConnectMeuPluggy } from '../components/ConnectMeuPluggy'
 import { CardDaysEditor } from '../components/CardDaysEditor'
+import { SyncBar } from '../components/SyncBar'
 
 /** Share of the limit at which a card is flagged "Near limit". */
 const NEAR_LIMIT = 0.8
@@ -70,6 +71,7 @@ export function Accounts() {
     <>
       <PageHeader title={t.nav.accounts} subtitle={`${t.accounts.total(institutions.length)}: ${formatMoney(bal.net)}`} />
       <div className="flex flex-col gap-3 lg:gap-5">
+        <SyncBar />
         <section className="flex flex-col gap-0.5 px-1 pt-2 pb-1 lg:hidden">
           <span className="text-[13px] leading-[18px] font-medium text-muted">{t.accounts.total(institutions.length)}</span>
           <span className="tabular text-[32px] leading-10 font-bold tracking-[-0.02em] text-ink">{formatMoney(bal.net)}</span>
@@ -102,7 +104,7 @@ export function Accounts() {
         {source === 'demo' && <p className="px-2 text-center text-xs leading-4 text-muted">{t.accounts.footer}</p>}
 
         {isDeployed() && (
-          <Link to="/debug" className="self-center px-2 py-1 text-xs leading-4 text-muted underline">
+          <Link to="/debug" className="flex h-12 items-center self-center px-3 text-xs leading-4 text-muted underline">
             {t.debug.link}
           </Link>
         )}

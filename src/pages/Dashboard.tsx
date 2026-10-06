@@ -3,7 +3,9 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
 import { MONTHS_OF_HISTORY } from '../data/seed'
 import type { Transaction } from '../data/types'
-import { averageIncome, balances, expensesByCategory, inMonth, totals } from '../lib/summary'
+import { averageIncome, balances, expensesByCategory, inMonth, totals, visible } from '../lib/summary'
+import { catVar } from '../components/CategoryBadge'
+import { SyncBar } from '../components/SyncBar'
 import { balanceHistory, cashByCurrency, cashByInstitution } from '../lib/history'
 import { installmentPlans, upcomingByMonth } from '../lib/installments'
 import { currentBill, isIdleCard } from '../lib/bills'
@@ -19,6 +21,8 @@ import { useI18n } from '../i18n/I18nProvider'
 import { useIsDesktop } from '../lib/useIsDesktop'
 
 const TOP_CATEGORIES = 5
+/** Complete months in the average income. */
+const AVERAGE_MONTHS = 6
 const CURRENCY_COLORS: Record<string, string> = { BRL: 'var(--series-1)', USD: 'var(--series-3)', EUR: 'var(--series-4)' }
 
 export function Dashboard() {
@@ -47,39 +51,48 @@ export function Dashboard() {
   const foreignBalance = (currency: string) =>
     accounts.filter((a) => a.type === 'BANK' && a.foreign?.currency === currency).reduce((s, a) => s + a.foreign!.balance, 0)
 
+  // Hidden transactions count nowhere here (balances aside: those are the bank's).
+  const counted = useMemo(() => visible(transactions), [transactions])
+
   // Cash flow. `locale` is a dependency because the labels are formatted text.
   const flow = useMemo(
-    () => months.map((m) => ({ month: m, label: formatMonthShort(m), ...totals(inMonth(transactions, m), categoriesById) })),
-    [transactions, categoriesById, months, locale],
+    () => months.map((m) => ({ month: m, label: formatMonthShort(m), ...totals(inMonth(counted, m), categoriesById) })),
+    [counted, categoriesById, months, locale],
   )
   // Figures for the selected month (the current one by default).
   const thisMonth = flow.find((f) => f.month === month) ?? flow[flow.length - 1]
   // Average income: complete months; the current one is compared with it.
-  const avgIncome = useMemo(() => averageIncome(flow), [flow])
+  // Average income: the last 6 complete months (7 with the current one), from the first month with data.
+  const incomeMonths = useMemo(() => {
+    const first = counted.reduce((min, tx) => (tx.date < min ? tx.date : min), '9999-12')
+    return lastMonths(latest, AVERAGE_MONTHS + 1)
+      .filter((m) => m >= monthKey(first))
+      .map((m) => ({ month: m, label: formatMonthShort(m), income: totals(inMonth(counted, m), categoriesById).income }))
+  }, [counted, categoriesById, latest, locale])
+  const avgIncome = useMemo(() => averageIncome(incomeMonths), [incomeMonths])
   const keptPct = thisMonth.income > 0 ? (thisMonth.net / thisMonth.income) * 100 : null
 
   // Spending trend: top categories over the period, the rest folded into "Other".
-  const periodTxs = useMemo(() => transactions.filter((tx) => monthKey(tx.date) >= months[0]), [transactions, months])
+  const periodTxs = useMemo(() => counted.filter((tx) => monthKey(tx.date) >= months[0]), [counted, months])
   const periodByCategory = expensesByCategory(periodTxs, categoriesById)
   const top = periodByCategory.slice(0, TOP_CATEGORIES)
   const hasOther = periodByCategory.length > TOP_CATEGORIES
   const trendSeries = [
-    ...top.map((c) => ({ key: c.category.id, name: categoryName(c.category) })),
+    ...top.map((c) => ({ key: c.category?.id ?? 'none', name: categoryName(c.category) })),
     ...(hasOther ? [{ key: 'other', name: t.other }] : []),
   ]
   const trendData = months.map((m) => {
     const row: Record<string, number | string> = { label: formatMonthShort(m) }
-    for (const c of expensesByCategory(inMonth(transactions, m), categoriesById)) {
-      const key = top.some((x) => x.category.id === c.category.id) ? c.category.id : 'other'
+    for (const c of expensesByCategory(inMonth(counted, m), categoriesById)) {
+      const id = c.category?.id ?? 'none'
+      const key = top.some((x) => (x.category?.id ?? 'none') === id) ? id : 'other'
       row[key] = Number(row[key] ?? 0) + c.amount
     }
     return row
   })
-  // A category keeps its chart colour everywhere; categories outside the top 5 share "Other".
-  const categoryColor = (id: string) => {
-    const i = top.findIndex((c) => c.category.id === id)
-    return i >= 0 ? seriesColor(i) : seriesColor(5)
-  }
+  // Each category in its own colour; uncategorized in muted; categories outside the top 5 share "Other".
+  const keyColor = (key: string) => (key === 'other' ? seriesColor(5) : key === 'none' ? 'var(--muted)' : catVar(categoriesById.get(key)?.color ?? 'slate'))
+  const trendColors = trendSeries.map((s) => keyColor(s.key))
 
   // Coming up: open card bills + installments charged next month.
   const plans = useMemo(() => installmentPlans(transactions), [transactions])
@@ -90,7 +103,7 @@ export function Dashboard() {
   const nextMonthPurchases = plans.filter((p) => p.upcoming.some((u) => u.month === nextMonthKey)).length
 
   // Selected month.
-  const monthTxs = useMemo(() => inMonth(transactions, month), [transactions, month])
+  const monthTxs = useMemo(() => inMonth(counted, month), [counted, month])
   const monthTotals = totals(monthTxs, categoriesById)
   const byCategory = expensesByCategory(monthTxs, categoriesById)
 
@@ -107,6 +120,7 @@ export function Dashboard() {
       <PageHeader title={t.nav.overview} subtitle={t.overview.subtitle(formatFullDate(toISO(new Date())))}>
         <MonthSwitcher variant="compact" month={month} latest={latest} count={MONTHS_OF_HISTORY} onChange={setMonth} />
       </PageHeader>
+      <SyncBar className="mb-3" />
 
       {/* Phones: one column in reading order. Desktop: a 12-column grid, reordered. */}
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-12 lg:gap-5">
@@ -230,7 +244,7 @@ export function Dashboard() {
         {/* 3b. Average income (desktop: full width after the two monthly charts) */}
         {avgIncome && (
           <Card className="lg:order-5 lg:col-span-12">
-            <AverageIncomeCard average={avgIncome} perMonth={flow} />
+            <AverageIncomeCard average={avgIncome} perMonth={incomeMonths} />
           </Card>
         )}
 
@@ -265,11 +279,11 @@ export function Dashboard() {
         {/* 5. Spending trend */}
         <Card className="flex flex-col gap-3.5 lg:order-4 lg:col-span-6 lg:gap-4">
           <CardTitle subtitle={t.overview.lastMonths(MONTHS_OF_HISTORY)}>{t.overview.spendingByCategory}</CardTitle>
-          <StackedMonthChart data={trendData} series={trendSeries} label={t.overview.spendingByCategory} />
+          <StackedMonthChart data={trendData} series={trendSeries} colors={trendColors} label={t.overview.spendingByCategory} />
           <ul className="flex flex-wrap gap-x-3.5 gap-y-2 lg:gap-x-4 lg:border-t lg:border-line lg:pt-3.5">
             {trendSeries.map((s, i) => (
               <li key={s.key} className="inline-flex items-center gap-1.5 text-[13px] leading-[18px] text-ink-2">
-                <Swatch color={seriesColor(i)} />
+                <Swatch color={trendColors[i]} />
                 {s.name}
               </li>
             ))}
@@ -302,21 +316,22 @@ export function Dashboard() {
               {byCategory.length === 0 && <p className="text-sm text-muted">{t.overview.noExpenses}</p>}
               {byCategory.map(({ category, amount }) => {
                 const share = monthTotals.expenses > 0 ? (amount / monthTotals.expenses) * 100 : 0
+                const key = category?.id ?? 'none'
                 return (
                   <Link
-                    key={category.id}
-                    to={`/transactions?m=${month}&c=${category.id}`}
-                    className="-mx-1 flex min-h-11 flex-col justify-center gap-1.5 rounded-sm px-1 active:bg-track lg:min-h-10 lg:hover:bg-track"
+                    key={key}
+                    to={`/transactions?m=${month}&c=${key}`}
+                    className="-mx-1 flex min-h-12 flex-col justify-center gap-1.5 rounded-sm px-1 active:bg-track lg:min-h-10 lg:hover:bg-track"
                   >
                     <span className="flex items-baseline gap-2">
                       <span className="inline-flex min-w-0 flex-1 items-center gap-2 text-sm text-ink">
-                        <Swatch color={categoryColor(category.id)} />
+                        <Swatch color={keyColor(key)} />
                         <span className="truncate">{categoryName(category)}</span>
                       </span>
                       <span className="tabular text-[13px] text-muted lg:text-xs">{formatPercent(share)}</span>
                       <span className="tabular w-[92px] text-right text-sm font-medium text-ink">{formatMoney(amount)}</span>
                     </span>
-                    <Progress value={share} height={4} tone={categoryColor(category.id)} />
+                    <Progress value={share} height={4} tone={keyColor(key)} />
                   </Link>
                 )
               })}

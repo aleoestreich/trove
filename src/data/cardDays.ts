@@ -1,4 +1,4 @@
-// Closing and due days the owner sets per card, for banks that don't report a
+// Closing and due days set by hand per card, for banks that don't report a
 // card's dates (or report wrong ones). Kept in this browser's localStorage,
 // like category edits, and applied on top of whatever data source is loaded.
 
@@ -54,7 +54,7 @@ export function billDates(days: CardDays, today: Date): { close: string; due: st
   return { close, due: addMonths(close, 1) }
 }
 
-/** Accounts with the owner's closing and due days in place of the bank's dates. */
+/** Accounts with the closing and due days set by hand in place of the bank's dates. */
 export function applyCardDays(accounts: Account[], days: Record<string, CardDays>, today: Date = new Date()): Account[] {
   return accounts.map((a) => {
     const d = days[a.id]

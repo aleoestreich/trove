@@ -15,13 +15,14 @@ const card = (close: string | null, due: string | null): Account => ({
   balance: 9_999_00, // everything owed on the card: not the bill
   creditData: { creditLimit: 20_000_00, availableCreditLimit: 10_001_00, balanceCloseDate: close, balanceDueDate: due },
 })
-const tx = (date: string, amount: number, categoryId = 'shopping'): Transaction => ({
-  id: `${date}${amount}${categoryId}`,
+/** `kind` "card-payment" makes a bill payment. */
+const tx = (date: string, amount: number, kind = 'shopping'): Transaction => ({
+  id: `${date}${amount}${kind}`,
   accountId: 'card',
   date,
   description: 'LOJA EXEMPLO',
   amount,
-  categoryId,
+  ...(kind === 'card-payment' ? { categoryId: null, transfer: 'card-payment' as const } : { categoryId: kind }),
   status: 'POSTED',
 })
 const today = new Date(2026, 9, 1) // 1 Oct 2026

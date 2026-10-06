@@ -32,6 +32,32 @@
   --logo-2: #a34bff;
   --logo-3: #19e3b1;
   --logo-blend: multiply;
+  /* Category colours (src/assets/icons/categories/categories.json), in picker order. */
+  --cat-navy: #2b4c9b;
+  --cat-blue: #3d5afe;
+  --cat-indigo: #5b4bdb;
+  --cat-violet: #a34bff;
+  --cat-purple: #7e3fbf;
+  --cat-lavender: #8a73c9;
+  --cat-magenta: #c2389e;
+  --cat-pink: #e0518f;
+  --cat-raspberry: #b8336a;
+  --cat-coral: #f0643a;
+  --cat-rust: #c2551f;
+  --cat-orange: #d9791a;
+  --cat-amber: #b58900;
+  --cat-olive: #7a8b1e;
+  --cat-lime: #6aa40f;
+  --cat-green: #2f9e44;
+  --cat-forest: #2e7040;
+  --cat-mint: #12a383;
+  --cat-teal: #0e9aa7;
+  --cat-sky: #1c8cd9;
+  --cat-steel: #4e6e8e;
+  --cat-brown: #8b5e3c;
+  --cat-slate: #6b7280;
+  --cat-graphite: #4a4a63;
+
 }
 
 /* Dark palette: follows the OS setting unless light is forced with
@@ -58,6 +84,32 @@
     --bar: #6f7eff;
     --scrim: rgb(0 0 0 / 0.6);
     --logo-blend: screen;
+    /* Category colours (src/assets/icons/categories/categories.json), in picker order. */
+    --cat-navy: #7a97e0;
+    --cat-blue: #6f7eff;
+    --cat-indigo: #8f82f2;
+    --cat-violet: #b07bff;
+    --cat-purple: #a97fe0;
+    --cat-lavender: #b7a6ea;
+    --cat-magenta: #de6fc2;
+    --cat-pink: #e8709f;
+    --cat-raspberry: #e06894;
+    --cat-coral: #f4805c;
+    --cat-rust: #e8804f;
+    --cat-orange: #e08a3a;
+    --cat-amber: #d6ac2a;
+    --cat-olive: #a6b84e;
+    --cat-lime: #86bc2e;
+    --cat-green: #4db561;
+    --cat-forest: #62a874;
+    --cat-mint: #4dbf9f;
+    --cat-teal: #2fb3bf;
+    --cat-sky: #4aa5e6;
+    --cat-steel: #8aa8c6;
+    --cat-brown: #be9270;
+    --cat-slate: #8a90a0;
+    --cat-graphite: #a9a9c0;
+
   }
 }
 
@@ -82,6 +134,32 @@
   --bar: #6f7eff;
   --scrim: rgb(0 0 0 / 0.6);
   --logo-blend: screen;
+  /* Category colours (src/assets/icons/categories/categories.json), in picker order. */
+  --cat-navy: #7a97e0;
+  --cat-blue: #6f7eff;
+  --cat-indigo: #8f82f2;
+  --cat-violet: #b07bff;
+  --cat-purple: #a97fe0;
+  --cat-lavender: #b7a6ea;
+  --cat-magenta: #de6fc2;
+  --cat-pink: #e8709f;
+  --cat-raspberry: #e06894;
+  --cat-coral: #f4805c;
+  --cat-rust: #e8804f;
+  --cat-orange: #e08a3a;
+  --cat-amber: #d6ac2a;
+  --cat-olive: #a6b84e;
+  --cat-lime: #86bc2e;
+  --cat-green: #4db561;
+  --cat-forest: #62a874;
+  --cat-mint: #4dbf9f;
+  --cat-teal: #2fb3bf;
+  --cat-sky: #4aa5e6;
+  --cat-steel: #8aa8c6;
+  --cat-brown: #be9270;
+  --cat-slate: #8a90a0;
+  --cat-graphite: #a9a9c0;
+
 }
 
 @theme inline {

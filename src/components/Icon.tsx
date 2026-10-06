@@ -1,4 +1,6 @@
-// Stroke icons on a 24px grid, drawn in currentColor.
+// Stroke icons on a 24px grid, drawn in currentColor. The icon pack's files
+// (src/assets/icons/ui/*.svg, one path each) are the source; the paths below
+// are older icons the pack doesn't have yet.
 const paths = {
   // Tabs
   overview: 'M4 19h16 M7 15v-4 M12 15V6 M17 15v-7',
@@ -42,47 +44,70 @@ const paths = {
   transfer: 'M4 8h14 M14 4l4 4-4 4 M20 16H6 M10 12l-4 4 4 4',
 } as const
 
-export type IconName = keyof typeof paths
+/** The pack's file names (ui/<name>.svg) in camelCase. A test checks this list against the files. */
+export const UI_ICONS = [
+  'accounts', 'alert', 'bankItau', 'bankNubank', 'bankSantander', 'bankWise', 'card', 'catFreelance', 'catGroceries',
+  'catHealth', 'catOther', 'catRent', 'catRestaurants', 'catSalary', 'catShopping', 'catSubscriptions', 'catTransfer',
+  'catTransport', 'catTravel', 'check', 'checking', 'chevronDown', 'chevronLeft', 'chevronRight', 'close', 'cloudCheck',
+  'cloudOff', 'copy', 'edit', 'eyeOff', 'eye', 'globe', 'installments', 'link', 'lock', 'overview', 'plug', 'plus',
+  'refresh', 'savings', 'search', 'sync', 'tabCategories', 'transactions', 'transfer', 'trash', 'trendUp',
+  'uncategorized', 'usdBalance',
+] as const
 
-export function Icon({ name, className = 'size-6', strokeWidth = 1.9 }: { name: IconName; className?: string; strokeWidth?: number }) {
+export type IconName = keyof typeof paths | (typeof UI_ICONS)[number]
+
+interface Glyph {
+  d: string
+  strokeWidth: number
+}
+
+/** `d` and stroke width of a one-path SVG file. */
+export function parseSvg(svg: string): Glyph {
+  return { d: /\sd="([^"]+)"/.exec(svg)?.[1] ?? '', strokeWidth: Number(/stroke-width="([\d.]+)"/.exec(svg)?.[1] ?? 1.75) }
+}
+
+const camel = (file: string) => file.replace(/^.*\/|\.svg$/g, '').replace(/-(\w)/g, (_, c: string) => c.toUpperCase())
+const load = (files: Record<string, string>) => Object.fromEntries(Object.entries(files).map(([path, svg]) => [camel(path), parseSvg(svg)]))
+
+const uiGlyphs: Record<string, Glyph> = load(
+  import.meta.glob<string>('../assets/icons/ui/*.svg', { query: '?raw', import: 'default', eager: true }),
+)
+const categoryGlyphs: Record<string, Glyph> = Object.fromEntries(
+  Object.entries(import.meta.glob<string>('../assets/icons/categories/*.svg', { query: '?raw', import: 'default', eager: true })).map(
+    ([path, svg]) => [path.replace(/^.*\/|\.svg$/g, ''), parseSvg(svg)],
+  ),
+)
+
+function Glyph({ glyph, className, strokeWidth }: { glyph: Glyph; className: string; strokeWidth?: number }) {
   return (
     <svg
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={strokeWidth}
+      strokeWidth={strokeWidth ?? glyph.strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
       aria-hidden
     >
-      <path d={paths[name]} />
+      <path d={glyph.d} />
     </svg>
   )
 }
 
-const categoryIcons: Record<string, IconName> = {
-  salary: 'salary',
-  freelance: 'freelance',
-  investments: 'investments',
-  'other-income': 'income',
-  housing: 'home',
-  utilities: 'utilities',
-  groceries: 'groceries',
-  food: 'restaurants',
-  transport: 'transport',
-  subscriptions: 'subscriptions',
-  shopping: 'shopping',
-  health: 'health',
-  leisure: 'leisure',
-  travel: 'travel',
-  education: 'education',
-  taxes: 'taxes',
-  'other-expense': 'other',
-  transfer: 'transfer',
-  'card-payment': 'card',
+/** A UI icon: the pack's file when there is one, else a built-in path. */
+export function Icon({ name, className = 'size-6', strokeWidth }: { name: IconName; className?: string; strokeWidth?: number }) {
+  const glyph = uiGlyphs[name] ?? { d: (paths as Record<string, string>)[name] ?? '', strokeWidth: 1.9 }
+  return <Glyph glyph={glyph} className={className} strokeWidth={strokeWidth} />
 }
 
-export function categoryIcon(categoryId: string | undefined): IconName {
-  return (categoryId && categoryIcons[categoryId]) || 'other'
+/** A category icon by its key (file name in src/assets/icons/categories/); "more" when unknown. */
+export function CategoryIcon({ icon, className = 'size-5', strokeWidth }: { icon: string; className?: string; strokeWidth?: number }) {
+  return <Glyph glyph={categoryGlyphs[icon] ?? categoryGlyphs.more} className={className} strokeWidth={strokeWidth} />
 }
+
+/** Every category icon key with a file, for checks. */
+export const categoryIconFiles = (): string[] => Object.keys(categoryGlyphs)
+/** Every UI icon with a file, for checks. */
+export const uiIconFiles = (): string[] => Object.keys(uiGlyphs)
+

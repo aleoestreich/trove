@@ -5,9 +5,9 @@ import type { Institution } from '../data/types'
 import { installmentPlans, upcomingByMonth, type InstallmentPlan } from '../lib/installments'
 import { formatMonthShort, formatMonthYear } from '../lib/dates'
 import { formatMoney } from '../lib/money'
-import { Card, CardTitle, EmptyState, IconDisc, Overline, PageHeader, Progress, Swatch } from '../components/ui'
+import { Card, CardTitle, EmptyState, Overline, PageHeader, Progress, Swatch } from '../components/ui'
 import { StackedMonthChart } from '../components/charts'
-import { categoryIcon } from '../components/Icon'
+import { CategoryBadge } from '../components/CategoryBadge'
 import { useAccountLabel } from '../components/TransactionRow'
 import { useI18n } from '../i18n/I18nProvider'
 import { InstitutionBadge, bankColors } from '../components/BankBadge'
@@ -121,7 +121,7 @@ export function Installments() {
             aria-selected={on}
             aria-controls={isDesktop ? 'installment-list-desktop' : 'installment-list'}
             onClick={() => setView(paid)}
-            className={`inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm focus-visible:outline-2 focus-visible:outline-accent ${
+            className={`inline-flex h-12 items-center gap-1.5 rounded-full px-4 text-sm lg:h-10 focus-visible:outline-2 focus-visible:outline-accent ${
               on ? 'bg-accent-soft font-medium text-accent' : 'text-ink-2'
             }`}
           >
@@ -237,7 +237,7 @@ function PlanTable({ plans }: { plans: InstallmentPlan[] }) {
         return (
           <div key={plan.key} role="row" className={`${planColumns} min-h-[72px] py-2 ${i > 0 ? 'border-t border-line' : ''}`}>
             <span role="cell" className="flex min-w-0 items-center gap-3">
-              <IconDisc icon={categoryIcon(plan.categoryId)} />
+              <PlanBadge categoryId={plan.categoryId} />
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="truncate text-[15px] font-medium text-ink">{plan.description}</span>
                 <span className="text-[13px] text-muted">{accountLabel(plan.accountId)}</span>
@@ -281,7 +281,7 @@ function PlanCard({ plan }: { plan: InstallmentPlan }) {
   return (
     <Card className="flex flex-col gap-3.5">
       <div className="flex items-center gap-3">
-        <IconDisc icon={categoryIcon(plan.categoryId)} />
+        <PlanBadge categoryId={plan.categoryId} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-base leading-[22px] font-medium text-ink">{plan.description}</span>
           <span className="text-[13px] leading-[18px] text-muted">{accountLabel(plan.accountId)}</span>
@@ -315,4 +315,10 @@ function Figure({ label, value, end = false }: { label: string; value: string; e
       <span className="tabular text-sm font-medium whitespace-nowrap text-ink">{value}</span>
     </div>
   )
+}
+
+/** The purchase's category badge (uncategorized when it has none). */
+function PlanBadge({ categoryId }: { categoryId: string | null }) {
+  const { categoriesById } = useData()
+  return <CategoryBadge category={categoryId ? categoriesById.get(categoryId) : null} />
 }

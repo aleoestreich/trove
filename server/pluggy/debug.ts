@@ -1,4 +1,4 @@
-// GET /api/debug/pluggy: Pluggy's raw responses for the owner's debug screen.
+// GET /api/debug/pluggy: Pluggy's raw responses for the debug screen.
 //
 // Behind the login like every other route. Read-only, and limited to:
 //   (no endpoint)                         -> { itemIds } configured in PLUGGY_ITEM_IDS
@@ -7,7 +7,7 @@
 //   endpoint=transactions&itemId=&accountId=[&after=]  -> GET /v2/transactions (one page)
 //   endpoint=bills&itemId=&accountId=     -> GET /bills?accountId=
 // Only the configured items, and only accounts that belong to them. This is
-// the one place that returns amounts and descriptions (to the logged-in owner
+// the one place that returns amounts and descriptions (to a logged-in user
 // only): responses are no-store, never cached on the server and never logged.
 
 import { PluggyClient, PluggyError, type PluggyConfig } from './client.js'

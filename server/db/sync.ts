@@ -1,0 +1,269 @@
+// Sync: fetches one bank connection from Meu Pluggy and saves it to the
+// database, in one transaction. Only the Sync button starts it.
+//
+// - Rows are matched on Pluggy's IDs (connection, account, transaction).
+// - A new transaction gets Trove's category guess; an existing one keeps its
+//   category, subcategory and "hidden" flag: a sync never overwrites
+//   edits.
+// - Transactions in the fetched window that Pluggy no longer returns (e.g. a
+//   pending purchase that posted under a new ID) are marked removed, not deleted.
+// - Each run is logged in sync_runs with counts only; errors keep status
+//   codes, never amounts, descriptions or credentials.
+
+import type pg from 'pg'
+import { fromGuess } from '../../src/data/categories.js'
+import type { SyncResult } from '../../src/data/types.js'
+import { PluggyClient } from '../pluggy/client.js'
+import { brazilDate, categoryFor, isMeuPluggy, itemBankName } from '../pluggy/map.js'
+import { ratesToBRL } from '../pluggy/rates.js'
+import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
+import { inTransaction, type Db } from './connection.js'
+
+/** How far back the first sync goes (Pluggy keeps about a year). */
+const FIRST_SYNC_MONTHS = 12
+/** Later syncs re-read this many days before the last one, to pick up late changes. */
+const OVERLAP_DAYS = 35
+
+const cents = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? Math.round(n * 100) : null)
+const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null)
+const day = (v: unknown): string | null => (typeof v === 'string' && v ? brazilDate(v) : null)
+
+/** The first day of the window to fetch, as YYYY-MM-DD. */
+export function syncFrom(lastSyncedAt: Date | null, now: Date): string {
+  const d = lastSyncedAt ? new Date(lastSyncedAt.getTime() - OVERLAP_DAYS * 86_400_000) : new Date(now.getFullYear(), now.getMonth() - FIRST_SYNC_MONTHS, 1)
+  return d.toISOString().slice(0, 10)
+}
+
+/** A connection's name in Trove: the bank for Meu Pluggy items, else the connector. */
+export function connectionName(item: PluggyItem, accounts: PluggyAccount[]): string {
+  return (isMeuPluggy(item) ? itemBankName(accounts) : null) ?? item.connector.name
+}
+
+interface Fetched {
+  item: PluggyItem
+  accounts: PluggyAccount[]
+  transactions: PluggyTransaction[]
+  from: string
+  rates: Record<string, number>
+}
+
+/** Everything from Pluggy for one connection. Nothing is written until it's all fetched. */
+export async function fetchConnection(client: PluggyClient, itemId: string, from: string, fetchFn: typeof fetch): Promise<Fetched> {
+  const item = await client.getItem(itemId)
+  const accounts = await client.getAccounts(itemId)
+  const transactions = (await Promise.all(accounts.map((a) => client.getTransactions(a.id, from)))).flat()
+  // Rates are optional here: if every source fails, the last stored ones are used when reading.
+  const currencies = [...accounts.map((a) => a.currencyCode), ...transactions.map((t) => t.currencyCode)].filter(Boolean)
+  const rates = await ratesToBRL(currencies, fetchFn).catch(() => ({}))
+  return { item, accounts, transactions, from, rates }
+}
+
+/** Syncs one connection: fetch from Pluggy, then save. */
+export async function syncConnection(
+  pool: pg.Pool,
+  client: PluggyClient,
+  itemId: string,
+  deps: { now?: Date; fetch?: typeof fetch; trigger?: string } = {},
+): Promise<SyncResult> {
+  const now = deps.now ?? new Date()
+  const last = await pool.query<{ synced_at: Date }>(`SELECT synced_at FROM bank_connections WHERE id = $1`, [itemId])
+  const from = syncFrom(last.rows[0]?.synced_at ?? null, now)
+  const run = await pool.query<{ id: string }>(`INSERT INTO sync_runs (connection_id, trigger, started_at) VALUES (NULL, $1, $2) RETURNING id`, [
+    deps.trigger ?? 'manual',
+    now,
+  ])
+  const runId = run.rows[0].id
+  try {
+    const fetched = await fetchConnection(client, itemId, from, deps.fetch ?? fetch)
+    const result = await inTransaction(pool, (db) => save(db, fetched, now))
+    await pool.query(
+      `UPDATE sync_runs SET connection_id = $2, finished_at = now(), ok = true, transactions_upserted = $3, transactions_removed = $4 WHERE id = $1`,
+      [runId, itemId, result.inserted + result.updated, result.removed],
+    )
+    return result
+  } catch (e) {
+    // Status codes and messages without values only (see PluggyError and dbErrorMessage).
+    const code = (e as { status?: unknown; code?: unknown })?.status ?? (e as { code?: unknown })?.code ?? 'error'
+    await pool.query(`UPDATE sync_runs SET finished_at = now(), ok = false, error = $2 WHERE id = $1`, [runId, String(code)]).catch(() => {})
+    throw e
+  }
+}
+
+/** Writes one fetched connection. Exported for tests. */
+export async function save(db: Db, f: Fetched, now: Date): Promise<SyncResult> {
+  const { item, accounts, transactions } = f
+  const name = connectionName(item, accounts)
+  const today = brazilDate(now.toISOString())
+
+  await db.query(
+    `INSERT INTO bank_connections (id, connector_id, connector_name, bank_name, status, execution_status, last_updated_at, created_at, raw, synced_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (id) DO UPDATE SET connector_id = excluded.connector_id, connector_name = excluded.connector_name, bank_name = excluded.bank_name,
+       status = excluded.status, execution_status = excluded.execution_status, last_updated_at = excluded.last_updated_at, raw = excluded.raw, synced_at = excluded.synced_at`,
+    [
+      item.id,
+      item.connector.id,
+      item.connector.name,
+      name,
+      item.status,
+      text((item as unknown as Record<string, unknown>).executionStatus),
+      item.lastUpdatedAt ?? null,
+      text((item as unknown as Record<string, unknown>).createdAt),
+      JSON.stringify(item),
+      now,
+    ],
+  )
+
+  const accountRows = accounts.map((a) => {
+    const credit = (a.creditData ?? {}) as Record<string, unknown>
+    const raw = a as unknown as Record<string, unknown>
+    return {
+      id: a.id,
+      connection_id: item.id,
+      type: a.type,
+      subtype: a.subtype,
+      name: a.name ?? '',
+      marketing_name: a.marketingName ?? null,
+      number: text(raw.number),
+      currency_code: (a.currencyCode || 'BRL').toUpperCase(),
+      balance_cents: cents(a.balance) ?? 0,
+      credit_limit_cents: cents(credit.creditLimit),
+      available_limit_cents: cents(credit.availableCreditLimit),
+      minimum_payment_cents: cents(credit.minimumPayment),
+      balance_close_date: day(credit.balanceCloseDate),
+      balance_due_date: day(credit.balanceDueDate),
+      card_brand: text(credit.brand),
+      card_level: text(credit.level),
+      raw: a,
+    }
+  })
+  await db.query(
+    `INSERT INTO accounts (id, connection_id, type, subtype, name, marketing_name, number, currency_code, balance_cents, credit_limit_cents,
+       available_limit_cents, minimum_payment_cents, balance_close_date, balance_due_date, card_brand, card_level, raw, synced_at)
+     SELECT r.id, r.connection_id, r.type, r.subtype, r.name, r.marketing_name, r.number, r.currency_code, r.balance_cents, r.credit_limit_cents,
+       r.available_limit_cents, r.minimum_payment_cents, r.balance_close_date, r.balance_due_date, r.card_brand, r.card_level, r.raw, $2
+     FROM jsonb_to_recordset($1::jsonb) AS r(id text, connection_id text, type text, subtype text, name text, marketing_name text, number text,
+       currency_code text, balance_cents bigint, credit_limit_cents bigint, available_limit_cents bigint, minimum_payment_cents bigint,
+       balance_close_date date, balance_due_date date, card_brand text, card_level text, raw jsonb)
+     ON CONFLICT (id) DO UPDATE SET connection_id = excluded.connection_id, type = excluded.type, subtype = excluded.subtype, name = excluded.name,
+       marketing_name = excluded.marketing_name, number = excluded.number, currency_code = excluded.currency_code, balance_cents = excluded.balance_cents,
+       credit_limit_cents = excluded.credit_limit_cents, available_limit_cents = excluded.available_limit_cents,
+       minimum_payment_cents = excluded.minimum_payment_cents, balance_close_date = excluded.balance_close_date,
+       balance_due_date = excluded.balance_due_date, card_brand = excluded.card_brand, card_level = excluded.card_level, raw = excluded.raw,
+       synced_at = excluded.synced_at`,
+    [JSON.stringify(accountRows), now],
+  )
+  // Today's balance, for the balance history.
+  await db.query(
+    `INSERT INTO account_balances (account_id, as_of, balance_cents, available_limit_cents)
+     SELECT r.id, $2::date, r.balance_cents, r.available_limit_cents FROM jsonb_to_recordset($1::jsonb) AS r(id text, balance_cents bigint, available_limit_cents bigint)
+     ON CONFLICT (account_id, as_of) DO UPDATE SET balance_cents = excluded.balance_cents, available_limit_cents = excluded.available_limit_cents`,
+    [JSON.stringify(accountRows), today],
+  )
+
+  // New transactions get the guess, but only for categories that exist.
+  const known = new Set((await db.query<{ id: string }>(`SELECT id FROM categories`)).rows.map((r) => r.id))
+  const txRows = transactions.map((t) => {
+    const raw = t as unknown as Record<string, unknown>
+    const m = (t.creditCardMetadata ?? {}) as Record<string, unknown>
+    const merchant = (raw.merchant ?? {}) as Record<string, unknown>
+    const payment = (raw.paymentData ?? {}) as Record<string, unknown>
+    const other = ((t.type === 'CREDIT' ? payment.payer : payment.receiver) ?? {}) as Record<string, unknown>
+    return {
+      id: t.id,
+      account_id: t.accountId,
+      card_bill_id: text(m.billId),
+      provider_id: text(raw.providerId),
+      date: t.date,
+      booked_on: brazilDate(t.date),
+      description: t.description ?? '',
+      description_raw: text(raw.descriptionRaw),
+      type: t.type,
+      amount_cents: cents(t.amount) ?? 0,
+      currency_code: (t.currencyCode || 'BRL').toUpperCase(),
+      amount_in_account_currency_cents: cents(t.amountInAccountCurrency),
+      balance_cents: cents(raw.balance),
+      status: t.status ?? null,
+      operation_type: text(raw.operationType),
+      pluggy_category: t.category ?? null,
+      pluggy_category_id: t.categoryId ?? null,
+      installment_number: typeof m.installmentNumber === 'number' ? m.installmentNumber : null,
+      total_installments: typeof m.totalInstallments === 'number' ? m.totalInstallments : null,
+      purchase_total_cents: cents(m.totalAmount),
+      purchase_date: day(m.purchaseDate),
+      card_last_digits: text(m.cardNumber),
+      mcc: m.payeeMCC != null ? String(m.payeeMCC) : null,
+      merchant_name: text(merchant.name),
+      merchant_cnpj: text(merchant.cnpj),
+      payment_method: text(payment.paymentMethod),
+      counterparty_name: text(other.name),
+      pluggy_updated_at: text(raw.updatedAt),
+      category_id: fromGuess(categoryFor(t), known).categoryId,
+      raw: t,
+    }
+  })
+  const json = JSON.stringify(txRows)
+  const ids = txRows.map((r) => r.id)
+
+  // Counts first: new IDs, and existing rows whose data changed (or that come back after being removed).
+  const existing = await db.query<{ id: string; changed: boolean }>(
+    `SELECT t.id, (t.raw IS DISTINCT FROM n.raw OR t.removed_at IS NOT NULL) AS changed
+     FROM transactions t JOIN jsonb_to_recordset($1::jsonb) AS n(id text, raw jsonb) USING (id)`,
+    [json],
+  )
+  const inserted = ids.length - existing.rowCount!
+  const updated = existing.rows.filter((r) => r.changed).length
+
+  // The category guess is set on insert only: category_id, subcategory_id and is_hidden are never updated here.
+  await db.query(
+    `INSERT INTO transactions (id, account_id, card_bill_id, provider_id, date, booked_on, description, description_raw, type, amount_cents,
+       currency_code, amount_in_account_currency_cents, balance_cents, status, operation_type, pluggy_category, pluggy_category_id,
+       installment_number, total_installments, purchase_total_cents, purchase_date, card_last_digits, mcc, merchant_name, merchant_cnpj,
+       payment_method, counterparty_name, pluggy_updated_at, category_id, raw, first_seen_at, last_seen_at)
+     SELECT r.id, r.account_id, r.card_bill_id, r.provider_id, r.date, r.booked_on, r.description, r.description_raw, r.type, r.amount_cents,
+       r.currency_code, r.amount_in_account_currency_cents, r.balance_cents, r.status, r.operation_type, r.pluggy_category, r.pluggy_category_id,
+       r.installment_number, r.total_installments, r.purchase_total_cents, r.purchase_date, r.card_last_digits, r.mcc, r.merchant_name,
+       r.merchant_cnpj, r.payment_method, r.counterparty_name, r.pluggy_updated_at, r.category_id, r.raw, $2, $2
+     FROM jsonb_to_recordset($1::jsonb) AS r(id text, account_id text, card_bill_id text, provider_id text, date timestamptz, booked_on date,
+       description text, description_raw text, type text, amount_cents bigint, currency_code text, amount_in_account_currency_cents bigint,
+       balance_cents bigint, status text, operation_type text, pluggy_category text, pluggy_category_id text, installment_number smallint,
+       total_installments smallint, purchase_total_cents bigint, purchase_date date, card_last_digits text, mcc text, merchant_name text,
+       merchant_cnpj text, payment_method text, counterparty_name text, pluggy_updated_at timestamptz, category_id text, raw jsonb)
+     ON CONFLICT (id) DO UPDATE SET account_id = excluded.account_id, card_bill_id = excluded.card_bill_id, provider_id = excluded.provider_id,
+       date = excluded.date, booked_on = excluded.booked_on, description = excluded.description, description_raw = excluded.description_raw,
+       type = excluded.type, amount_cents = excluded.amount_cents, currency_code = excluded.currency_code,
+       amount_in_account_currency_cents = excluded.amount_in_account_currency_cents, balance_cents = excluded.balance_cents,
+       status = excluded.status, operation_type = excluded.operation_type, pluggy_category = excluded.pluggy_category,
+       pluggy_category_id = excluded.pluggy_category_id, installment_number = excluded.installment_number,
+       total_installments = excluded.total_installments, purchase_total_cents = excluded.purchase_total_cents,
+       purchase_date = excluded.purchase_date, card_last_digits = excluded.card_last_digits, mcc = excluded.mcc,
+       merchant_name = excluded.merchant_name, merchant_cnpj = excluded.merchant_cnpj, payment_method = excluded.payment_method,
+       counterparty_name = excluded.counterparty_name, pluggy_updated_at = excluded.pluggy_updated_at, raw = excluded.raw,
+       last_seen_at = excluded.last_seen_at, removed_at = NULL`,
+    [json, now],
+  )
+
+  // In the fetched window, what Pluggy no longer returns is marked removed.
+  const removed = await db.query(
+    `UPDATE transactions SET removed_at = $4
+     WHERE account_id = ANY($1::text[]) AND booked_on >= $2::date AND removed_at IS NULL AND NOT (id = ANY($3::text[]))`,
+    [accounts.map((a) => a.id), f.from, ids, now],
+  )
+
+  for (const [currency, rate] of Object.entries(f.rates)) {
+    await db.query(
+      `INSERT INTO exchange_rates (currency_code, as_of, brl_per_unit, source) VALUES ($1, $2, $3, 'sync')
+       ON CONFLICT (currency_code, as_of) DO UPDATE SET brl_per_unit = excluded.brl_per_unit`,
+      [currency, today, rate],
+    )
+  }
+
+  // Per connection: bank_connections.synced_at (above). Overall: the latest sync of any connection.
+  await db.query(
+    `INSERT INTO app_settings (key, value, updated_at) VALUES ('last_synced_at', to_jsonb($1::text), $2)
+     ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    [now.toISOString(), now],
+  )
+
+  return { connectionId: item.id, name, inserted, updated, removed: removed.rowCount ?? 0 }
+}

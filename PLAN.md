@@ -90,10 +90,13 @@ No backend, no auth. It runs in the browser on hardcoded data.
     (`/api/finance?summary`);
   - confirm how Meu Pluggy reports Wise;
   - add a "last updated" indicator and a manual refresh.
-- In progress: store data in Postgres on Neon, synced by Pluggy webhooks
-  (`item/updated`, `transactions/created`) plus a daily job, for full history,
-  faster loads and category edits saved on the server. Schema in
-  `db/schema.sql`, setup in `docs/neon-setup.md`; the sync is next.
+- ✅ Data in Postgres on Neon (`docs/neon-setup.md`): every screen reads the
+  database; the Sync button fetches each connection from Meu Pluggy
+  and saves it without touching their edits.
+- ✅ Categories and subcategories in the database (Categories tab), hidden
+  transactions, category colours and icons.
+- Next: card closing days in the database (today per device); Pluggy's card
+  bills in the sync.
 
 ## Phase 3 — Authentication & security
 
@@ -102,7 +105,7 @@ No backend, no auth. It runs in the browser on hardcoded data.
   sign in is managed only in Auth0 (one user, sign-ups disabled); the code has
   no email list. See `docs/auth0-setup.md`.
 - Optional: passkeys (fingerprint) and MFA in Auth0.
-- Every record scoped to the owner once there is a database.
+- One database per user; no per-record user scoping needed (see docs/neon-setup.md).
 - Pluggy API credentials live only on the server; never store bank passwords.
 - HTTPS, secure cookies, rate limiting. Optionally lock the app with a PIN or
   biometrics on the phone.

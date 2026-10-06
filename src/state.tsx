@@ -1,16 +1,18 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Repository } from './data/repository'
 import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
-import type { Snapshot } from './data/seed'
-import type { Account, Category, Institution } from './data/types'
+import { applyEdit, type Edit } from './data/edits'
+import type { Account, Category, Institution, Snapshot, Subcategory, SyncInfo } from './data/types'
 import { useI18n } from './i18n/I18nProvider'
 import { Button, EmptyState } from './components/ui'
 
 interface AppData extends Snapshot {
   accountsById: Map<string, Account>
   categoriesById: Map<string, Category>
+  subcategoriesById: Map<string, Subcategory>
   institutionsById: Map<string, Institution>
-  setCategory(transactionId: string, categoryId: string): void
+  /** Applies a change at once and saves it (see src/data/edits.ts). */
+  edit(edit: Edit): void
   /** Set (or clear, with null) a card's closing and due days; saved on this device. */
   setCardDays(accountId: string, days: CardDays | null): void
 }
@@ -26,35 +28,75 @@ interface LoadState {
 
 const LoadContext = createContext<LoadState>({ error: null, retry() {}, source: null })
 
+export interface SyncState {
+  /** Connections and when they last synced; null for demo data with nothing to sync. */
+  info: SyncInfo | null
+  status: 'idle' | 'syncing'
+  /** While syncing: which connection (1-based) of how many, and its bank's name when known. */
+  progress: { index: number; total: number; name: string | null } | null
+  /** Connections that failed in the last sync (the others were saved). */
+  failed: { id: string; name: string | null }[]
+  /** After a successful sync: new and updated transactions, for the snackbar. */
+  result: { inserted: number; updated: number; at: number } | null
+  /** Syncs every connection, or just `only` (Retry). */
+  sync(only?: string[]): void
+  dismissResult(): void
+}
+
+const SyncContext = createContext<SyncState>({
+  info: null,
+  status: 'idle',
+  progress: null,
+  failed: [],
+  result: null,
+  sync() {},
+  dismissResult() {},
+})
+
+/** A save that failed (shown as a message; the data is reloaded). */
+const EditErrorContext = createContext<{ message: string | null; dismiss(): void }>({ message: null, dismiss() {} })
+
+const byOrder = <T extends { sortOrder: number; name: string }>(a: T, b: T) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)
+
 /**
- * Loads the snapshot for the whole app. The header and sidebar can read its
- * source with `useDataSource()`; pages go inside `<DataGate>`, which shows the
- * loading and error states in the content area.
+ * Loads the snapshot for the whole app, applies edits and runs
+ * syncs. The header and sidebar can read the source and sync state; pages go
+ * inside `<DataGate>`, which shows the loading and error states.
  */
 export function DataProvider({ repository, children }: { repository: Repository; children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  const load = useCallback(() => repository.load().then(setSnapshot), [repository])
 
   useEffect(() => {
     setError(null)
-    repository.load().then(setSnapshot, (e) => {
+    load().catch((e) => {
       console.error(e)
       setError(e instanceof Error ? e.message : String(e))
     })
-  }, [repository, attempt])
+  }, [load, attempt])
 
-  const setCategory = useCallback(
-    (transactionId: string, categoryId: string) => {
-      setSnapshot((s) =>
-        s && {
-          ...s,
-          transactions: s.transactions.map((t) => (t.id === transactionId ? { ...t, categoryId } : t)),
-        },
-      )
-      void repository.setTransactionCategory(transactionId, categoryId)
+  // Edits are applied at once, then saved in order; a failed save reloads what's stored.
+  const queue = useRef(Promise.resolve())
+  const edit = useCallback(
+    (e: Edit) => {
+      try {
+        setSnapshot((s) => s && applyEdit(s, e))
+      } catch (err) {
+        setEditError(err instanceof Error ? err.message : String(err))
+        return
+      }
+      queue.current = queue.current
+        .then(() => repository.edit(e))
+        .catch((err) => {
+          setEditError(err instanceof Error ? err.message : String(err))
+          return load().catch(() => {})
+        })
     },
-    [repository],
+    [repository, load],
   )
 
   const [cardDays, setCardDaysState] = useState(readCardDays)
@@ -63,31 +105,92 @@ export function DataProvider({ repository, children }: { repository: Repository;
     setCardDaysState(readCardDays())
   }, [])
 
+  // Sync: one connection at a time, then reload from the database.
+  const [syncing, setSyncing] = useState<Pick<SyncState, 'status' | 'progress' | 'failed' | 'result'>>({
+    status: 'idle',
+    progress: null,
+    failed: [],
+    result: null,
+  })
+  const sync = useCallback(
+    async (only?: string[]) => {
+      const connections = (snapshot?.sync?.connections ?? []).filter((c) => !only || only.includes(c.id))
+      if (connections.length === 0 || syncing.status === 'syncing') return
+      const failed: SyncState['failed'] = []
+      let inserted = 0
+      let updated = 0
+      for (const [i, c] of connections.entries()) {
+        setSyncing({ status: 'syncing', progress: { index: i + 1, total: connections.length, name: c.name }, failed, result: null })
+        try {
+          const r = await repository.sync(c.id)
+          inserted += r.inserted
+          updated += r.updated
+        } catch (e) {
+          console.error(e)
+          failed.push({ id: c.id, name: c.name })
+        }
+      }
+      await load().catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      const ok = failed.length < connections.length
+      setSyncing({ status: 'idle', progress: null, failed, result: ok && failed.length === 0 ? { inserted, updated, at: Date.now() } : null })
+    },
+    [snapshot?.sync, syncing.status, repository, load],
+  )
+  const syncState = useMemo<SyncState>(
+    () => ({
+      info: snapshot?.sync ?? null,
+      ...syncing,
+      sync: (only) => void sync(only),
+      dismissResult: () => setSyncing((s) => ({ ...s, result: null })),
+    }),
+    [snapshot?.sync, syncing, sync],
+  )
+
   const value = useMemo<AppData | null>(() => {
     if (!snapshot) return null
-    // The owner's closing and due days replace the bank's dates for those cards.
+    // Closing and due days set by hand replace the bank's dates for those cards.
     const accounts = applyCardDays(snapshot.accounts, cardDays)
+    const categories = [...snapshot.categories].sort(byOrder)
+    const subcategories = [...snapshot.subcategories].sort(byOrder)
     return {
       ...snapshot,
       accounts,
+      categories,
+      subcategories,
       accountsById: new Map(accounts.map((a) => [a.id, a])),
-      categoriesById: new Map(snapshot.categories.map((c) => [c.id, c])),
+      categoriesById: new Map(categories.map((c) => [c.id, c])),
+      subcategoriesById: new Map(subcategories.map((s) => [s.id, s])),
       institutionsById: new Map(snapshot.institutions.map((i) => [i.id, i])),
-      setCategory,
+      edit,
       setCardDays,
     }
-  }, [snapshot, setCategory, cardDays, setCardDays])
+  }, [snapshot, edit, cardDays, setCardDays])
 
-  const load = useMemo<LoadState>(
+  const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),
     [error, snapshot],
   )
+  const editErrorState = useMemo(() => ({ message: editError, dismiss: () => setEditError(null) }), [editError])
 
   return (
-    <LoadContext.Provider value={load}>
-      <DataContext.Provider value={value}>{children}</DataContext.Provider>
+    <LoadContext.Provider value={loadState}>
+      <SyncContext.Provider value={syncState}>
+        <EditErrorContext.Provider value={editErrorState}>
+          <DataContext.Provider value={value}>{children}</DataContext.Provider>
+        </EditErrorContext.Provider>
+      </SyncContext.Provider>
     </LoadContext.Provider>
   )
+}
+
+/** Sync state and actions (header bar, sidebar, snackbar). */
+export function useSync(): SyncState {
+  return useContext(SyncContext)
+}
+
+/** The last save that failed, if any. */
+export function useEditError() {
+  return useContext(EditErrorContext)
 }
 
 /** Renders its children once the data has loaded; until then, a skeleton or the error. */

@@ -1,4 +1,4 @@
-// GET /api/finance: the owner's data from Pluggy, in Trove's model.
+// GET /api/finance?summary: data read live from Pluggy, in Trove's model.
 // Protected by the login middleware like every other route.
 //
 // Responses:
@@ -38,9 +38,12 @@ function json(status: number, body: unknown, extra: Record<string, string> = {})
   })
 }
 
-/** First day of the oldest month the app shows, as YYYY-MM-DD. */
-export function historyStart(now: Date): string {
-  const d = new Date(now.getFullYear(), now.getMonth() - (MONTHS_OF_HISTORY - 1), 1)
+/**
+ * First day of the oldest month the app shows, as YYYY-MM-DD; `extra` months
+ * further back (the database read adds one, for the 6-complete-month income average).
+ */
+export function historyStart(now: Date, extra = 0): string {
+  const d = new Date(now.getFullYear(), now.getMonth() - (MONTHS_OF_HISTORY - 1) - extra, 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 

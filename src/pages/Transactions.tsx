@@ -1,16 +1,17 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
 import { MONTHS_OF_HISTORY } from '../data/seed'
-import type { CategoryKind, Transaction } from '../data/types'
+import type { Category, CategoryKind, Transaction } from '../data/types'
 import { formatDayHeading, formatMonth, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
 import { currentBill, inBill } from '../lib/bills'
 import { installmentPlans } from '../lib/installments'
 import { formatMoney } from '../lib/money'
-import { totals } from '../lib/summary'
-import { Icon, categoryIcon } from '../components/Icon'
-import { Amount, Button, EmptyState, IconDisc, PageHeader } from '../components/ui'
-import { TransactionRow, useAccountLabel } from '../components/TransactionRow'
+import { kindOf, totals } from '../lib/summary'
+import { Icon } from '../components/Icon'
+import { Amount, Button, EmptyState, PageHeader } from '../components/ui'
+import { CategoryLine, TransactionRow, useAccountLabel } from '../components/TransactionRow'
+import { TransactionBadge, catVar } from '../components/CategoryBadge'
 import { TransactionPanel, TransactionSheet } from '../components/TransactionSheet'
 import { useI18n } from '../i18n/I18nProvider'
 import { accountLabel } from '../lib/accountLabel'
@@ -19,23 +20,22 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 export interface TransactionFilters {
   month?: string
   accountId?: string
+  /** A category ID, or "none" for uncategorized. */
   categoryId?: string
   kind?: CategoryKind
   query?: string
 }
 
-export function filterTransactions(
-  transactions: Transaction[],
-  kindOf: (categoryId: string) => CategoryKind | undefined,
-  f: TransactionFilters,
-): Transaction[] {
+/** The transactions matching the filters. Hidden ones are left out (they have their own view). */
+export function filterTransactions(transactions: Transaction[], categoriesById: Map<string, Category>, f: TransactionFilters): Transaction[] {
   const q = f.query?.trim().toLowerCase()
   return transactions.filter(
     (t) =>
+      !t.hidden &&
       (!f.month || monthKey(t.date) === f.month) &&
       (!f.accountId || t.accountId === f.accountId) &&
-      (!f.categoryId || t.categoryId === f.categoryId) &&
-      (!f.kind || kindOf(t.categoryId) === f.kind) &&
+      (!f.categoryId || (f.categoryId === 'none' ? !t.transfer && !(t.categoryId && categoriesById.has(t.categoryId)) : t.categoryId === f.categoryId)) &&
+      (!f.kind || kindOf(t, categoriesById) === f.kind) &&
       (!q || t.description.toLowerCase().includes(q)),
   )
 }
@@ -108,9 +108,9 @@ export function Transactions() {
   const billCard = params.get('bill') ? accounts.find((a) => a.id === params.get('bill')) : undefined
   const bill = billCard ? currentBill(billCard, transactions, plans) : null
   const filtered = useMemo(() => {
-    if (!bill || !billCard) return filterTransactions(transactions, (id) => categoriesById.get(id)?.kind, filters)
+    if (!bill || !billCard) return filterTransactions(transactions, categoriesById, filters)
     const inCycle = transactions.filter((tx) => inBill(tx, billCard.id, bill))
-    return filterTransactions(inCycle, (id) => categoriesById.get(id)?.kind, { ...filters, month: undefined, accountId: undefined })
+    return filterTransactions(inCycle, categoriesById, { ...filters, month: undefined, accountId: undefined })
   }, [transactions, categoriesById, params, bill?.closeDate])
 
   // Grouped by day, each with its net (transfers excluded). `locale`: headings are formatted text.
@@ -129,7 +129,8 @@ export function Transactions() {
   const monthLabel = filters.month ? formatMonth(filters.month) : t.transactions.allMonths
   const kindLabel = { expense: t.expenses, income: t.income, transfer: t.transfers }
   const account = filters.accountId ? accounts.find((a) => a.id === filters.accountId) : undefined
-  const category = filters.categoryId ? categoriesById.get(filters.categoryId) : undefined
+  const category = filters.categoryId && filters.categoryId !== 'none' ? categoriesById.get(filters.categoryId) : undefined
+  const hiddenCount = transactions.filter((tx) => tx.hidden).length
 
   // A bill spans two months: no month in the count or the empty message.
   const shownMonth = bill ? undefined : filters.month
@@ -152,7 +153,9 @@ export function Transactions() {
 
   return (
     <>
-      <PageHeader title={t.nav.transactions} subtitle={countText} />
+      <PageHeader title={t.nav.transactions} subtitle={countText}>
+        {hiddenCount > 0 && <HiddenLink count={hiddenCount} />}
+      </PageHeader>
       <div className="-mx-4 flex flex-col gap-1 lg:mx-0 lg:gap-4">
         <div className="flex flex-col gap-1 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
           <div className="px-4 lg:w-[340px] lg:px-0">
@@ -219,13 +222,19 @@ export function Transactions() {
               ))}
             </FilterChip>
             )}
-            <FilterChip label={category ? categoryName(category) : t.category} applied={!!category} value={filters.categoryId ?? ''} onChange={(v) => set('c', v)}>
+            <FilterChip
+              label={filters.categoryId === 'none' ? t.transactions.uncategorized : category ? categoryName(category) : t.category}
+              applied={!!filters.categoryId}
+              value={filters.categoryId ?? ''}
+              onChange={(v) => set('c', v)}
+            >
               <option value="">{t.transactions.allCategories}</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {categoryName(c)}
                 </option>
               ))}
+              <option value="none">{t.transactions.uncategorized}</option>
             </FilterChip>
             {hasFilters && (
               <button type="button" className="h-12 shrink-0 px-2 text-sm font-medium text-accent lg:h-11" onClick={clear}>
@@ -254,7 +263,10 @@ export function Transactions() {
           empty
         ) : (
           <>
-            <p className="px-4 pb-2 text-[13px] leading-[18px] text-muted">{countText}</p>
+            <div className="flex min-h-12 items-center justify-between gap-3 pr-1 pl-4">
+              <p className="text-[13px] leading-[18px] text-muted">{countText}</p>
+              {hiddenCount > 0 && <HiddenLink count={hiddenCount} />}
+            </div>
             <div className="flex flex-col gap-4 px-4">
               {byDate.map((day) => (
                 <section key={day.date} className="flex flex-col gap-2">
@@ -279,6 +291,78 @@ export function Transactions() {
   )
 }
 
+/** "Hidden (n)": opens the hidden transactions. */
+function HiddenLink({ count }: { count: number }) {
+  const { t } = useI18n()
+  return (
+    <Link
+      to="/transactions/hidden"
+      className="inline-flex h-12 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-accent hover:bg-accent-faint active:bg-track lg:h-11"
+    >
+      <Icon name="eyeOff" className="size-[18px]" />
+      {t.transactions.hiddenLink(count)}
+    </Link>
+  )
+}
+
+/** Hidden transactions: grouped by day, no day totals, dimmed, each with Unhide. */
+export function HiddenTransactions() {
+  const { transactions, edit, categoriesById } = useData()
+  const { t, locale } = useI18n()
+  const accountLabel = useAccountLabel()
+  const days = useMemo(() => {
+    const groups = new Map<string, Transaction[]>()
+    for (const tx of transactions) if (tx.hidden) groups.set(tx.date, [...(groups.get(tx.date) ?? []), tx])
+    return [...groups].map(([date, txs]) => ({ date, label: formatDayHeading(date), txs }))
+  }, [transactions, locale])
+
+  return (
+    <div className="flex flex-col gap-4 lg:max-w-[880px]">
+      <div className="flex items-center gap-1">
+        <Link
+          to="/transactions"
+          aria-label={t.nav.transactions}
+          className="-ml-3 flex size-12 items-center justify-center rounded-full text-ink-2 hover:bg-track active:bg-track"
+        >
+          <Icon name="chevronLeft" className="size-[22px]" />
+        </Link>
+        <h1 className="text-[22px] leading-7 font-medium text-ink lg:text-[28px] lg:leading-[34px]">{t.transactions.hiddenTitle}</h1>
+      </div>
+      <p className="text-sm leading-5 text-ink-2">{t.transactions.hiddenNote}</p>
+      {days.length === 0 && <p className="py-6 text-center text-sm text-muted">{t.transactions.hiddenEmpty}</p>}
+      {days.map((day) => (
+        <section key={day.date} className="flex flex-col gap-2">
+          <h2 className="px-1 text-[13px] leading-[18px] font-medium text-ink-2">{day.label}</h2>
+          <div className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
+            {day.txs.map((tx) => (
+              <div key={tx.id} className="flex min-h-[72px] items-center gap-3 py-2 pr-2 pl-4">
+                <div className="flex min-w-0 flex-1 items-center gap-3 opacity-60">
+                  <TransactionBadge tx={tx} categoriesById={categoriesById} />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[15px] leading-5 font-medium text-ink">{tx.description}</span>
+                    <CategoryLine tx={tx} compact />
+                    <span className="truncate text-[13px] leading-[18px] text-muted">{accountLabel(tx.accountId)}</span>
+                  </span>
+                  <Amount cents={tx.amount} foreign={tx.foreign} transfer={!!tx.transfer} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => edit({ op: 'hide', transactionId: tx.id, hidden: false })}
+                  aria-label={t.transactions.unhideAria(tx.description)}
+                  className="inline-flex h-12 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-accent hover:bg-accent-faint active:bg-track"
+                >
+                  <Icon name="eye" className="size-[18px]" />
+                  {t.transactions.unhide}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
+}
+
 function DayTotal({ net }: { net: number }) {
   if (net === 0) return null
   return (
@@ -293,7 +377,7 @@ function DayTotal({ net }: { net: number }) {
  * Category columns (the panel shows both) so descriptions keep their room.
  */
 const columnsFor = (narrow: boolean) =>
-  `grid gap-4 px-5 ${narrow ? 'grid-cols-[minmax(0,1fr)_130px] xl:grid-cols-[minmax(0,1fr)_150px_150px_130px]' : 'grid-cols-[minmax(0,1fr)_150px_150px_130px]'}`
+  `grid gap-4 px-5 ${narrow ? 'grid-cols-[minmax(0,1fr)_130px] 2xl:grid-cols-[minmax(0,1fr)_150px_170px_130px]' : 'grid-cols-[minmax(0,1fr)_150px_170px_130px]'}`
 
 /** Desktop: one table, day bands between the rows. The selected row is highlighted. */
 function TransactionTable({
@@ -308,9 +392,9 @@ function TransactionTable({
   narrow: boolean
 }) {
   const columns = columnsFor(narrow)
-  const optional = narrow ? 'hidden xl:block' : ''
+  const optional = narrow ? 'hidden 2xl:flex' : 'flex'
   const { categoriesById } = useData()
-  const { t, categoryName } = useI18n()
+  const { t } = useI18n()
   const accountLabel = useAccountLabel()
   return (
     <div role="table" aria-label={t.nav.transactions}>
@@ -335,7 +419,7 @@ function TransactionTable({
             <DayTotal net={day.net} />
           </div>
           {day.txs.map((tx) => {
-            const category = categoriesById.get(tx.categoryId)
+            const category = tx.categoryId ? categoriesById.get(tx.categoryId) : undefined
             const on = tx.id === selectedId
             return (
               <button
@@ -347,7 +431,7 @@ function TransactionTable({
                 className={`${columns} min-h-14 w-full items-center border-b border-line py-2 text-left ${on ? 'bg-accent-faint' : 'hover:bg-page'}`}
               >
                 <span role="cell" className="flex min-w-0 items-center gap-3">
-                  <IconDisc icon={categoryIcon(tx.categoryId)} size="sm" />
+                  <TransactionBadge tx={tx} categoriesById={categoriesById} size={34} />
                   <span className="min-w-0 truncate text-sm font-medium text-ink">{tx.description}</span>
                   {tx.installment && (
                     <span className="tabular inline-flex h-[22px] shrink-0 items-center rounded-full bg-track px-[7px] text-xs font-medium text-ink-2">
@@ -356,14 +440,21 @@ function TransactionTable({
                   )}
                   {tx.status === 'PENDING' && <span className="min-w-0 shrink-[2] truncate text-xs text-muted">{t.pending}</span>}
                 </span>
-                <span role="cell" className={`truncate text-[13px] text-ink-2 ${optional}`}>
-                  {accountLabel(tx.accountId)}
+                <span role="cell" className={`min-w-0 items-center truncate text-[13px] text-ink-2 ${optional}`}>
+                  <span className="truncate">{accountLabel(tx.accountId)}</span>
                 </span>
-                <span role="cell" className={`truncate text-[13px] text-ink-2 ${optional}`}>
-                  {categoryName(category)}
+                <span role="cell" className={`min-w-0 items-center gap-2 ${optional}`}>
+                  {!tx.transfer && (
+                    <span
+                      aria-hidden
+                      className={`size-2 shrink-0 rounded-full ${category ? '' : 'border-[1.5px] border-dashed border-muted'}`}
+                      style={category ? { background: catVar(category.color) } : undefined}
+                    />
+                  )}
+                  <CategoryLine tx={tx} compact />
                 </span>
                 <span role="cell">
-                  <Amount cents={tx.amount} foreign={tx.foreign} transfer={category?.kind === 'transfer'} className="[&>span:first-child]:text-sm" />
+                  <Amount cents={tx.amount} foreign={tx.foreign} transfer={!!tx.transfer} className="[&>span:first-child]:text-sm" />
                 </span>
               </button>
             )

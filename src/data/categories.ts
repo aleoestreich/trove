@@ -1,26 +1,33 @@
-// Trove's categories. Shared by the demo data and the Pluggy mapping
-// (server/pluggy/map.ts), so it must only import types.
+// Turns Trove's category guesses into categories. Shared by the
+// demo data and the Pluggy mapping (server/pluggy/map.ts), so it must only
+// import types and data.
+//
+// The guessing rules (server/pluggy/map.ts) still use a fixed set of IDs
+// ("food", "housing"…). Those that match a default category map to it; the
+// rest stay uncategorized until one is chosen; transfers and card bill
+// payments become transfers, which have no category.
 
-import type { Category } from './types.js'
+import type { Transaction } from './types.js'
 
-export const categories: Category[] = [
-  { id: 'salary', name: 'Salary', kind: 'income' },
-  { id: 'freelance', name: 'Freelance', kind: 'income' },
-  { id: 'investments', name: 'Investment income', kind: 'income' },
-  { id: 'other-income', name: 'Other income', kind: 'income' },
-  { id: 'housing', name: 'Housing', kind: 'expense' },
-  { id: 'utilities', name: 'Bills & utilities', kind: 'expense' },
-  { id: 'groceries', name: 'Groceries', kind: 'expense' },
-  { id: 'food', name: 'Restaurants & delivery', kind: 'expense' },
-  { id: 'transport', name: 'Transport', kind: 'expense' },
-  { id: 'subscriptions', name: 'Subscriptions', kind: 'expense' },
-  { id: 'shopping', name: 'Shopping', kind: 'expense' },
-  { id: 'health', name: 'Health & fitness', kind: 'expense' },
-  { id: 'leisure', name: 'Leisure', kind: 'expense' },
-  { id: 'travel', name: 'Travel', kind: 'expense' },
-  { id: 'education', name: 'Education', kind: 'expense' },
-  { id: 'taxes', name: 'Taxes & fees', kind: 'expense' },
-  { id: 'other-expense', name: 'Other expenses', kind: 'expense' },
-  { id: 'transfer', name: 'Transfer between accounts', kind: 'transfer' },
-  { id: 'card-payment', name: 'Credit card payment', kind: 'transfer' },
-]
+/** Guess ID → default category ID (src/data/categoryCatalog.ts). */
+const TO_DEFAULT: Record<string, string> = {
+  housing: 'home',
+  utilities: 'home',
+  groceries: 'groceries',
+  food: 'restaurants',
+  transport: 'transport',
+  shopping: 'shopping',
+  subscriptions: 'subscriptions',
+  health: 'health',
+  travel: 'travel',
+  salary: 'salary',
+  freelance: 'freelance',
+}
+
+/** A guess as a category, or a transfer. `known`: the category IDs that exist (deleted ones aren't used). */
+export function fromGuess(guess: string, known?: Set<string>): Pick<Transaction, 'categoryId' | 'transfer'> {
+  if (guess === 'transfer') return { categoryId: null, transfer: 'own' }
+  if (guess === 'card-payment') return { categoryId: null, transfer: 'card-payment' }
+  const id = TO_DEFAULT[guess] ?? null
+  return { categoryId: id && (!known || known.has(id)) ? id : null }
+}
