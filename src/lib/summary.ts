@@ -12,12 +12,14 @@ export interface Totals {
  * Income and expenses for a set of transactions. Transfers between your own
  * accounts and credit-card bill payments are excluded, so money moving
  * between accounts is never counted twice. Card purchases count as expenses
- * on the day they happen, not when the bill is paid.
+ * on the day they happen, not when the bill is paid. Transactions the owner
+ * ignored are left out.
  */
 export function totals(transactions: Transaction[], categoriesById: Map<string, Category>): Totals {
   let income = 0
   let expenses = 0
   for (const t of transactions) {
+    if (t.ignored) continue
     const kind = categoriesById.get(t.categoryId)?.kind
     if (kind === 'income') income += t.amount
     else if (kind === 'expense') expenses -= t.amount
@@ -34,11 +36,11 @@ export interface CategoryTotal {
   amount: Cents
 }
 
-/** Expenses per category, largest first. */
+/** Expenses per category, largest first (ignored transactions left out). */
 export function expensesByCategory(transactions: Transaction[], categoriesById: Map<string, Category>): CategoryTotal[] {
   const sums = new Map<string, Cents>()
   for (const t of transactions) {
-    if (categoriesById.get(t.categoryId)?.kind !== 'expense') continue
+    if (t.ignored || categoriesById.get(t.categoryId)?.kind !== 'expense') continue
     sums.set(t.categoryId, (sums.get(t.categoryId) ?? 0) - t.amount)
   }
   return [...sums]

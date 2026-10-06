@@ -1,13 +1,13 @@
 import type { Repository } from './repository'
 import type { Snapshot } from './types'
-import { applyOverrides, saveOverride } from './overrides'
+import { applyOverrides, saveIgnored, saveOverride } from './overrides'
 
 /** Pluggy isn't configured on the server yet (see docs/pluggy-setup.md). */
 export class NotConfiguredError extends Error {}
 
 /**
  * Live data: the owner's accounts via Pluggy, from /api/finance (server-side,
- * behind the login). Category edits are kept in localStorage.
+ * behind the login). The owner's edits are kept in localStorage.
  */
 export function createPluggyRepository(fetchFn: typeof fetch = (...a) => fetch(...a)): Repository {
   return {
@@ -28,6 +28,9 @@ export function createPluggyRepository(fetchFn: typeof fetch = (...a) => fetch(.
     async setTransactionCategory(transactionId, categoryId) {
       saveOverride(transactionId, categoryId)
     },
+    async setTransactionIgnored(transactionId, ignored) {
+      saveIgnored(transactionId, ignored)
+    },
   }
 }
 
@@ -46,6 +49,9 @@ export function withDemoFallback(live: Repository, demo: Repository): Repository
     },
     setTransactionCategory(id, categoryId) {
       return (usingDemo ? demo : live).setTransactionCategory(id, categoryId)
+    },
+    setTransactionIgnored(id, ignored) {
+      return (usingDemo ? demo : live).setTransactionIgnored(id, ignored)
     },
   }
 }

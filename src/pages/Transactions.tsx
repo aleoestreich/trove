@@ -355,6 +355,7 @@ function TransactionTable({
                     </span>
                   )}
                   {tx.status === 'PENDING' && <span className="min-w-0 shrink-[2] truncate text-xs text-muted">{t.pending}</span>}
+                  {tx.ignored && <span className="min-w-0 shrink-[2] truncate text-xs text-muted">{t.transactions.ignored}</span>}
                 </span>
                 <span role="cell" className={`truncate text-[13px] text-ink-2 ${optional}`}>
                   {accountLabel(tx.accountId)}
@@ -363,7 +364,13 @@ function TransactionTable({
                   {categoryName(category)}
                 </span>
                 <span role="cell">
-                  <Amount cents={tx.amount} foreign={tx.foreign} transfer={category?.kind === 'transfer'} className="[&>span:first-child]:text-sm" />
+                  <Amount
+                    cents={tx.amount}
+                    foreign={tx.foreign}
+                    transfer={category?.kind === 'transfer'}
+                    ignored={tx.ignored}
+                    className="[&>span:first-child]:text-sm"
+                  />
                 </span>
               </button>
             )

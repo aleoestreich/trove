@@ -30,6 +30,12 @@ describe('totals', () => {
   it('treats refunds in an expense category as reducing expenses', () => {
     expect(totals([tx(-100_00, 'shopping'), tx(40_00, 'shopping')], byId).expenses).toBe(60_00)
   })
+
+  it('leaves out the transactions the owner ignored', () => {
+    const t = totals([tx(1000_00, 'salary'), tx(500_00, 'other-income', { ignored: true }), tx(-150_00, 'shopping', { ignored: true })], byId)
+    expect(t).toEqual({ income: 1000_00, expenses: 0, net: 1000_00 })
+    expect(expensesByCategory([tx(-150_00, 'shopping', { ignored: true }), tx(-10_00, 'food')], byId).map((c) => c.category.id)).toEqual(['food'])
+  })
 })
 
 describe('expensesByCategory', () => {

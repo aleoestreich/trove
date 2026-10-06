@@ -8,4 +8,6 @@ import type { Snapshot } from './types'
 export interface Repository {
   load(): Promise<Snapshot>
   setTransactionCategory(transactionId: string, categoryId: string): Promise<void>
+  /** Leave a transaction out of income, expenses and the charts (or count it again). */
+  setTransactionIgnored(transactionId: string, ignored: boolean): Promise<void>
 }

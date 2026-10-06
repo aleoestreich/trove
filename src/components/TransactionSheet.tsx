@@ -15,7 +15,7 @@ import { useI18n } from '../i18n/I18nProvider'
  * Transactions page shows it in a side panel (`panel`).
  */
 function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose(): void; variant: 'sheet' | 'panel' }) {
-  const { categories, categoriesById, setCategory, transactions } = useData()
+  const { categories, categoriesById, setCategory, setIgnored, transactions } = useData()
   const { t, categoryName } = useI18n()
   const accountLabel = useAccountLabel()
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -89,6 +89,27 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
           </div>
         ))}
       </dl>
+
+      <button
+        type="button"
+        role="switch"
+        aria-checked={!!current.ignored}
+        onClick={() => setIgnored(current.id, !current.ignored)}
+        className={`flex w-full items-center gap-3 border-b border-line py-2.5 text-left ${panel ? 'min-h-11' : 'min-h-14'}`}
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className={`font-medium text-ink ${panel ? 'text-[13px] leading-[18px]' : 'text-[15px] leading-5'}`}>{t.transactions.ignore}</span>
+          <span className="text-xs leading-4 text-muted">{t.transactions.ignoreNote}</span>
+        </span>
+        <span
+          aria-hidden
+          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${current.ignored ? 'bg-accent' : 'bg-track'}`}
+        >
+          <span
+            className={`absolute top-0.5 size-6 rounded-full bg-surface shadow-sm transition-[left] ${current.ignored ? 'left-[22px]' : 'left-0.5'}`}
+          />
+        </span>
+      </button>
 
       <h3 id={`${variant}-category`} className="label-caps pt-4 pb-2">
         {t.category}

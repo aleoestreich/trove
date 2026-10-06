@@ -1,8 +1,8 @@
 import type { Repository } from './repository'
 import { buildSeed } from './seed'
-import { applyOverrides, clearOverrides, saveOverride } from './overrides'
+import { applyOverrides, clearOverrides, saveIgnored, saveOverride } from './overrides'
 
-/** Hardcoded demo data. Category edits are kept in localStorage. */
+/** Hardcoded demo data. The owner's edits are kept in localStorage. */
 export function createMockRepository(today: Date = new Date()): Repository {
   return {
     async load() {
@@ -10,6 +10,9 @@ export function createMockRepository(today: Date = new Date()): Repository {
     },
     async setTransactionCategory(transactionId, categoryId) {
       saveOverride(transactionId, categoryId)
+    },
+    async setTransactionIgnored(transactionId, ignored) {
+      saveIgnored(transactionId, ignored)
     },
   }
 }

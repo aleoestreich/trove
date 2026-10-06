@@ -140,20 +140,23 @@ export function Amount({
   cents,
   foreign,
   transfer = false,
+  ignored = false,
   className = '',
 }: {
   cents: Cents
   foreign?: { currency: CurrencyCode; amount: Cents }
   transfer?: boolean
+  /** Left out of the totals: muted and struck through. */
+  ignored?: boolean
   className?: string
 }) {
-  const color = transfer ? 'text-muted' : cents > 0 ? 'text-income' : 'text-ink'
+  const color = transfer || ignored ? 'text-muted' : cents > 0 ? 'text-income' : 'text-ink'
   const main = foreign
     ? formatMoney(transfer ? Math.abs(foreign.amount) : foreign.amount, foreign.currency, { signed: !transfer })
     : formatMoney(transfer ? Math.abs(cents) : cents, 'BRL', { signed: !transfer })
   return (
     <span className={`flex shrink-0 flex-col items-end gap-0.5 ${className}`}>
-      <span className={`tabular text-[15px] leading-5 font-medium whitespace-nowrap ${color}`}>{main}</span>
+      <span className={`tabular text-[15px] leading-5 font-medium whitespace-nowrap ${color} ${ignored ? 'line-through' : ''}`}>{main}</span>
       {foreign && <span className="tabular text-xs leading-4 whitespace-nowrap text-muted">≈ {formatMoney(Math.abs(cents))}</span>}
     </span>
   )

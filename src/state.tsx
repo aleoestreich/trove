@@ -11,6 +11,8 @@ interface AppData extends Snapshot {
   categoriesById: Map<string, Category>
   institutionsById: Map<string, Institution>
   setCategory(transactionId: string, categoryId: string): void
+  /** Leave a transaction out of income, expenses and the charts (or count it again). */
+  setIgnored(transactionId: string, ignored: boolean): void
   /** Set (or clear, with null) a card's closing and due days; saved on this device. */
   setCardDays(accountId: string, days: CardDays | null): void
 }
@@ -57,6 +59,14 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [repository],
   )
 
+  const setIgnored = useCallback(
+    (transactionId: string, ignored: boolean) => {
+      setSnapshot((s) => s && { ...s, transactions: s.transactions.map((t) => (t.id === transactionId ? { ...t, ignored } : t)) })
+      void repository.setTransactionIgnored(transactionId, ignored)
+    },
+    [repository],
+  )
+
   const [cardDays, setCardDaysState] = useState(readCardDays)
   const setCardDays = useCallback((accountId: string, days: CardDays | null) => {
     saveCardDays(accountId, days)
@@ -74,9 +84,10 @@ export function DataProvider({ repository, children }: { repository: Repository;
       categoriesById: new Map(snapshot.categories.map((c) => [c.id, c])),
       institutionsById: new Map(snapshot.institutions.map((i) => [i.id, i])),
       setCategory,
+      setIgnored,
       setCardDays,
     }
-  }, [snapshot, setCategory, cardDays, setCardDays])
+  }, [snapshot, setCategory, setIgnored, cardDays, setCardDays])
 
   const load = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

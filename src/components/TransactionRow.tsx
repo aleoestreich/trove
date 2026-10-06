@@ -58,9 +58,10 @@ export function TransactionRow({
             </>
           )}
           {tx.status === 'PENDING' && ` · ${t.pending}`}
+          {tx.ignored && ` · ${t.transactions.ignored}`}
         </span>
       </span>
-      <Amount cents={tx.amount} foreign={tx.foreign} transfer={category?.kind === 'transfer'} />
+      <Amount cents={tx.amount} foreign={tx.foreign} transfer={category?.kind === 'transfer'} ignored={tx.ignored} />
     </button>
   )
 }

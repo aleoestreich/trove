@@ -105,6 +105,10 @@ const en = {
     purchaseTotal: 'Purchase total',
     status: 'Status',
     transferNote: 'Transfers aren’t counted as income or expenses.',
+    /** Label on a transaction the owner chose to ignore. */
+    ignored: 'Ignored',
+    ignore: 'Ignore this transaction',
+    ignoreNote: 'Not counted in income, expenses or the charts. Balances and card bills still include it.',
   },
 
   installments: {
@@ -330,6 +334,9 @@ const ptBR: Messages = {
     purchaseTotal: 'Total da compra',
     status: 'Situação',
     transferNote: 'Transferências não contam como receita nem despesa.',
+    ignored: 'Ignorada',
+    ignore: 'Ignorar esta transação',
+    ignoreNote: 'Não entra em receitas, despesas nem nos gráficos. Saldos e faturas continuam incluindo.',
   },
 
   installments: {

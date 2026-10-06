@@ -72,6 +72,11 @@ export interface Transaction {
   categoryId: string
   status: 'POSTED' | 'PENDING'
   /**
+   * Set by the owner: left out of income, expenses and the charts. Balances,
+   * card bills and installments still include it (the money did move).
+   */
+  ignored?: boolean
+  /**
    * Credit-card installment purchase ("parcelado"), mirroring Pluggy's
    * `creditCardMetadata`. Each installment is its own transaction, charged in
    * a later bill; `amount` is this installment only.
