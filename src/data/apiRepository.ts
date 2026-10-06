@@ -4,6 +4,13 @@ import type { Snapshot, SyncInfo, SyncJob } from './types'
 /** Pluggy or the database isn't configured on the server yet (see docs/pluggy-setup.md, docs/neon-setup.md). */
 export class NotConfiguredError extends Error {}
 
+/** A sync couldn't start: the HTTP status of POST /api/sync, or 0 without a response. */
+export class SyncStartError extends Error {
+  constructor(readonly status: number) {
+    super(status ? `Sync couldn't start (HTTP ${status}).` : "Sync couldn't start: no response.")
+  }
+}
+
 /** Configured, but nothing has been synced yet: the app shows demo data with a Sync button. */
 export class NeverSyncedError extends Error {
   constructor(readonly sync: SyncInfo) {
@@ -52,8 +59,8 @@ export function createApiRepository(fetchFn: Fetch = (...a) => fetch(...a)): Rep
       if (!res.ok) throw await failure(res)
     },
     async startSync(connectionIds) {
-      const res = await post('/api/sync', connectionIds ? { connectionIds } : {})
-      if (!res.ok) throw await failure(res)
+      const res = await post('/api/sync', connectionIds ? { connectionIds } : {}).catch(() => null)
+      if (!res || !res.ok) throw new SyncStartError(res?.status ?? 0)
       return (await res.json()) as SyncJob
     },
     async syncStatus() {

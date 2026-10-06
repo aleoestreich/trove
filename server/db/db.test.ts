@@ -219,7 +219,7 @@ suite('database', () => {
       ['t1', 'groceries', false],
       ['t2', null, true],
     ])
-    expect(s.sync).toMatchObject({ lastSyncedAt: now.toISOString(), connections: [{ id: 'item-1', name: 'Banco Exemplo' }] })
+    expect(s.sync).toMatchObject({ lastSyncedAt: now.toISOString(), connections: [{ id: 'item-1', name: 'Banco Exemplo', status: 'UPDATED' }] })
   })
 })
 
