@@ -45,6 +45,9 @@ On the deployed site, Trove shows your real accounts, read live from Pluggy
 Local development always uses demo data. Setup:
 [docs/pluggy-setup.md](docs/pluggy-setup.md).
 
+A Postgres database on Neon will keep the history beyond Pluggy's window. Its
+tables and setup are in [docs/neon-setup.md](docs/neon-setup.md).
+
 ## Login (deployed site only)
 
 The site on Vercel is private: every request goes through `middleware.ts`,
