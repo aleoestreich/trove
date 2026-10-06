@@ -51,9 +51,20 @@ secret:
 - If it leaks, reset the role's password in Neon (**Roles → Reset password**)
   and update `DATABASE_URL`.
 
-Alternatively, Vercel → **Storage → Create Database → Neon** creates the
-project and sets the variables for you. The free plan is also available there,
+Alternatively, Vercel → **Storage → Create Database → Neon** (or **Connect**
+an existing Neon database there) creates the variables for you and keeps them
+up to date if the password changes. The free plan is also available there,
 but then the database is billed and managed through Vercel. Both ways work.
+
+When connecting through Vercel Storage, the variable names start with the
+prefix chosen there. Trove reads, in this order:
+
+1. `DATABASE_URL` (added by hand, as above, or by Storage with no prefix);
+2. `TROVE_DATABASE_DATABASE_URL` (Storage with the prefix `TROVE_DATABASE`).
+
+Both are the pooled connection. The `…_UNPOOLED` and `…_PG*` variables that
+Storage also creates aren't used. If neither variable is set, Trove refuses to
+use the database rather than guessing.
 
 ## The tables
 
