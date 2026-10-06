@@ -153,8 +153,10 @@ configured items and their accounts.
   when Pluggy or the database isn't configured, and returns `409
   never_synced` before the first sync; the app then shows demo data.
   `?summary` is the live diagnostic report (`server/pluggy/finance.ts`).
-- `api/sync.ts` → `server/db/sync.ts`: `POST /api/sync` with one
-  `connectionId` from `PLUGGY_ITEM_IDS` (`403` otherwise). See
+- `api/sync.ts` → `server/db/syncJobs.ts` and `server/db/sync.ts`:
+  `POST /api/sync` starts a background sync (optionally of some
+  `connectionIds`, which must be in `PLUGGY_ITEM_IDS`; `403` otherwise) and
+  answers `202`; `GET /api/sync` returns the latest job's progress. See
   [docs/neon-setup.md](neon-setup.md#sync).
 - `server/pluggy/client.ts`: minimal `fetch` client. It calls `POST /auth`,
   sends the API key as `X-API-KEY`, and uses `GET /items/{id}`,

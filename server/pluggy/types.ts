@@ -51,6 +51,17 @@ export interface PluggyAccount {
   } | null
 }
 
+/** A closed credit card bill (GET /bills?accountId=, as in the SDK's CreditCardBills). */
+export interface PluggyBill {
+  id: string
+  dueDate: string
+  totalAmount: number
+  totalAmountCurrencyCode?: string | null
+  minimumPaymentAmount?: number | null
+  allowsInstallments?: boolean | null
+  financeCharges?: unknown[] | null
+}
+
 export interface PluggyTransaction {
   id: string
   accountId: string
