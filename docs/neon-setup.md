@@ -27,7 +27,7 @@ set up, every screen reads from it, and it only changes on **Sync** (see
 ## 2. Create the tables
 
 1. In Neon, open **SQL Editor** and select the database.
-2. Paste the whole of `db/schema.sql` and **Run**. It creates 12 tables.
+2. Paste the whole of `db/schema.sql` and **Run**. It creates 14 tables.
    Running it again is safe: existing tables are skipped.
 
 **Tables created from an earlier version:** run
@@ -37,6 +37,10 @@ transactions' `category_id`, `subcategory_id` and `is_hidden` columns. It
 replaces three tables that were never written to (`user_categories`, the old
 `subcategories`, `transaction_overrides`); running it again is safe. Until it
 has run, the app shows "The database tables are out of date".
+
+Then run [`db/migrations/003_sync_jobs.sql`](../db/migrations/003_sync_jobs.sql)
+the same way: it adds `sync_jobs` and `sync_job_items` for the background
+sync.
 
 ## 3. Give Vercel the connection string
 
@@ -96,7 +100,9 @@ use today can be read later without fetching it again.
 | `subcategories` | `id` → `categories`; unique name per category | Subcategories, deleted with their category |
 | `card_settings` | `account_id` → `accounts` | Closing and due days per card (not used yet: still kept per device) |
 | `exchange_rates` | (`currency_code`, `as_of`) | BRL per unit of a foreign currency, one per day, saved by the sync |
-| `sync_runs` | generated `id` | When each sync ran, what triggered it, how many rows changed, and errors as status codes only |
+| `sync_jobs` | `id` | One per Sync: when it started and finished |
+| `sync_job_items` | (`job_id`, `connection_id`) | One per connection in a job: queued, running, ok or failed, with counts or an error code |
+| `sync_runs` | generated `id` | Log of each connection sync: what triggered it, how many rows changed, and errors as status codes only |
 | `webhook_events` | `event_id` (Pluggy's) | Webhook deliveries already handled, so a repeated delivery runs once |
 | `app_settings` | `key` | App-wide values: when the default categories were seeded, when anything last synced |
 
@@ -114,14 +120,37 @@ another category moves its transactions with it, in one database transaction.
 ## Sync
 
 Trove only contacts the banks on **Sync** (under the header on Overview and
-Accounts on phones, in the sidebar on desktop). For each connection in
-`PLUGGY_ITEM_IDS`, one at a time, the server fetches the connection, its
-accounts and their transactions from Meu Pluggy, then saves them in one
+Accounts on phones, in the sidebar on desktop). The sync runs in the
+background on the server:
+
+1. `POST /api/sync` creates a job (`sync_jobs`) with one item per connection
+   in `PLUGGY_ITEM_IDS` (`sync_job_items`, all `queued`) and answers `202` at
+   once. A second press while a job is unfinished returns that job.
+2. After the response (Vercel's `waitUntil`), a worker claims the queued
+   items one at a time (`FOR UPDATE SKIP LOCKED`) and syncs each connection.
+   It stops claiming after 40 s, within the function's 60 s limit; anything
+   left stays queued.
+3. The app polls `GET /api/sync` every 1.5 s for progress. That request also
+   starts a worker when items are queued and none is running, so a long sync
+   continues across invocations. With the app closed, the work in progress
+   finishes on the server; remaining queued items resume on the next poll.
+   Opening the app during a sync shows its progress.
+4. An item still `running` after 90 s belongs to a worker that was stopped:
+   it is marked `failed` (`timeout`) and can be retried.
+
+Syncing one connection fetches the connection, its accounts, their
+transactions and, for credit cards, their closed bills (`GET /bills`; a card
+whose bills can't be read still syncs the rest), then saves everything in one
 database transaction:
 
-- rows are matched on Pluggy's IDs; new transactions get Trove's category
-  guess, and existing ones keep their stored category, subcategory and
-  `is_hidden`: a sync never overwrites edits;
+- **idempotent:** rows are upserted on Pluggy's IDs (connection, account,
+  transaction, bill), so syncing the same data again changes nothing and
+  never duplicates a row. A transaction ID repeated within one fetch is kept
+  once, and a lock on the connection ID serializes two syncs of the same
+  connection;
+- new transactions get Trove's category guess, and existing ones keep their
+  stored category, subcategory and `is_hidden`: a sync never overwrites
+  edits;
 - the first sync goes back 12 months; later ones re-read from 35 days before
   the previous sync;
 - transactions in that window that Pluggy no longer returns are marked
@@ -131,7 +160,7 @@ database transaction:
 - each run is logged in `sync_runs` (counts and status codes only).
 
 If one connection fails, the others are still saved and the sync bar offers
-**Retry**. Pluggy's webhook changes nothing: data only moves on Sync.
+**Retry** (a new job for the failed connections). Pluggy's webhook changes nothing: data only moves on Sync.
 
 ## Reads
 

@@ -71,8 +71,9 @@ Run `npm test` and `npm run build` before pushing.
   emails, user IDs or secrets in code, docs or config; secrets are Vercel
   environment variables.
 - **Real data:** every screen reads Trove's database (Neon, `server/db/`,
-  setup in `docs/neon-setup.md`); it only changes on Sync,
-  which fetches one connection at a time from Pluggy (`server/db/sync.ts`) and
+  setup in `docs/neon-setup.md`); it only changes on Sync, a background job
+  (`server/db/syncJobs.ts`) that fetches one connection at a time from Pluggy
+  (`server/db/sync.ts`), upserts on Pluggy's IDs so it is idempotent, and
   never overwrites a stored category, subcategory or hidden flag. The
   database URL is a Vercel environment variable only (`DATABASE_URL` or
   `TROVE_DATABASE_DATABASE_URL`); schema changes go in `db/migrations/` and

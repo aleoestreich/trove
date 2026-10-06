@@ -139,6 +139,25 @@ export interface SyncInfo {
   connections: { id: string; name: string | null; lastSyncedAt: string | null }[]
 }
 
+/** A background sync: one item per bank connection, worked through by the server. */
+export interface SyncJob {
+  id: string
+  createdAt: string
+  /** No item is queued or running. */
+  done: boolean
+  items: {
+    connectionId: string
+    /** The bank's name, once the connection has synced at least once. */
+    name: string | null
+    status: 'queued' | 'running' | 'ok' | 'failed'
+    inserted: number
+    updated: number
+    removed: number
+    /** Failed items: a status code (e.g. "pluggy_401", "timeout"). */
+    error: string | null
+  }[]
+}
+
 /** The result of syncing one bank connection. */
 export interface SyncResult {
   connectionId: string

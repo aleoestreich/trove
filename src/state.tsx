@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Repository } from './data/repository'
 import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, type Edit } from './data/edits'
-import type { Account, Category, Institution, Snapshot, Subcategory, SyncInfo } from './data/types'
+import type { Account, Category, Institution, Snapshot, Subcategory, SyncInfo, SyncJob } from './data/types'
 import { useI18n } from './i18n/I18nProvider'
 import { Button, EmptyState } from './components/ui'
 
@@ -18,6 +18,9 @@ interface AppData extends Snapshot {
 }
 
 const DataContext = createContext<AppData | null>(null)
+
+/** How often the app checks a running sync. */
+const POLL_MS = 1500
 
 interface LoadState {
   error: string | null
@@ -105,43 +108,92 @@ export function DataProvider({ repository, children }: { repository: Repository;
     setCardDaysState(readCardDays())
   }, [])
 
-  // Sync: one connection at a time, then reload from the database.
-  const [syncing, setSyncing] = useState<Pick<SyncState, 'status' | 'progress' | 'failed' | 'result'>>({
-    status: 'idle',
-    progress: null,
-    failed: [],
-    result: null,
-  })
-  const sync = useCallback(
-    async (only?: string[]) => {
-      const connections = (snapshot?.sync?.connections ?? []).filter((c) => !only || only.includes(c.id))
-      if (connections.length === 0 || syncing.status === 'syncing') return
-      const failed: SyncState['failed'] = []
-      let inserted = 0
-      let updated = 0
-      for (const [i, c] of connections.entries()) {
-        setSyncing({ status: 'syncing', progress: { index: i + 1, total: connections.length, name: c.name }, failed, result: null })
-        try {
-          const r = await repository.sync(c.id)
-          inserted += r.inserted
-          updated += r.updated
-        } catch (e) {
-          console.error(e)
-          failed.push({ id: c.id, name: c.name })
+  // Sync runs on the server in the background (it continues with the app
+  // closed); the app polls the job, then reloads from the database.
+  const [job, setJob] = useState<SyncJob | null>(null)
+  const [result, setResult] = useState<SyncState['result']>(null)
+  const [startError, setStartError] = useState<string[] | null>(null)
+  const polling = useRef(false)
+
+  const follow = useCallback(
+    async (initial: SyncJob, announce: boolean) => {
+      setJob(initial)
+      if (polling.current || initial.done) return
+      polling.current = true
+      let current = initial
+      try {
+        while (!current.done) {
+          await new Promise((r) => setTimeout(r, POLL_MS))
+          current = (await repository.syncStatus()) ?? { ...current, done: true }
+          setJob(current)
         }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        polling.current = false
       }
       await load().catch((e) => setError(e instanceof Error ? e.message : String(e)))
-      const ok = failed.length < connections.length
-      setSyncing({ status: 'idle', progress: null, failed, result: ok && failed.length === 0 ? { inserted, updated, at: Date.now() } : null })
+      const ok = current.items.filter((i) => i.status === 'ok')
+      if (announce && ok.length === current.items.length) {
+        setResult({ inserted: ok.reduce((s, i) => s + i.inserted, 0), updated: ok.reduce((s, i) => s + i.updated, 0), at: Date.now() })
+      }
     },
-    [snapshot?.sync, syncing.status, repository, load],
+    [repository, load],
   )
+
+  // A sync started earlier (e.g. before the app was closed) may still be running: follow it.
+  const hasConnections = !!snapshot?.sync
+  useEffect(() => {
+    if (!hasConnections) return
+    repository.syncStatus().then(
+      (j) => {
+        if (j && !j.done) void follow(j, true)
+      },
+      () => {},
+    )
+  }, [hasConnections, repository, follow])
+
+  const sync = useCallback(
+    async (only?: string[]) => {
+      if (polling.current) return
+      setStartError(null)
+      setResult(null)
+      try {
+        await follow(await repository.startSync(only), true)
+      } catch (e) {
+        console.error(e)
+        setStartError(only ?? (snapshot?.sync?.connections ?? []).map((c) => c.id))
+      }
+    },
+    [repository, follow, snapshot?.sync],
+  )
+
+  const syncing = useMemo<Pick<SyncState, 'status' | 'progress' | 'failed' | 'result'>>(() => {
+    const names = new Map((snapshot?.sync?.connections ?? []).map((c) => [c.id, c.name]))
+    if (startError) return { status: 'idle', progress: null, failed: startError.map((id) => ({ id, name: names.get(id) ?? null })), result: null }
+    if (!job) return { status: 'idle', progress: null, failed: [], result }
+    const failed = job.items.filter((i) => i.status === 'failed').map((i) => ({ id: i.connectionId, name: i.name ?? names.get(i.connectionId) ?? null }))
+    if (job.done) return { status: 'idle', progress: null, failed, result }
+    const finished = job.items.filter((i) => i.status === 'ok' || i.status === 'failed').length
+    const current = job.items.find((i) => i.status === 'running') ?? job.items.find((i) => i.status === 'queued')
+    return {
+      status: 'syncing',
+      progress: {
+        index: Math.min(finished + 1, job.items.length),
+        total: job.items.length,
+        name: current ? (current.name ?? names.get(current.connectionId) ?? null) : null,
+      },
+      failed: [],
+      result: null,
+    }
+  }, [job, result, startError, snapshot?.sync])
+
   const syncState = useMemo<SyncState>(
     () => ({
       info: snapshot?.sync ?? null,
       ...syncing,
       sync: (only) => void sync(only),
-      dismissResult: () => setSyncing((s) => ({ ...s, result: null })),
+      dismissResult: () => setResult(null),
     }),
     [snapshot?.sync, syncing, sync],
   )

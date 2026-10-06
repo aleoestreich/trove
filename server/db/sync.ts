@@ -1,7 +1,10 @@
 // Sync: fetches one bank connection from Meu Pluggy and saves it to the
 // database, in one transaction. Only the Sync button starts it.
 //
-// - Rows are matched on Pluggy's IDs (connection, account, transaction).
+// - Rows are matched on Pluggy's IDs (connection, account, transaction, bill),
+//   so running a sync again never duplicates anything: a repeated ID inside
+//   one fetch is kept once, and two syncs of the same connection are
+//   serialized by a lock on its ID.
 // - A new transaction gets Trove's category guess; an existing one keeps its
 //   category, subcategory and "hidden" flag: a sync never overwrites
 //   edits.
@@ -16,7 +19,7 @@ import type { SyncResult } from '../../src/data/types.js'
 import { PluggyClient } from '../pluggy/client.js'
 import { brazilDate, categoryFor, isMeuPluggy, itemBankName } from '../pluggy/map.js'
 import { ratesToBRL } from '../pluggy/rates.js'
-import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
+import type { PluggyAccount, PluggyBill, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
 import { inTransaction, type Db } from './connection.js'
 
 /** How far back the first sync goes (Pluggy keeps about a year). */
@@ -39,12 +42,19 @@ export function connectionName(item: PluggyItem, accounts: PluggyAccount[]): str
   return (isMeuPluggy(item) ? itemBankName(accounts) : null) ?? item.connector.name
 }
 
-interface Fetched {
+export interface Fetched {
   item: PluggyItem
   accounts: PluggyAccount[]
   transactions: PluggyTransaction[]
+  /** Closed bills per credit card account. */
+  bills: { accountId: string; bill: PluggyBill }[]
   from: string
   rates: Record<string, number>
+}
+
+/** One entry per ID, the last one winning (Pluggy's pages can repeat a row). */
+export function uniqueById<T>(rows: T[], id: (row: T) => string): T[] {
+  return [...new Map(rows.map((r) => [id(r), r])).values()]
 }
 
 /** Everything from Pluggy for one connection. Nothing is written until it's all fetched. */
@@ -52,10 +62,18 @@ export async function fetchConnection(client: PluggyClient, itemId: string, from
   const item = await client.getItem(itemId)
   const accounts = await client.getAccounts(itemId)
   const transactions = (await Promise.all(accounts.map((a) => client.getTransactions(a.id, from)))).flat()
+  // Bills are optional: a card whose bills can't be read still syncs the rest.
+  const bills = (
+    await Promise.all(
+      accounts
+        .filter((a) => a.type === 'CREDIT')
+        .map((a) => client.getBills(a.id).then((list) => list.map((bill) => ({ accountId: a.id, bill })), () => [])),
+    )
+  ).flat()
   // Rates are optional here: if every source fails, the last stored ones are used when reading.
   const currencies = [...accounts.map((a) => a.currencyCode), ...transactions.map((t) => t.currencyCode)].filter(Boolean)
   const rates = await ratesToBRL(currencies, fetchFn).catch(() => ({}))
-  return { item, accounts, transactions, from, rates }
+  return { item, accounts, transactions, bills, from, rates }
 }
 
 /** Syncs one connection: fetch from Pluggy, then save. */
@@ -91,7 +109,12 @@ export async function syncConnection(
 
 /** Writes one fetched connection. Exported for tests. */
 export async function save(db: Db, f: Fetched, now: Date): Promise<SyncResult> {
-  const { item, accounts, transactions } = f
+  const { item } = f
+  const accounts = uniqueById(f.accounts, (a) => a.id)
+  const transactions = uniqueById(f.transactions, (t) => t.id)
+  const bills = uniqueById(f.bills, (b) => b.bill.id)
+  // One sync per connection at a time; the lock is released with the transaction.
+  await db.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`sync:${item.id}`])
   const name = connectionName(item, accounts)
   const today = brazilDate(now.toISOString())
 
@@ -160,6 +183,36 @@ export async function save(db: Db, f: Fetched, now: Date): Promise<SyncResult> {
      ON CONFLICT (account_id, as_of) DO UPDATE SET balance_cents = excluded.balance_cents, available_limit_cents = excluded.available_limit_cents`,
     [JSON.stringify(accountRows), today],
   )
+
+  // Card bills (the card itself is a row in accounts).
+  if (bills.length > 0) {
+    await db.query(
+      `INSERT INTO card_bills (id, account_id, due_date, total_cents, currency_code, minimum_payment_cents, allows_installments, finance_charges, raw, synced_at)
+       SELECT r.id, r.account_id, r.due_date, r.total_cents, r.currency_code, r.minimum_payment_cents, r.allows_installments, r.finance_charges, r.raw, $2
+       FROM jsonb_to_recordset($1::jsonb) AS r(id text, account_id text, due_date date, total_cents bigint, currency_code text,
+         minimum_payment_cents bigint, allows_installments boolean, finance_charges jsonb, raw jsonb)
+       ON CONFLICT (id) DO UPDATE SET account_id = excluded.account_id, due_date = excluded.due_date, total_cents = excluded.total_cents,
+         currency_code = excluded.currency_code, minimum_payment_cents = excluded.minimum_payment_cents,
+         allows_installments = excluded.allows_installments, finance_charges = excluded.finance_charges, raw = excluded.raw,
+         synced_at = excluded.synced_at`,
+      [
+        JSON.stringify(
+          bills.map(({ accountId, bill }) => ({
+            id: bill.id,
+            account_id: accountId,
+            due_date: brazilDate(bill.dueDate),
+            total_cents: cents(bill.totalAmount) ?? 0,
+            currency_code: (bill.totalAmountCurrencyCode || accounts.find((a) => a.id === accountId)?.currencyCode || 'BRL').toUpperCase(),
+            minimum_payment_cents: cents(bill.minimumPaymentAmount),
+            allows_installments: bill.allowsInstallments ?? null,
+            finance_charges: bill.financeCharges ?? null,
+            raw: bill,
+          })),
+        ),
+        now,
+      ],
+    )
+  }
 
   // New transactions get the guess, but only for categories that exist.
   const known = new Set((await db.query<{ id: string }>(`SELECT id FROM categories`)).rows.map((r) => r.id))

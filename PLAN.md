@@ -95,8 +95,9 @@ No backend, no auth. It runs in the browser on hardcoded data.
   and saves it without touching their edits.
 - ✅ Categories and subcategories in the database (Categories tab), hidden
   transactions, category colours and icons.
-- Next: card closing days in the database (today per device); Pluggy's card
-  bills in the sync.
+- ✅ Background, idempotent sync (also stores card bills).
+- Next: card closing days in the database (today per device); use the stored
+  card bills for the current bill (PR #23 reads them live).
 
 ## Phase 3 — Authentication & security
 

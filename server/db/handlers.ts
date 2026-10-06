@@ -4,20 +4,22 @@
 //        200 Snapshot · 409 { error: 'never_synced', sync } · 503 not_configured
 //   POST /api/edits    one change to categories or transactions (src/data/edits.ts)
 //        204 · 400 invalid · 404 not_found · 409 name_taken
-//   POST /api/sync     { connectionId }: fetch that connection from Meu Pluggy and save it
-//        200 SyncResult · 403 not one of PLUGGY_ITEM_IDS · 502 Pluggy failed
+//   POST /api/sync     { connectionIds? }: start a background sync (default: every connection)
+//        202 SyncJob (the running one if a sync is already in progress) · 403 not in PLUGGY_ITEM_IDS
+//   GET  /api/sync     the latest sync job, for progress: 200 { job: SyncJob | null }
 //
 // All fail closed (503) without the database or Pluggy settings. Responses are
 // no-store. Errors carry status codes and fixed messages, never amounts,
 // descriptions, connection strings or credentials.
 
 import { EditError, validateEdit } from '../../src/data/edits.js'
-import { PluggyClient, PluggyError, type PluggyConfig } from '../pluggy/client.js'
+import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 import { historyStart } from '../pluggy/finance.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
 import { dbErrorMessage, getPool } from './connection.js'
 import { readSnapshot, readSyncInfo } from './read.js'
-import { syncConnection } from './sync.js'
+import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
+import { waitUntil } from '@vercel/functions'
 
 export interface DbConfig {
   pluggy: PluggyConfig | null
@@ -74,21 +76,49 @@ export async function edits(request: Request, config: DbConfig): Promise<Respons
   }
 }
 
-export async function sync(request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}): Promise<Response> {
-  if (!config.pluggy || !config.databaseUrl) return notConfigured()
-  const body = (await request.json().catch(() => null)) as { connectionId?: unknown } | null
-  const connectionId = typeof body?.connectionId === 'string' ? body.connectionId : ''
-  if (!config.pluggy.itemIds.includes(connectionId)) return json(403, { error: 'connection_not_configured' })
+/** Runs work after the response (Vercel's waitUntil); injectable for tests. */
+export type Background = (work: Promise<unknown>) => void
+
+function startWorker(pool: ReturnType<typeof getPool>, config: DbConfig & { pluggy: PluggyConfig }, jobId: string, deps: Partial<HandlerDeps>, background: Background) {
   const fetchFn = deps.fetch ?? fetch
+  background(runJob(pool, new PluggyClient(config.pluggy, fetchFn), jobId, { fetch: fetchFn, now: deps.now }))
+}
+
+/**
+ * POST /api/sync { connectionIds? }: starts a background sync of these
+ * connections (default: all of PLUGGY_ITEM_IDS), or returns the one already
+ * running. Answers 202 with the job at once.
+ */
+export async function startSync(request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}, background: Background = waitUntil): Promise<Response> {
+  if (!config.pluggy || !config.databaseUrl) return notConfigured()
+  const body = (await request.json().catch(() => ({}))) as { connectionIds?: unknown }
+  const all = config.pluggy.itemIds
+  const wanted = Array.isArray(body?.connectionIds) ? body.connectionIds : all
+  if (wanted.length === 0 || !wanted.every((id): id is string => typeof id === 'string' && all.includes(id))) {
+    return json(403, { error: 'connection_not_configured' })
+  }
   try {
-    const result = await syncConnection(getPool(config.databaseUrl), new PluggyClient(config.pluggy, fetchFn), connectionId, {
-      now: deps.now?.(),
-      fetch: fetchFn,
-    })
-    return json(200, result)
+    const pool = getPool(config.databaseUrl)
+    const job = await startJob(pool, all.filter((id) => wanted.includes(id)))
+    if (needsWorker(job)) startWorker(pool, { ...config, pluggy: config.pluggy }, job.id, deps, background)
+    return json(202, job)
   } catch (e) {
-    // Pluggy's messages carry a path and status, never credentials (see client.ts).
-    if (e instanceof PluggyError) return json(502, { error: 'upstream', message: e.message })
+    return json(500, { error: 'database', message: dbErrorMessage(e) })
+  }
+}
+
+/**
+ * GET /api/sync: the latest sync job (null if none). If items are queued with
+ * no worker on them (the previous one hit its time limit), a worker resumes them.
+ */
+export async function syncStatus(_request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}, background: Background = waitUntil): Promise<Response> {
+  if (!config.pluggy || !config.databaseUrl) return notConfigured()
+  try {
+    const pool = getPool(config.databaseUrl)
+    const job = await readJob(pool)
+    if (job && needsWorker(job)) startWorker(pool, { ...config, pluggy: config.pluggy }, job.id, deps, background)
+    return json(200, { job })
+  } catch (e) {
     return json(500, { error: 'database', message: dbErrorMessage(e) })
   }
 }

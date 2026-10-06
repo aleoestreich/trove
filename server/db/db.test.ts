@@ -9,7 +9,10 @@ import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/typ
 import { applyEditSql, ensureSeeded } from './categories.js'
 import { inTransaction } from './connection.js'
 import { readSnapshot } from './read.js'
-import { save, syncFrom } from './sync.js'
+import { save, syncFrom, type Fetched } from './sync.js'
+import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
+import { startSync, syncStatus } from './handlers.js'
+import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 
 const url = process.env.TEST_DATABASE_URL
 const suite = url ? describe : describe.skip
@@ -22,11 +25,12 @@ const tx = (id: string, over: Partial<PluggyTransaction> = {}): PluggyTransactio
   id, accountId: 'acc-1', date: '2026-10-01T12:00:00.000Z', description: 'LOJA EXEMPLO', type: 'DEBIT', amount: -150, currencyCode: 'BRL', status: 'POSTED', ...over,
 })
 const now = new Date('2026-10-06T12:00:00.000Z')
-const fetched = (transactions: PluggyTransaction[]) => ({ item, accounts: [checking], transactions, from: '2026-09-01', rates: {} })
+const fetched = (transactions: PluggyTransaction[], bills: Fetched['bills'] = []) => ({ item, accounts: [checking], transactions, bills, from: '2026-09-01', rates: {} })
 
 suite('database', () => {
   let pool: pg.Pool
-  const sync = (txs: PluggyTransaction[]) => inTransaction(pool, (db) => save(db, fetched(txs), now))
+  const sync = (txs: PluggyTransaction[], bills: Fetched['bills'] = []) => inTransaction(pool, (db) => save(db, fetched(txs, bills), now))
+  const count = async (table: string) => (await pool.query(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n as number
   const row = async (id: string) =>
     (await pool.query(`SELECT category_id, subcategory_id, is_hidden, removed_at, description FROM transactions WHERE id = $1`, [id])).rows[0]
   const subOf = async (categoryId: string, name: string) =>
@@ -39,7 +43,7 @@ suite('database', () => {
   })
   afterAll(() => pool.end())
   beforeEach(async () => {
-    await pool.query(`TRUNCATE app_settings, categories, subcategories, transactions, accounts, account_balances, bank_connections, exchange_rates, sync_runs CASCADE`)
+    await pool.query(`TRUNCATE app_settings, categories, subcategories, transactions, accounts, account_balances, card_bills, bank_connections, exchange_rates, sync_runs, sync_jobs, sync_job_items CASCADE`)
     await ensureSeeded(pool, 'pt')
   })
 
@@ -67,6 +71,30 @@ suite('database', () => {
     await applyEditSql(pool, { op: 'hide', transactionId: 't1', hidden: true })
     await sync([tx('t1', { category: 'Supermarkets', amount: -151 })])
     expect(await row('t1')).toMatchObject({ category_id: 'restaurants', subcategory_id: delivery, is_hidden: true })
+  })
+
+  it('is idempotent: the same data synced again changes nothing and duplicates nothing', async () => {
+    const data = [tx('t1', { category: 'Supermarkets' }), tx('t2')]
+    const bills = [{ accountId: 'acc-1', bill: { id: 'b1', dueDate: '2026-10-10T03:00:00.000Z', totalAmount: 150 } }]
+    await sync(data, bills)
+    const counts = [await count('transactions'), await count('card_bills'), await count('accounts'), await count('bank_connections')]
+    expect(await sync(data, bills)).toMatchObject({ inserted: 0, updated: 0, removed: 0 })
+    expect([await count('transactions'), await count('card_bills'), await count('accounts'), await count('bank_connections')]).toEqual(counts)
+    expect(counts).toEqual([2, 1, 1, 1])
+  })
+
+  it('keeps one row when Pluggy repeats a transaction ID within one fetch', async () => {
+    expect(await sync([tx('t1'), tx('t1', { description: 'LOJA EXEMPLO 2' })])).toMatchObject({ inserted: 1 })
+    expect((await row('t1')).description).toBe('LOJA EXEMPLO 2')
+    expect(await count('transactions')).toBe(1)
+  })
+
+  it('stores card bills, updated in place on the next sync', async () => {
+    const bill = (total: number) => [{ accountId: 'acc-1', bill: { id: 'b1', dueDate: '2026-10-10T03:00:00.000Z', totalAmount: total, minimumPaymentAmount: 15 } }]
+    await sync([], bill(150))
+    await sync([], bill(152.5))
+    const rows = (await pool.query(`SELECT id, due_date::text, total_cents::int, minimum_payment_cents::int FROM card_bills`)).rows
+    expect(rows).toEqual([{ id: 'b1', due_date: '2026-10-10', total_cents: 152_50, minimum_payment_cents: 15_00 }])
   })
 
   it('marks transactions Pluggy no longer returns as removed, and brings them back', async () => {
@@ -107,6 +135,77 @@ suite('database', () => {
     await sync([tx('t1')])
     const delivery = await subOf('restaurants', 'Delivery')
     await expect(applyEditSql(pool, { op: 'categorize', transactionId: 't1', categoryId: 'groceries', subcategoryId: delivery })).rejects.toMatchObject({ code: 'not_found' })
+  })
+
+  describe('background sync jobs', () => {
+    const config: PluggyConfig = { clientId: 'cid', clientSecret: 'secret', itemIds: ['item-1', 'item-2'], baseUrl: 'https://api.pluggy.ai' }
+    /** Fake Pluggy: item-1 has one account and two transactions; item-2 fails. */
+    const fakeFetch = (async (input: string | URL) => {
+      const url = new URL(String(input))
+      const ok = (body: unknown) => Response.json(body)
+      if (url.pathname === '/auth') return ok({ apiKey: 'k' })
+      if (url.pathname === '/items/item-1') return ok(item)
+      if (url.pathname.startsWith('/items/')) return new Response('{}', { status: 500 })
+      if (url.pathname === '/accounts') return ok({ results: [checking], page: 1, total: 1, totalPages: 1 })
+      if (url.pathname === '/v2/transactions') return ok({ results: [tx('t1'), tx('t2')], next: null })
+      if (url.pathname === '/bills') return ok({ results: [], page: 1, total: 0, totalPages: 1 })
+      return new Response('{}', { status: 404 })
+    }) as typeof fetch
+    const client = () => new PluggyClient(config, fakeFetch)
+
+    it('works through every connection: one saved, one failed with a status code', async () => {
+      const job = await startJob(pool, config.itemIds)
+      expect(job.items.map((i) => i.status)).toEqual(['queued', 'queued'])
+      await runJob(pool, client(), job.id, { fetch: fakeFetch, now: () => now })
+      const done = (await readJob(pool, job.id))!
+      expect(done.done).toBe(true)
+      expect(done.items).toMatchObject([
+        { connectionId: 'item-1', status: 'ok', inserted: 2, name: 'Banco Exemplo' },
+        { connectionId: 'item-2', status: 'failed', error: 'pluggy_500' },
+      ])
+      expect(await count('transactions')).toBe(2)
+    })
+
+    it('runs one sync at a time, and a second run of the same data adds nothing', async () => {
+      const first = await startJob(pool, ['item-1'])
+      expect((await startJob(pool, ['item-1'])).id).toBe(first.id) // still running: the same job
+      await runJob(pool, client(), first.id, { fetch: fakeFetch, now: () => now })
+      const second = await startJob(pool, ['item-1'])
+      expect(second.id).not.toBe(first.id)
+      await runJob(pool, client(), second.id, { fetch: fakeFetch, now: () => now })
+      expect((await readJob(pool, second.id))!.items[0]).toMatchObject({ status: 'ok', inserted: 0, updated: 0 })
+      expect(await count('transactions')).toBe(2)
+    })
+
+    it('leaves work queued when the time budget runs out, for the next poll to resume', async () => {
+      const job = await startJob(pool, config.itemIds)
+      await runJob(pool, client(), job.id, { fetch: fakeFetch, budgetMs: 0 })
+      const after = (await readJob(pool, job.id))!
+      expect(after.done).toBe(false)
+      expect(needsWorker(after)).toBe(true)
+    })
+
+    it('marks an item left running by a stopped worker as failed', async () => {
+      const job = await startJob(pool, ['item-1'])
+      await pool.query(`UPDATE sync_job_items SET status = 'running', started_at = now() - interval '10 minutes' WHERE job_id = $1`, [job.id])
+      expect((await readJob(pool, job.id))!.items[0]).toMatchObject({ status: 'failed', error: 'timeout' })
+    })
+
+    it('POST /api/sync answers 202 at once and the sync finishes in the background', async () => {
+      const work: Promise<unknown>[] = []
+      const background = (p: Promise<unknown>) => void work.push(p)
+      const settings = { pluggy: config, databaseUrl: url! }
+      const res = await startSync(new Request('https://t/api/sync', { method: 'POST', body: '{}' }), settings, { fetch: fakeFetch, now: () => now }, background)
+      expect(res.status).toBe(202)
+      expect((await res.json()).done).toBe(false)
+      expect(work).toHaveLength(1)
+      await Promise.all(work)
+      const status = await (await syncStatus(new Request('https://t/api/sync'), settings, {}, background)).json()
+      expect(status.job).toMatchObject({ done: true })
+      expect(work).toHaveLength(1) // nothing left to resume
+      const bad = await startSync(new Request('https://t/api/sync', { method: 'POST', body: '{"connectionIds":["other"]}' }), settings, {}, background)
+      expect(bad.status).toBe(403)
+    })
   })
 
   it('reads the snapshot with the stored categories and hidden flags', async () => {
