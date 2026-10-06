@@ -110,9 +110,25 @@ CREATE TABLE IF NOT EXISTS transactions (
   -- with a POSTED one under a new id). Kept, not deleted, and hidden in the app.
   removed_at             timestamptz
 );
-CREATE INDEX IF NOT EXISTS transactions_account_date_idx ON transactions (account_id, booked_on DESC);
+-- The app's main read: every live transaction since the first month shown,
+-- newest first (see "How the app reads it" in docs/neon-setup.md).
+CREATE INDEX IF NOT EXISTS transactions_live_booked_idx ON transactions (booked_on DESC, date DESC) WHERE removed_at IS NULL;
+-- The sync: an account's live transactions in the window it just fetched, to
+-- mark the ones Pluggy no longer returns as removed.
+CREATE INDEX IF NOT EXISTS transactions_live_account_idx ON transactions (account_id, booked_on) WHERE removed_at IS NULL;
 CREATE INDEX IF NOT EXISTS transactions_card_bill_idx ON transactions (card_bill_id) WHERE card_bill_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS transactions_provider_idx ON transactions (account_id, provider_id) WHERE provider_id IS NOT NULL;
+
+-- BRL per unit of a foreign currency (e.g. Wise USD), one per currency per
+-- day. The sync fetches it, so loading the app calls no rate service; the
+-- latest row replaces today's in-memory "last good rate". Not money: a rate.
+CREATE TABLE IF NOT EXISTS exchange_rates (
+  currency_code  char(3) NOT NULL,
+  as_of          date NOT NULL,                 -- day in America/Sao_Paulo
+  brl_per_unit   numeric(14, 6) NOT NULL CHECK (brl_per_unit > 0),
+  source         text NOT NULL,                 -- AwesomeAPI | Banco Central | ExchangeRate-API
+  PRIMARY KEY (currency_code, as_of)
+);
 
 -- Trove's own data, today saved per device in localStorage.
 
@@ -146,6 +162,8 @@ CREATE TABLE IF NOT EXISTS sync_runs (
   transactions_removed   integer,
   error                  text
 );
+-- "Last updated" and the debug screen: the latest runs per connection.
+CREATE INDEX IF NOT EXISTS sync_runs_connection_started_idx ON sync_runs (connection_id, started_at DESC);
 
 -- Pluggy webhook deliveries, so a repeated delivery is processed once.
 CREATE TABLE IF NOT EXISTS webhook_events (
