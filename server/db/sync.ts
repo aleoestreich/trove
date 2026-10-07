@@ -24,19 +24,29 @@ import { ratesToBRL } from '../pluggy/rates.js'
 import type { PluggyAccount, PluggyBill, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
 import { inTransaction, type Db } from './connection.js'
 
-/** How far back the first sync goes (Pluggy keeps about a year). */
-const FIRST_SYNC_MONTHS = 12
+/**
+ * How far back Sync fetches. Pluggy returns what each bank provides from
+ * there (often about a year). A connection not yet fetched back to it gets
+ * one full fetch on its next sync.
+ */
+export const HISTORY_START = '2025-01-01'
 /** Later syncs re-read this many days before the last one, to pick up late changes. */
 const OVERLAP_DAYS = 35
+/** app_settings key holding how far back a connection has been fetched (YYYY-MM-DD). */
+const fetchedFromKey = (itemId: string) => `fetched_from:${itemId}`
 
 const cents = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? Math.round(n * 100) : null)
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null)
 const day = (v: unknown): string | null => (typeof v === 'string' && v ? brazilDate(v) : null)
 
-/** The first day of the window to fetch, as YYYY-MM-DD. */
-export function syncFrom(lastSyncedAt: Date | null, now: Date): string {
-  const d = lastSyncedAt ? new Date(lastSyncedAt.getTime() - OVERLAP_DAYS * 86_400_000) : new Date(now.getFullYear(), now.getMonth() - FIRST_SYNC_MONTHS, 1)
-  return d.toISOString().slice(0, 10)
+/**
+ * The first day of the window to fetch, as YYYY-MM-DD: HISTORY_START until
+ * the connection has been fetched back to it (`fetchedFrom`), then 35 days
+ * before its last sync.
+ */
+export function syncFrom(lastSyncedAt: Date | null, fetchedFrom: string | null): string {
+  if (!lastSyncedAt || !fetchedFrom || fetchedFrom > HISTORY_START) return HISTORY_START
+  return new Date(lastSyncedAt.getTime() - OVERLAP_DAYS * 86_400_000).toISOString().slice(0, 10)
 }
 
 /** A connection's name in Trove: the bank for Meu Pluggy items, else the connector. */
@@ -87,7 +97,8 @@ export async function syncConnection(
 ): Promise<SyncResult> {
   const now = deps.now ?? new Date()
   const last = await pool.query<{ synced_at: Date }>(`SELECT synced_at FROM bank_connections WHERE id = $1`, [itemId])
-  const from = syncFrom(last.rows[0]?.synced_at ?? null, now)
+  const fetchedFrom = await pool.query<{ day: string }>(`SELECT value #>> '{}' AS day FROM app_settings WHERE key = $1`, [fetchedFromKey(itemId)])
+  const from = syncFrom(last.rows[0]?.synced_at ?? null, fetchedFrom.rows[0]?.day ?? null)
   const run = await pool.query<{ id: string }>(`INSERT INTO sync_runs (connection_id, trigger, started_at) VALUES (NULL, $1, $2) RETURNING id`, [
     deps.trigger ?? 'manual',
     now,
@@ -298,11 +309,24 @@ export async function save(db: Db, f: Fetched, now: Date): Promise<SyncResult> {
     [json, now],
   )
 
-  // In the fetched window, what Pluggy no longer returns is marked removed.
+  // In the fetched window, what Pluggy no longer returns is marked removed. On a
+  // full fetch (from HISTORY_START), the window starts at the earliest day Pluggy
+  // returned: a bank that keeps less history than asked for must not remove the
+  // older transactions stored. A normal sync (35 days) uses its whole window, so
+  // a pending transaction replaced by a later-dated one is still removed.
+  const earliest = txRows.reduce((min, r) => (r.booked_on < min ? r.booked_on : min), '9999-12-31')
+  const removeFrom = f.from <= HISTORY_START && txRows.length && earliest > f.from ? earliest : f.from
   const removed = await db.query(
     `UPDATE transactions SET removed_at = $4
      WHERE account_id = ANY($1::text[]) AND booked_on >= $2::date AND removed_at IS NULL AND NOT (id = ANY($3::text[]))`,
-    [accounts.map((a) => a.id), f.from, ids, now],
+    [accounts.map((a) => a.id), removeFrom, ids, now],
+  )
+  // How far back this connection has been fetched (only ever moves earlier).
+  await db.query(
+    `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, to_jsonb($2::text), $3)
+     ON CONFLICT (key) DO UPDATE SET value = CASE WHEN app_settings.value #>> '{}' <= $2 THEN app_settings.value ELSE excluded.value END,
+       updated_at = excluded.updated_at`,
+    [fetchedFromKey(item.id), f.from, now],
   )
   await carryEdits(db, new Set(ids.filter((id) => !existing.rows.some((r) => r.id === id))), now)
 
