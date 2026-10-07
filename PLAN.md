@@ -85,13 +85,13 @@ No backend, no auth. It runs in the browser on hardcoded data.
   - Transfers between own accounts and card bill payments detected.
   - The app falls back to demo data until Pluggy is configured.
 - Next:
-  - tune the category and transfer mapping with real data
-    (`/api/finance?summary`);
+  - tune the category and transfer mapping with real data;
   - confirm how Meu Pluggy reports Wise;
   - add a "last updated" indicator and a manual refresh.
-- ✅ Data in Postgres on Neon (`docs/neon-setup.md`): every screen reads the
-  database; the Sync button fetches each connection from Meu Pluggy
-  and saves it without touching their edits.
+- ✅ Data in Postgres on Neon (`docs/neon-setup.md`): every screen and route
+  reads the database; only the Sync button fetches from Meu Pluggy, and it
+  never touches edits. The live read, its diagnostic report and the debug
+  screen are gone.
 - ✅ Categories and subcategories in the database (Categories tab), hidden
   transactions, category colours and icons.
 - ✅ Background, idempotent sync (also stores card bills).

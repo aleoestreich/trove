@@ -6,7 +6,6 @@ import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { Accounts } from './pages/Accounts'
 import { Installments } from './pages/Installments'
-import { Debug } from './pages/Debug'
 import { Categories } from './pages/Categories'
 import { HiddenTransactions } from './pages/Transactions'
 import { Snackbar, SyncBar } from './components/SyncBar'
@@ -69,8 +68,6 @@ function Shell() {
       <main className="px-4 pt-2 pb-6 lg:min-w-0 lg:flex-1 lg:px-10 lg:pt-8 lg:pb-12">
         <div className="lg:mx-auto lg:max-w-[1200px]">
           <Routes>
-            {/* Outside DataGate: it should work even when /api/finance fails. */}
-            <Route path="/debug" element={<Debug />} />
             <Route
               path="*"
               element={

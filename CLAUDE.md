@@ -69,7 +69,7 @@ Run `npm test` and `npm run build` before pushing.
   in `.js` (e.g. `./config.js`); the typecheck enforces it. It must fail
   closed: if a setting is missing, refuse the request. Each file in `api/` is
   one Vercel Function, and the Hobby plan allows 12 per deployment, the login
-  middleware included (11 in use): group new routes into an existing file
+  middleware included (10 in use): group new routes into an existing file
   (with `vercel.json` rewrites when the public paths must stay) instead of
   adding files. Who may sign in is
   managed only in Auth0 (its user list, sign-ups disabled). Never hardcode
@@ -94,7 +94,10 @@ Run `npm test` and `npm run build` before pushing.
   `server/pluggy/map.ts`; shared types come from `src/data/types.ts` and
   `src/data/categories.ts`, which must stay free of browser-only imports.
   Never log or return amounts, descriptions or credentials in errors or
-  diagnostics. The one exception is the debug screen (`#/debug`,
-  `GET /api/debug/pluggy`): it returns Pluggy's raw responses, read-only, only
-  for the configured items and their accounts, behind the login, `no-store`
-  and never logged. It shows the responses in full, values included.
+  diagnostics.
+- **Only Sync reaches Pluggy.** Every page and every route reads Trove's
+  database; the Sync job is the only code that fetches data from Meu Pluggy.
+  The one other Pluggy call is the Connect token (`/api/connect-token`), which
+  opens Pluggy Connect to link the account and returns no data. A test
+  (`server/pluggy/onlySync.test.ts`) fails if another file creates a Pluggy
+  client.

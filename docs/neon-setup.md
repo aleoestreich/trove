@@ -114,9 +114,6 @@ Transactions that disappear are kept, not deleted. A pending card purchase can
 come back under a new ID once it posts; when a sync no longer finds the old
 one, it sets `removed_at` and the app stops showing it.
 
-The debug screen (`/#/debug`) shows whether `id` stays the same across syncs
-and when `provider_id` and `card_bill_id` (Pluggy's `billId`) are filled in.
-
 Deleting a category leaves its transactions uncategorized (`ON DELETE SET
 NULL`) and deletes its subcategories. Moving ("linking") a subcategory to
 another category moves its transactions with it, in one database transaction.

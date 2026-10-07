@@ -271,25 +271,6 @@ export interface Messages {
     notIncome: string
     http: (status: number) => string
   }
-  debug: {
-    title: string
-    link: string
-    intro: string
-    loading: string
-    notConfigured: string
-    failed: (status: number) => string
-    item: (n: number) => string
-    accountsHint: string
-    itemCall: string
-    accountsCall: string
-    page: (n: number) => string
-    transactions: string
-    bills: string
-    nextPage: string
-    copy: string
-    copied: string
-    status: (status: number) => string
-  }
   categoriesPage: {
     /** Accessible names of the 54 category icons, by key. */
     iconNames: Record<string, string>
@@ -613,26 +594,6 @@ export const messages: Messages = {
     notIncome: 'Só categorias de receita entram na renda média.',
     http: (status) => `A requisição falhou (HTTP ${status}).`,
   },
-  debug: {
-    title: 'Depuração do Pluggy',
-    link: 'Depuração do Pluggy',
-    intro: 'A resposta do Pluggy para cada chamada, como o servidor recebe. Só você vê esta página.',
-    loading: 'Carregando…',
-    notConfigured: 'O Pluggy não está configurado no servidor (PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET, PLUGGY_ITEM_IDS).',
-    failed: (status) => `A requisição falhou (HTTP ${status}).`,
-    item: (n) => `Item ${n}`,
-    accountsHint: 'Carregue as contas para ver cada conta.',
-    itemCall: 'Item',
-    accountsCall: 'Contas',
-    page: (n) => `Página ${n}`,
-    transactions: 'Transações',
-    bills: 'Faturas',
-    nextPage: 'Próxima página',
-    copy: 'Copiar JSON',
-    copied: 'Copiado',
-    status: (status) => `HTTP ${status}`,
-  },
-
   categoriesPage: {
     iconNames: {
       home: 'Casa',

@@ -3,7 +3,7 @@
 // (server/pluggy/map.ts), then the stored categories, subcategories and
 // "hidden" flags are applied.
 
-import type { Snapshot, SyncInfo } from '../../src/data/types.js'
+import { MONTHS_OF_HISTORY, type Snapshot, type SyncInfo } from '../../src/data/types.js'
 import { toSnapshot } from '../pluggy/map.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
 import { readCategories, readIncomeFilter } from './categories.js'
@@ -59,4 +59,13 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string): Pro
     },
   })
   return { ...snapshot, sync, incomeFilter: await readIncomeFilter(db) }
+}
+
+/**
+ * First day of the oldest month the app shows, as YYYY-MM-DD; `extra` months
+ * further back (the database read adds one, for the 6-complete-month income average).
+ */
+export function historyStart(now: Date, extra = 0): string {
+  const d = new Date(now.getFullYear(), now.getMonth() - (MONTHS_OF_HISTORY - 1) - extra, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
