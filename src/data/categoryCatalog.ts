@@ -12,7 +12,7 @@ export const CATEGORY_COLOR_NAMES: Record<CategoryColor, { en: string; pt: strin
 export const CATEGORY_ICONS = ["home","bolt","droplet","flame","wifi","phone","cart","fork","coffee","pizza","beer","delivery","car","bus","fuel","parking","bag","shirt","package","gift","lipstick","laptop","heart","pill","stethoscope","tooth","dumbbell","scissors","users","stroller","paw","backpack","book","cap","briefcase","monitor","game","film","music","repeat","ball","plane","suitcase","beach","coin","banknote","bank","card","piggy","chart","receipt","shield","star","more"] as const
 export type CategoryIconKey = (typeof CATEGORY_ICONS)[number]
 
-/** Icon labels, for the picker's accessible names (English in the pack). */
+/** Icon labels as the pack has them (English); the app shows the pt-BR names in src/i18n/messages.ts. */
 export const CATEGORY_ICON_LABELS: Record<string, string> = {"home":"Home","bolt":"Electricity","droplet":"Water","flame":"Gas","wifi":"Internet","phone":"Phone","cart":"Groceries","fork":"Restaurant","coffee":"Coffee","pizza":"Fast food","beer":"Bar","delivery":"Delivery","car":"Car","bus":"Bus","fuel":"Fuel","parking":"Parking","bag":"Shopping","shirt":"Clothing","package":"Online orders","gift":"Gifts","lipstick":"Beauty","laptop":"Electronics","heart":"Health","pill":"Pharmacy","stethoscope":"Doctor","tooth":"Dentist","dumbbell":"Gym","scissors":"Hair & beauty","users":"Family","stroller":"Kids","paw":"Pets","backpack":"School","book":"Books","cap":"Courses","briefcase":"Work","monitor":"Software","game":"Games","film":"Cinema","music":"Music","repeat":"Subscriptions","ball":"Sports","plane":"Flights","suitcase":"Luggage","beach":"Vacation","coin":"Money","banknote":"Cash","bank":"Bank","card":"Card","piggy":"Savings","chart":"Investments","receipt":"Bills","shield":"Insurance","star":"Favourites","more":"Other"}
 
 export interface DefaultCategory {
@@ -24,7 +24,7 @@ export interface DefaultCategory {
   subcategories: { en: string; pt: string }[]
 }
 
-/** Seeded on first run, in the app's language. */
+/** Seeded on first run, with the Portuguese names. */
 export const DEFAULT_CATEGORIES: DefaultCategory[] = [
   {
     "id": "home",

@@ -84,7 +84,7 @@ export function Transactions() {
   const { transactions, accounts, institutionsById, categories, categoriesById } = useData()
   const [params, setParams] = useSearchParams()
   const [selected, setSelected] = useState<Transaction | null>(null)
-  const { t, categoryName, locale } = useI18n()
+  const { t, categoryName } = useI18n()
   const desktop = useIsDesktop()
 
   const latest = monthKey(toISO(new Date()))
@@ -113,12 +113,12 @@ export function Transactions() {
     return filterTransactions(inCycle, categoriesById, { ...filters, month: undefined, accountId: undefined })
   }, [transactions, categoriesById, params, bill?.closeDate])
 
-  // Grouped by day, each with its net (transfers excluded). `locale`: headings are formatted text.
+  // Grouped by day, each with its net (transfers excluded).
   const byDate = useMemo(() => {
     const groups = new Map<string, Transaction[]>()
     for (const tx of filtered) groups.set(tx.date, [...(groups.get(tx.date) ?? []), tx])
     return [...groups].map(([date, txs]) => ({ date, label: formatDayHeading(date), txs, net: totals(txs, categoriesById).net }))
-  }, [filtered, categoriesById, locale])
+  }, [filtered, categoriesById])
 
   const hasFilters = params.has('a') || params.has('c') || params.has('type') || params.has('q')
   // Clearing keeps the month, and the bill when one is open.
@@ -308,13 +308,13 @@ function HiddenLink({ count }: { count: number }) {
 /** Hidden transactions: grouped by day, no day totals, dimmed, each with Unhide. */
 export function HiddenTransactions() {
   const { transactions, edit, categoriesById } = useData()
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const accountLabel = useAccountLabel()
   const days = useMemo(() => {
     const groups = new Map<string, Transaction[]>()
     for (const tx of transactions) if (tx.hidden) groups.set(tx.date, [...(groups.get(tx.date) ?? []), tx])
     return [...groups].map(([date, txs]) => ({ date, label: formatDayHeading(date), txs }))
-  }, [transactions, locale])
+  }, [transactions])
 
   return (
     <div className="flex flex-col gap-4 lg:max-w-[880px]">

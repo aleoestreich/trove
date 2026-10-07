@@ -16,7 +16,7 @@ import { EditError, validateEdit } from '../../src/data/edits.js'
 import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 import { historyStart } from '../pluggy/finance.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
-import { dbErrorMessage, getPool } from './connection.js'
+import { dbErrorCode, dbErrorMessage, getPool } from './connection.js'
 import { readSnapshot, readSyncInfo } from './read.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
 import { waitUntil } from '@vercel/functions'
@@ -40,22 +40,17 @@ function json(status: number, body: unknown): Response {
 
 const notConfigured = () => json(503, { error: 'not_configured' })
 
-/** The app's language, from the cookie the app sets (Portuguese by default), for seeding categories. */
-export function requestLanguage(request: Request): 'en' | 'pt' {
-  const cookie = request.headers.get('cookie') ?? ''
-  return /(?:^|;\s*)trove_locale=en(?:;|$)/.test(cookie) ? 'en' : 'pt'
-}
-
-export async function financeFromDb(request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}): Promise<Response> {
+export async function financeFromDb(_request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}): Promise<Response> {
   if (!config.pluggy || !config.databaseUrl) return notConfigured()
   const pool = getPool(config.databaseUrl)
   try {
-    await ensureSeeded(pool, requestLanguage(request))
+    await ensureSeeded(pool)
     const snapshot = await readSnapshot(pool, config.pluggy.itemIds, historyStart(deps.now?.() ?? new Date(), 1))
     if (!snapshot) return json(409, { error: 'never_synced', sync: await readSyncInfo(pool, config.pluggy.itemIds) })
     return json(200, snapshot)
   } catch (e) {
-    return json(500, { error: 'database', message: e instanceof Error && e.message.startsWith('Missing exchange rate') ? e.message : dbErrorMessage(e) })
+    if (e instanceof Error && e.message.startsWith('Missing exchange rate')) return json(500, { error: 'missing_rate', message: e.message })
+    return json(500, { error: dbErrorCode(e), message: dbErrorMessage(e) })
   }
 }
 
@@ -72,7 +67,7 @@ export async function edits(request: Request, config: DbConfig): Promise<Respons
     return json(204, null)
   } catch (e) {
     if (e instanceof EditError) return json(e.code === 'not_found' ? 404 : e.code === 'name_taken' ? 409 : 400, { error: e.code, message: e.message })
-    return json(500, { error: 'database', message: dbErrorMessage(e) })
+    return json(500, { error: dbErrorCode(e), message: dbErrorMessage(e) })
   }
 }
 
@@ -103,7 +98,7 @@ export async function startSync(request: Request, config: DbConfig, deps: Partia
     if (needsWorker(job)) startWorker(pool, { ...config, pluggy: config.pluggy }, job.id, deps, background)
     return json(202, job)
   } catch (e) {
-    return json(500, { error: 'database', message: dbErrorMessage(e) })
+    return json(500, { error: dbErrorCode(e), message: dbErrorMessage(e) })
   }
 }
 
@@ -119,6 +114,6 @@ export async function syncStatus(_request: Request, config: DbConfig, deps: Part
     if (job && needsWorker(job)) startWorker(pool, { ...config, pluggy: config.pluggy }, job.id, deps, background)
     return json(200, { job })
   } catch (e) {
-    return json(500, { error: 'database', message: dbErrorMessage(e) })
+    return json(500, { error: dbErrorCode(e), message: dbErrorMessage(e) })
   }
 }

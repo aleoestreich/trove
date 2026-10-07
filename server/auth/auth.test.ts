@@ -179,10 +179,8 @@ describe('login', () => {
     expect(await unseal('login', loginCookie, config.secret)).toMatchObject({ state: p.get('state'), returnTo: '/transactions' })
   })
 
-  it("shows Auth0's page in the app's language, else the browser's", async () => {
-    expect((await startLogin('/api/auth/login', { Cookie: 'trove_locale=en', 'Accept-Language': 'pt-BR' })).authorize.searchParams.get('ui_locales')).toBe('en')
-    expect((await startLogin('/api/auth/login', { 'Accept-Language': 'pt-BR,pt;q=0.9' })).authorize.searchParams.get('ui_locales')).toBe('pt-BR')
-    expect((await startLogin('/api/auth/login', { 'Accept-Language': 'en-US' })).authorize.searchParams.get('ui_locales')).toBe('en')
+  it("shows Auth0's page in Portuguese, whatever the browser's language", async () => {
+    expect((await startLogin('/api/auth/login', { 'Accept-Language': 'en-US' })).authorize.searchParams.get('ui_locales')).toBe('pt-BR')
   })
 
   it('never redirects to another site afterwards', () => {

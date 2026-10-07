@@ -1,5 +1,6 @@
 import type { Repository } from './repository'
 import type { Snapshot, SyncInfo, SyncJob } from './types'
+import { messages } from '../i18n/messages'
 
 /** Pluggy or the database isn't configured on the server yet (see docs/pluggy-setup.md, docs/neon-setup.md). */
 export class NotConfiguredError extends Error {}
@@ -30,9 +31,26 @@ async function request(fetchFn: Fetch, url: string, init: RequestInit = {}): Pro
   return res
 }
 
+/**
+ * An error code (the API's, or an EditError's) as a message for the UI. The
+ * server's own text is technical and in English, so it is never shown.
+ */
+export function errorMessage(code: string | undefined, status?: number): string {
+  const e = messages.errors
+  const byCode: Record<string, string> = {
+    database: e.database,
+    schema_outdated: e.schemaOutdated,
+    missing_rate: e.missingRate,
+    invalid: e.invalid,
+    not_found: e.notFound,
+    name_taken: e.nameTaken,
+  }
+  return byCode[code ?? ''] ?? e.http(status ?? 0)
+}
+
 async function failure(res: Response): Promise<Error> {
-  const body = (await res.json().catch(() => null)) as { message?: string } | null
-  return new Error(body?.message ?? `HTTP ${res.status}`)
+  const body = (await res.json().catch(() => null)) as { error?: string } | null
+  return new Error(errorMessage(body?.error, res.status))
 }
 
 /**

@@ -179,11 +179,11 @@ function fail(code: EditError['code'], what: string): never {
   throw new EditError(code, code === 'not_found' ? `No such ${what}.` : code === 'name_taken' ? `That ${what} is taken.` : `Invalid ${what}.`)
 }
 
-/** The default categories and subcategories in a language, with the given subcategory IDs. */
-export function defaultCategories(lang: 'en' | 'pt', subId: (categoryId: string, index: number) => string): { categories: Category[]; subcategories: Subcategory[] } {
+/** The default categories and subcategories (pt-BR names), with the given subcategory IDs. */
+export function defaultCategories(subId: (categoryId: string, index: number) => string): { categories: Category[]; subcategories: Subcategory[] } {
   return {
-    categories: DEFAULT_CATEGORIES.map((c, i) => ({ id: c.id, name: c.name[lang], type: c.type, color: c.color, icon: c.icon, sortOrder: i })),
-    subcategories: DEFAULT_CATEGORIES.flatMap((c) => c.subcategories.map((s, i) => ({ id: subId(c.id, i), categoryId: c.id, name: s[lang], sortOrder: i }))),
+    categories: DEFAULT_CATEGORIES.map((c, i) => ({ id: c.id, name: c.name.pt, type: c.type, color: c.color, icon: c.icon, sortOrder: i })),
+    subcategories: DEFAULT_CATEGORIES.flatMap((c) => c.subcategories.map((s, i) => ({ id: subId(c.id, i), categoryId: c.id, name: s.pt, sortOrder: i }))),
   }
 }
 

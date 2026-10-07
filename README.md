@@ -29,14 +29,15 @@ The dev server is at the URL Vite prints (http://localhost:5173).
 The app follows the system light/dark setting. If Windows Firewall or macOS
 blocks the connection, allow Node.js on private networks.
 
-## Languages
+## Language
 
-English and Brazilian Portuguese (PT-BR), switched in the header and saved on
-the device. On first launch the device language is used. UI text, money
-(`R$ 1.234,56` / `R$1,234.56`) and dates follow the language. Category names
-are stored as entered (the defaults are seeded in the language active on first
-run). Transaction descriptions and account names are shown as the banks send
-them. Strings live in `src/i18n/messages.ts`.
+Brazilian Portuguese (pt-BR) only. All UI text lives in one file,
+`src/i18n/messages.ts`. Money (`R$ 1.234,56`, `US$ 1.234,56`), dates
+(`12 set.`, `segunda, 28 set.`) and chart labels (`13,4 mil`) use pt-BR
+formatting (`src/lib/money.ts`, `src/lib/dates.ts`). The default categories are
+seeded with their Portuguese names. Error codes from the API are shown in
+Portuguese, never the server's own text. Transaction descriptions and account
+names are shown as the banks send them.
 
 ## Data
 
@@ -128,7 +129,7 @@ src/
   data/repository.ts       data-access interface the UI uses
   data/mockRepository.ts   demo data, edits in localStorage
   data/apiRepository.ts    database-backed data via /api (deployed site)
-  i18n/                    EN / PT-BR strings and the language switch
+  i18n/                    UI strings (pt-BR)
   lib/                     money, dates, summaries, bills, installment plans
   pages/                   Overview, Transactions, Accounts, Installments, Categories
   components/              shared UI

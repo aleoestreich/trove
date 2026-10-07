@@ -1,14 +1,13 @@
 import type { Cents, CurrencyCode } from '../data/types'
-import { intlLocale } from '../i18n/locale'
+import { LOCALE } from '../i18n/locale'
 
 const formatters = new Map<string, Intl.NumberFormat>()
 
 function formatter(currency: CurrencyCode, signed: boolean): Intl.NumberFormat {
-  const locale = intlLocale()
-  const key = `${locale}:${currency}:${signed}`
+  const key = `${currency}:${signed}`
   let f = formatters.get(key)
   if (!f) {
-    f = new Intl.NumberFormat(locale, {
+    f = new Intl.NumberFormat(LOCALE, {
       style: 'currency',
       currency,
       signDisplay: signed ? 'exceptZero' : 'auto',
@@ -19,8 +18,8 @@ function formatter(currency: CurrencyCode, signed: boolean): Intl.NumberFormat {
 }
 
 /**
- * Format cents as currency in the active language:
- * pt-BR "R$ 1.234,56" / "US$ 12,00", en "R$1,234.56" / "$12.00".
+ * Format cents as currency (pt-BR):
+ * "R$ 1.234,56" / "US$ 12,00".
  */
 export function formatMoney(cents: Cents, currency: CurrencyCode = 'BRL', opts: { signed?: boolean } = {}): string {
   return formatter(currency, !!opts.signed).format(cents / 100)
@@ -36,22 +35,22 @@ export function convertToBRL(cents: Cents, rate: number): Cents {
   return Math.round(cents * rate)
 }
 
-/** pt-BR "5,45", en "5.45" */
+/** "5,45" */
 export function formatRate(rate: number): string {
-  return rate.toLocaleString(intlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+  return rate.toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 }
 
-/** Axis ticks: pt-BR "15 mil", en "15K". */
+/** Axis ticks: "15 mil". */
 export function formatCompact(value: number): string {
-  return new Intl.NumberFormat(intlLocale(), { notation: 'compact', maximumFractionDigits: 1 }).format(value)
+  return new Intl.NumberFormat(LOCALE, { notation: 'compact', maximumFractionDigits: 1 }).format(value)
 }
 
-/** Percentage in the active language: pt-BR "6,0%", en "6.0%". */
+/** Percentage: "6,0%". */
 export function formatPercent(value: number, decimals = 0): string {
-  return new Intl.NumberFormat(intlLocale(), { style: 'percent', minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value / 100)
+  return new Intl.NumberFormat(LOCALE, { style: 'percent', minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value / 100)
 }
 
-/** Short money for chart labels: pt-BR "R$ 14,5 mil", en "R$14.5K". */
+/** Short money for chart labels: "R$ 14,5 mil". */
 export function formatCompactMoney(cents: Cents): string {
-  return new Intl.NumberFormat(intlLocale(), { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(cents / 100)
+  return new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(cents / 100)
 }

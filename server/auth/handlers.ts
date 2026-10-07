@@ -5,7 +5,7 @@
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose'
 import { next } from '@vercel/functions'
 import { issuerOf, NOT_CONFIGURED, type AuthConfig } from './config.js'
-import { clearCookie, LOCALE_COOKIE, LOGIN_COOKIE, readCookie, SESSION_COOKIE, setCookie } from './cookies.js'
+import { clearCookie, LOGIN_COOKIE, readCookie, SESSION_COOKIE, setCookie } from './cookies.js'
 import { LOGIN_MAX_AGE, seal, SESSION_MAX_AGE, unseal, type LoginClaims, type SessionClaims } from './session.js'
 import { messagePage, signOutLink, tryAgain } from './pages.js'
 
@@ -46,13 +46,6 @@ function randomToken(): string {
 
 async function pkceChallenge(verifier: string): Promise<string> {
   return base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))))
-}
-
-/** Language for Auth0's login page: the app's choice, else the browser's. */
-export function loginLocale(request: Request): 'pt-BR' | 'en' {
-  const chosen = readCookie(request, LOCALE_COOKIE)
-  if (chosen === 'pt-BR' || chosen === 'en') return chosen
-  return (request.headers.get('Accept-Language') ?? '').toLowerCase().startsWith('pt') ? 'pt-BR' : 'en'
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +91,7 @@ export async function login(request: Request, config: AuthConfig | null): Promis
     nonce,
     code_challenge: await pkceChallenge(verifier),
     code_challenge_method: 'S256',
-    ui_locales: loginLocale(request),
+    ui_locales: 'pt-BR', // Auth0's login page in the app's language
   }).toString()
 
   return redirect(authorize.toString(), [setCookie(LOGIN_COOKIE, loginState, LOGIN_MAX_AGE)])

@@ -29,7 +29,7 @@ export function Dashboard() {
   const { accounts, transactions, categoriesById, institutionsById } = useData()
   const isDesktop = useIsDesktop()
   const [params, setParams] = useSearchParams()
-  const { t, categoryName, locale } = useI18n()
+  const { t, categoryName } = useI18n()
   const latest = monthKey(toISO(new Date()))
   const month = params.get('m') ?? latest
   const months = useMemo(() => lastMonths(latest, MONTHS_OF_HISTORY), [latest])
@@ -54,10 +54,10 @@ export function Dashboard() {
   // Hidden transactions count nowhere here (balances aside: those are the bank's).
   const counted = useMemo(() => visible(transactions), [transactions])
 
-  // Cash flow. `locale` is a dependency because the labels are formatted text.
+  // Cash flow.
   const flow = useMemo(
     () => months.map((m) => ({ month: m, label: formatMonthShort(m), ...totals(inMonth(counted, m), categoriesById) })),
-    [counted, categoriesById, months, locale],
+    [counted, categoriesById, months],
   )
   // Figures for the selected month (the current one by default).
   const thisMonth = flow.find((f) => f.month === month) ?? flow[flow.length - 1]
@@ -68,7 +68,7 @@ export function Dashboard() {
     return lastMonths(latest, AVERAGE_MONTHS + 1)
       .filter((m) => m >= monthKey(first))
       .map((m) => ({ month: m, label: formatMonthShort(m), income: totals(inMonth(counted, m), categoriesById).income }))
-  }, [counted, categoriesById, latest, locale])
+  }, [counted, categoriesById, latest])
   const avgIncome = useMemo(() => averageIncome(incomeMonths), [incomeMonths])
   const keptPct = thisMonth.income > 0 ? (thisMonth.net / thisMonth.income) * 100 : null
 

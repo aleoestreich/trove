@@ -1,312 +1,316 @@
-// UI strings in English and Brazilian Portuguese (pt-BR). `ptBR` must have exactly the
-// same shape as `en`; TypeScript enforces it.
+// UI strings, in Brazilian Portuguese (pt-BR): the app's only language.
 //
 // Transaction descriptions and account names are not translated: they are
 // data from the banks (via Pluggy) and shown as the bank sends them.
 
-const en = {
-  nav: { overview: 'Overview', transactions: 'Transactions', accounts: 'Accounts', installments: 'Installments', categories: 'Categories' },
-  mainNav: 'Main',
-  demoData: 'Demo data',
-  demoNote: 'Showing demo data until Meu Pluggy is connected.',
-  language: 'Language',
-  loading: 'Loading your finances',
-  loadErrorTitle: 'Couldn’t load your finances',
-  loadErrorBody: 'Check your connection and try again. Nothing was changed; your data is safe.',
-  tryAgain: 'Try again',
-  previousMonth: 'Previous month',
-  nextMonth: 'Next month',
-  income: 'Income',
-  expenses: 'Expenses',
-  transfers: 'Transfers',
-  net: 'Balance',
-  seeAll: 'See all',
-  pending: 'Pending',
-  close: 'Close',
-  done: 'Done',
-  category: 'Category',
-  other: 'Other',
+export interface Messages {
+  nav: {
+    overview: string
+    transactions: string
+    accounts: string
+    installments: string
+    categories: string
+  }
+  mainNav: string
+  demoData: string
+  demoNote: string
+  loading: string
+  loadErrorTitle: string
+  loadErrorBody: string
+  tryAgain: string
+  previousMonth: string
+  nextMonth: string
+  income: string
+  expenses: string
+  transfers: string
+  net: string
+  seeAll: string
+  pending: string
+  close: string
+  done: string
+  category: string
+  other: string
   /** Last line of a chart's month breakdown. */
-  chartTotal: 'Total',
-  cardOf: (institution: string) => `${institution} card`,
-  oneUnitIs: (currency: string, rate: string) => `1 ${currency} = R$ ${rate}`,
-
+  chartTotal: string
+  cardOf: (institution: string) => string
+  oneUnitIs: (currency: string, rate: string) => string
   overview: {
-    subtitle: (date: string) => `As of ${date}`,
-    netWorth: 'Net worth',
-    vsLastMonth: 'vs last month',
-    netWorthChart: (months: number, from: string, to: string) => `Net worth over the last ${months} months, from ${from} to ${to}`,
-    chartAccountsCards: (accounts: string, cards: string) => `Accounts ${accounts} · Cards −${cards}`,
+    subtitle: (date: string) => string
+    netWorth: string
+    vsLastMonth: string
+    netWorthChart: (months: number, from: string, to: string) => string
+    chartAccountsCards: (accounts: string, cards: string) => string
     /** Average income card. */
     avgIncome: {
-      title: 'Average income',
-      sub: (months: number) => `Monthly average, last ${months} full ${months === 1 ? 'month' : 'months'}`,
-      perMonth: '/month',
-      range: (lowest: string, lowMonth: string, highest: string, highMonth: string) => `Lowest ${lowest} (${lowMonth}) · Highest ${highest} (${highMonth})`,
-      current: (amount: string, pct: string, above: boolean) => `This month so far: ${amount} · ${pct} ${above ? 'above' : 'below'} average`,
+      title: string
+      sub: (months: number) => string
+      perMonth: string
+      range: (lowest: string, lowMonth: string, highest: string, highMonth: string) => string
+      current: (amount: string, pct: string, above: boolean) => string
       /** Nothing in yet this month: no comparison. */
-      currentNone: (amount: string) => `This month so far: ${amount}`,
-      avgLabel: (amount: string) => `avg ${amount}`,
-      chart: (average: string) => `Income per month; average ${average}`,
-    },
-    whereMoney: 'Where your money is',
-    balancesNote: 'Account balances, before card bills',
-    byCurrency: 'By currency',
-    byBank: 'By bank',
-    incomeVsExpenses: 'Income vs expenses',
-    lastMonths: (months: number) => `Last ${months} months`,
-    kept: 'of this month’s income kept',
-    keptShort: 'Kept this month',
-    comingUp: 'Coming up',
-    openCardBills: 'Open card bills',
-    due: (date: string) => `Due ${date}`,
-    installmentsNextMonth: 'Next month’s installments',
-    nextMonthPurchases: (month: string, n: number) => `${month} · ${n} ${n === 1 ? 'purchase' : 'purchases'}`,
-    spendingByCategory: 'Spending by category',
-    monthInDetail: 'Month in detail',
-    categories: 'Categories',
-    noExpenses: 'No expenses this month.',
-    latestTransactions: 'Latest transactions',
-  },
-
+      currentNone: (amount: string) => string
+      avgLabel: (amount: string) => string
+      chart: (average: string) => string
+    }
+    whereMoney: string
+    balancesNote: string
+    byCurrency: string
+    byBank: string
+    incomeVsExpenses: string
+    lastMonths: (months: number) => string
+    kept: string
+    keptShort: string
+    comingUp: string
+    openCardBills: string
+    due: (date: string) => string
+    installmentsNextMonth: string
+    nextMonthPurchases: (month: string, n: number) => string
+    spendingByCategory: string
+    monthInDetail: string
+    categories: string
+    noExpenses: string
+    latestTransactions: string
+  }
   transactions: {
-    search: 'Search transactions',
+    search: string
     /** Chip on Transactions when opened from a card's bill. */
-    billChip: (closed: boolean, from: string, to: string) => `${closed ? 'Closed bill' : 'Current bill'} · ${from} – ${to}`,
-    billShowAll: "Show all of this card's transactions",
-    billTotal: (amount: string) => `Bill total ${amount}`,
-    billExpected: (amount: string) => `Includes ${amount} in installments that haven't posted yet.`,
-    allMonths: 'All months',
-    type: 'Type',
-    allTypes: 'All types',
-    account: 'Account',
-    allAccounts: 'All accounts',
-    allCategories: 'All categories',
-    clear: 'Clear',
-    clearFilters: 'Clear filters',
-    colDescription: 'Description',
-    colAmount: 'Amount',
-    count: (n: number, month: string | null) =>
-      `${n} ${n === 1 ? 'transaction' : 'transactions'}${month ? ` in ${month.replace(/ \d{4}$/, '')}` : ''}`,
-    emptyTitle: 'No transactions found',
-    emptyBody: (month: string | null) =>
-      month
-        ? `Nothing in ${month.replace(/ \d{4}$/, '')} matches these filters. Try another month or clear the filters.`
-        : 'Nothing matches these filters. Try clearing them.',
-    details: 'Transaction details',
-    kindIncome: 'Income',
-    kindExpense: 'Expense',
-    kindTransfer: 'Transfer',
-    installmentN: (n: number, total: number) => `installment ${n} of ${total}`,
-    date: 'Date',
-    inBRL: 'In BRL',
-    installment: 'Installment',
-    installmentEnds: (n: number, total: number, month: string) => `${n} of ${total} · ends ${month}`,
-    purchaseTotal: 'Purchase total',
-    status: 'Status',
-    transferNote: 'Transfers aren’t counted as income or expenses.',
+    billChip: (closed: boolean, from: string, to: string) => string
+    billShowAll: string
+    billTotal: (amount: string) => string
+    billExpected: (amount: string) => string
+    allMonths: string
+    type: string
+    allTypes: string
+    account: string
+    allAccounts: string
+    allCategories: string
+    clear: string
+    clearFilters: string
+    colDescription: string
+    colAmount: string
+    count: (n: number, month: string | null) => string
+    emptyTitle: string
+    emptyBody: (month: string | null) => string
+    details: string
+    kindIncome: string
+    kindExpense: string
+    kindTransfer: string
+    installmentN: (n: number, total: number) => string
+    date: string
+    inBRL: string
+    installment: string
+    installmentEnds: (n: number, total: number, month: string) => string
+    purchaseTotal: string
+    status: string
+    transferNote: string
     /** Row line 2 for a transaction without a category. */
-    uncategorizedTap: 'Uncategorized · tap to choose',
-    uncategorized: 'Uncategorized',
-    transferRow: 'Transfer between your accounts',
-    cardPaymentRow: 'Card bill payment',
+    uncategorizedTap: string
+    uncategorized: string
+    transferRow: string
+    cardPaymentRow: string
     /** Text button next to the result count. */
-    hiddenLink: (n: number) => `Hidden (${n})`,
-    hiddenTitle: 'Hidden transactions',
-    hiddenNote: 'Hidden transactions are left out of every total, chart and average. Unhide one to count it again.',
-    hiddenEmpty: 'No hidden transactions.',
-    unhide: 'Unhide',
-    unhideAria: (description: string) => `Unhide ${description}`,
-    subcategory: 'Subcategory',
-    newSubcategory: 'New',
-    subcategoryName: 'Subcategory name',
-    add: 'Add',
-    hide: 'Hide this transaction',
-    hideNote: 'Leaves it out of totals and charts. Find it again under Transactions › Hidden.',
-    noCategoriesOfType: (kind: string) => `No ${kind} categories yet. Create one under Categories.`,
-  },
-
+    hiddenLink: (n: number) => string
+    hiddenTitle: string
+    hiddenNote: string
+    hiddenEmpty: string
+    unhide: string
+    unhideAria: (description: string) => string
+    subcategory: string
+    newSubcategory: string
+    subcategoryName: string
+    add: string
+    hide: string
+    hideNote: string
+    noCategoriesOfType: (kind: string) => string
+  }
   installments: {
-    subtitle: 'Card purchases split into monthly payments',
-    stillToPay: 'Still to pay',
-    summary: (n: number, lastMonth: string | null) =>
-      `${n} ${n === 1 ? 'purchase' : 'purchases'}${lastMonth ? ` · last installment in ${lastMonth}` : ''}`,
-    committedPerMonth: 'Committed per month',
-    committedNote: 'Already taken from your card limits. New purchases will add to these bills.',
-    purchases: 'Purchases',
-    purchase: 'Purchase',
-    progress: 'Progress',
-    finished: 'Paid off',
-    inProgress: 'In progress',
+    subtitle: string
+    stillToPay: string
+    summary: (n: number, lastMonth: string | null) => string
+    committedPerMonth: string
+    committedNote: string
+    purchases: string
+    purchase: string
+    progress: string
+    finished: string
+    inProgress: string
     /** Label for the In progress / Paid off switch. */
-    view: 'Installments to show',
-    bankLeft: 'left to pay',
-    bankPurchases: (n: number) => `${n} ${n === 1 ? 'purchase' : 'purchases'}`,
-    noneInProgress: 'Nothing in progress: every installment purchase is paid off.',
-    paid: 'paid',
-    toGo: (n: number) => `${n} to go`,
-    paidOff: 'Paid off',
-    chargedLabel: 'Installments charged',
-    perMonth: 'Per month',
-    leftToPay: 'Left to pay',
-    ends: 'Ends',
-    emptyTitle: 'No installments',
-    emptyBody: 'When you split a card purchase into monthly payments, it will show up here with its progress.',
-  },
-
+    view: string
+    bankLeft: string
+    bankPurchases: (n: number) => string
+    noneInProgress: string
+    paid: string
+    toGo: (n: number) => string
+    paidOff: string
+    chargedLabel: string
+    perMonth: string
+    leftToPay: string
+    ends: string
+    emptyTitle: string
+    emptyBody: string
+  }
   connect: {
-    title: 'Connect your banks',
-    intro: 'Trove reads your accounts through Meu Pluggy. Connect it once to get the connection ID.',
-    button: 'Connect Meu Pluggy',
-    opening: 'Opening…',
-    connected: 'Connected',
-    nextStep: 'Copy this ID into Vercel as PLUGGY_ITEM_IDS, then redeploy.',
-    copy: 'Copy',
-    copied: 'Copied',
-    notConfigured: 'Add PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET in Vercel first, then redeploy.',
-    meuPluggyMissing: "Meu Pluggy isn't available for these credentials, so nothing was opened (to avoid paid connections).",
-    failed: 'Could not connect. Try again.',
-  },
-
+    title: string
+    intro: string
+    button: string
+    opening: string
+    connected: string
+    nextStep: string
+    copy: string
+    copied: string
+    notConfigured: string
+    meuPluggyMissing: string
+    failed: string
+  }
   accounts: {
-    total: (banks: number) => `Total across ${banks} ${banks === 1 ? 'bank' : 'banks'}`,
-    totalNote: 'Balances minus open card bills',
+    total: (banks: number) => string
+    totalNote: string
     /** Label for an account the bank sent without a name, e.g. "USD balance". */
-    balanceIn: (currency: string) => `${currency} balance`,
-    footer: 'Demo data. Your real accounts appear here once Meu Pluggy is connected.',
-    signOut: 'Sign out',
-    nearLimit: 'Near limit',
-    currentBill: 'Current bill',
+    balanceIn: (currency: string) => string
+    footer: string
+    signOut: string
+    nearLimit: string
+    currentBill: string
     /** A bill that has closed and is waiting to be paid. */
-    closedBill: 'Closed bill',
+    closedBill: string
     /** Account labels on Accounts, by kind. */
-    types: { checking: 'Checking', savings: 'Savings', usd: 'USD balance', card: 'Credit card' },
+    types: {
+      checking: string
+      savings: string
+      usd: string
+      card: string
+    }
     /** Under a closed bill that's been partly paid; the amount shown is what's left. */
-    alreadyPaid: (amount: string) => `${amount} already paid`,
-    closed: 'Closed',
+    alreadyPaid: (amount: string) => string
+    closed: string
     /** Per-card closing and due days set by hand. */
     cardDays: {
-      missing: "The bank doesn't send this card's closing date, so the current bill can't be worked out. Set the days from your bank's app.",
-      set: 'Set closing and due days',
-      summary: (close: number, due: number) => `Closes on day ${close} · due on day ${due}`,
-      edit: 'Edit',
-      closeDay: 'Closing day',
-      dueDay: 'Due day',
-      save: 'Save',
-      cancel: 'Cancel',
-      useBank: "Use the bank's dates",
-      note: 'Saved on this device.',
-    },
-    limitUsed: 'Limit used',
-    used: 'Used',
-    available: 'Available',
-    limit: 'Limit',
-    futureInstallments: (amount: string) => `${amount} in future installments`,
-    closes: 'Closes',
-    due: 'Due',
-    rate: (currency: string, rate: string) => `Rate 1 ${currency} = R$ ${rate}`,
-  },
-
+      missing: string
+      set: string
+      summary: (close: number, due: number) => string
+      edit: string
+      closeDay: string
+      dueDay: string
+      save: string
+      cancel: string
+      useBank: string
+      note: string
+    }
+    limitUsed: string
+    used: string
+    available: string
+    limit: string
+    futureInstallments: (amount: string) => string
+    closes: string
+    due: string
+    rate: (currency: string, rate: string) => string
+  }
+  /** Server errors, by the code the API returns (never its text, which is English and technical). */
+  errors: {
+    database: string
+    schemaOutdated: string
+    missingRate: string
+    invalid: string
+    notFound: string
+    nameTaken: string
+    network: string
+    http: (status: number) => string
+  }
   debug: {
-    title: 'Pluggy debug',
-    link: 'Pluggy debug',
-    intro: "Pluggy's raw answer for each call, as the server receives it. Only you can see this page.",
-    loading: 'Loading…',
-    notConfigured: 'Pluggy is not configured on the server (PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET, PLUGGY_ITEM_IDS).',
-    failed: (status: number) => `Request failed (HTTP ${status}).`,
-    item: (n: number) => `Item ${n}`,
-    accountsHint: 'Load the accounts to see each account.',
-    itemCall: 'Item',
-    accountsCall: 'Accounts',
-    page: (n: number) => `Page ${n}`,
-    transactions: 'Transactions',
-    bills: 'Bills',
-    nextPage: 'Next page',
-    copy: 'Copy JSON',
-    copied: 'Copied',
-    status: (status: number) => `HTTP ${status}`,
-  },
-
+    title: string
+    link: string
+    intro: string
+    loading: string
+    notConfigured: string
+    failed: (status: number) => string
+    item: (n: number) => string
+    accountsHint: string
+    itemCall: string
+    accountsCall: string
+    page: (n: number) => string
+    transactions: string
+    bills: string
+    nextPage: string
+    copy: string
+    copied: string
+    status: (status: number) => string
+  }
   categoriesPage: {
-    title: 'Categories',
-    newCategory: 'New',
-    typeAria: 'Category type',
-    subCount: (n: number) => `${n} ${n === 1 ? 'subcategory' : 'subcategories'}`,
-    add: 'Add',
-    editCategory: 'Edit category',
-    listNote: 'Tap a category to see its subcategories. Transactions keep their category even if you rename it.',
-    empty: 'No categories of this type yet.',
-    editTitle: 'Edit category',
-    newTitle: 'New category',
-    save: 'Save',
-    name: 'Name',
-    type: 'Type',
-    expense: 'Expense',
-    income: 'Income',
-    color: 'Color',
-    icon: 'Icon',
-    subcategories: 'Subcategories',
-    addSubcategory: 'Add a subcategory',
-    link: 'Link an existing subcategory',
-    linkPlaceholder: 'Choose from another category…',
-    linkNote: 'Linking moves the subcategory here, together with its transactions.',
-    deleteCategory: 'Delete category',
-    deleteConfirm: (name: string) => `Delete “${name}”? Its subcategories are deleted too, and its transactions become uncategorized.`,
-    deleteSubConfirm: (name: string) => `Remove “${name}”? Its transactions keep the category, without a subcategory.`,
-    transactionsN: (n: number) => `${n} ${n === 1 ? 'transaction' : 'transactions'}`,
-    remove: (name: string) => `Remove ${name}`,
-    nameTaken: 'Use a name that isn’t taken.',
-    nameRequired: 'Give it a name.',
-    noSubcategories: 'No subcategories yet.',
-  },
-
+    /** Accessible names of the 54 category icons, by key. */
+    iconNames: Record<string, string>
+    title: string
+    newCategory: string
+    typeAria: string
+    subCount: (n: number) => string
+    add: string
+    editCategory: string
+    listNote: string
+    empty: string
+    editTitle: string
+    newTitle: string
+    save: string
+    name: string
+    type: string
+    expense: string
+    income: string
+    color: string
+    icon: string
+    subcategories: string
+    addSubcategory: string
+    link: string
+    linkPlaceholder: string
+    linkNote: string
+    deleteCategory: string
+    deleteConfirm: (name: string) => string
+    deleteSubConfirm: (name: string) => string
+    transactionsN: (n: number) => string
+    remove: (name: string) => string
+    nameTaken: string
+    nameRequired: string
+    noSubcategories: string
+  }
   sync: {
-    syncedToday: (time: string) => `Synced today at ${time}`,
-    syncedYesterday: (time: string) => `Synced yesterday at ${time}`,
-    syncedOn: (date: string, time: string) => `Synced on ${date} at ${time}`,
-    stale: (days: number) => `Last synced ${days} days ago`,
-    syncing: (bank: string | null, n: number, total: number) =>
-      total === 1 ? `Syncing ${bank ?? 'your bank'}…` : `Syncing ${bank ?? `bank ${n}`}… ${n} of ${total} banks`,
-    failed: (banks: string, _count: number) => `${banks} didn’t sync. Other banks are up to date.`,
-    failedAll: 'Couldn’t sync. Check your connection and try again.',
-    neverSynced: 'Showing demo data. Sync to load your banks.',
-    notConnected: 'Showing demo data. Connect Meu Pluggy to sync.',
-    syncNow: 'Sync now',
-    syncingButton: 'Syncing',
-    retry: 'Retry',
-    connect: 'Connect',
-    done: (inserted: number, updated: number) =>
-      `Synced · ${inserted} new, ${updated} updated ${inserted + updated === 1 ? 'transaction' : 'transactions'}`,
-    view: 'View',
-    progress: 'Sync progress',
-    saveFailed: 'Couldn’t save that change. Showing what’s saved.',
+    syncedToday: (time: string) => string
+    syncedYesterday: (time: string) => string
+    syncedOn: (date: string, time: string) => string
+    stale: (days: number) => string
+    syncing: (bank: string | null, n: number, total: number) => string
+    failed: (banks: string, _count: number) => string
+    failedAll: string
+    neverSynced: string
+    notConnected: string
+    syncNow: string
+    syncingButton: string
+    retry: string
+    connect: string
+    done: (inserted: number, updated: number) => string
+    view: string
+    progress: string
+    saveFailed: string
     /** Why a bank didn't sync, under the failure message. */
     problems: {
-      credentials: 'Pluggy refused the API credentials. Check PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET in Vercel.',
-      notFound: 'Pluggy doesn’t know this connection. Check PLUGGY_ITEM_IDS in Vercel.',
-      rateLimited: 'Pluggy is limiting requests. Try again in a few minutes.',
-      unavailable: 'Pluggy or the bank didn’t respond. Try again later.',
-      timeout: 'It took too long and was stopped. Try again.',
-      database: 'The database refused the update. Check that the migrations in db/migrations have run.',
-      notConfigured: 'Pluggy or the database isn’t configured on the server.',
-      network: 'Couldn’t reach Trove’s server. Check the connection.',
-      unknown: 'Something went wrong. Try again.',
-    },
-    problemFor: (bank: string, reason: string) => `${bank}: ${reason}`,
+      credentials: string
+      notFound: string
+      rateLimited: string
+      unavailable: string
+      timeout: string
+      database: string
+      notConfigured: string
+      network: string
+      unknown: string
+    }
+    problemFor: (bank: string, reason: string) => string
     /** A connection Pluggy marks as needing attention (expired consent…). */
-    reconnect: (banks: string) => `${banks} needs to be reconnected in the Meu Pluggy app.`,
-    reconnectNote: 'Its data stops updating until then. Reconnect it, then sync.',
-  },
+    reconnect: (banks: string) => string
+    reconnectNote: string
+  }
 }
 
-export type Messages = typeof en
-
-const ptBR: Messages = {
+export const messages: Messages = {
   nav: { overview: 'Visão geral', transactions: 'Transações', accounts: 'Contas', installments: 'Parcelas', categories: 'Categorias' },
   mainNav: 'Principal',
   demoData: 'Dados de exemplo',
   demoNote: 'Mostrando dados de exemplo até o Meu Pluggy ser conectado.',
-  language: 'Idioma',
   loading: 'Carregando suas finanças',
   loadErrorTitle: 'Não foi possível carregar suas finanças',
   loadErrorBody: 'Verifique sua conexão e tente de novo. Nada foi alterado; seus dados estão seguros.',
@@ -338,8 +342,8 @@ const ptBR: Messages = {
       sub: (months) => `Média mensal dos últimos ${months} ${months === 1 ? 'mês completo' : 'meses completos'}`,
       perMonth: '/mês',
       range: (lowest, lowMonth, highest, highMonth) => `Menor ${lowest} (${lowMonth}) · Maior ${highest} (${highMonth})`,
-      current: (amount, pct, above) => `Este mês até agora: ${amount} · ${pct} ${above ? 'acima' : 'abaixo'} da média`,
-      currentNone: (amount) => `Este mês até agora: ${amount}`,
+      current: (amount, pct, above) => `Este mês: ${amount} · ${pct} ${above ? 'acima' : 'abaixo'} da média`,
+      currentNone: (amount) => `Este mês: ${amount}`,
       avgLabel: (amount) => `média ${amount}`,
       chart: (average) => `Renda por mês; média ${average}`,
     },
@@ -491,6 +495,16 @@ const ptBR: Messages = {
     rate: (currency, rate) => `Cotação 1 ${currency} = R$ ${rate}`,
   },
 
+  errors: {
+    database: 'O banco de dados não respondeu. Tente de novo em instantes.',
+    schemaOutdated: 'As tabelas do banco de dados estão desatualizadas: rode os arquivos pendentes de db/migrations (docs/neon-setup.md).',
+    missingRate: 'Sem cotação para converter uma moeda estrangeira. Sincronize de novo.',
+    invalid: 'A alteração não é válida.',
+    notFound: 'Isso não existe mais. Os dados foram recarregados.',
+    nameTaken: 'Já existe uma com esse nome.',
+    network: 'Não foi possível acessar o servidor do Trove. Verifique a conexão.',
+    http: (status) => `A requisição falhou (HTTP ${status}).`,
+  },
   debug: {
     title: 'Depuração do Pluggy',
     link: 'Depuração do Pluggy',
@@ -512,6 +526,62 @@ const ptBR: Messages = {
   },
 
   categoriesPage: {
+    iconNames: {
+      home: 'Casa',
+      bolt: 'Energia',
+      droplet: 'Água',
+      flame: 'Gás',
+      wifi: 'Internet',
+      phone: 'Telefone',
+      cart: 'Mercado',
+      fork: 'Restaurante',
+      coffee: 'Café',
+      pizza: 'Fast food',
+      beer: 'Bar',
+      delivery: 'Delivery',
+      car: 'Carro',
+      bus: 'Ônibus',
+      fuel: 'Combustível',
+      parking: 'Estacionamento',
+      bag: 'Compras',
+      shirt: 'Roupas',
+      package: 'Pedidos online',
+      gift: 'Presentes',
+      lipstick: 'Beleza',
+      laptop: 'Eletrônicos',
+      heart: 'Saúde',
+      pill: 'Farmácia',
+      stethoscope: 'Médico',
+      tooth: 'Dentista',
+      dumbbell: 'Academia',
+      scissors: 'Cabelo e estética',
+      users: 'Família',
+      stroller: 'Filhos',
+      paw: 'Pets',
+      backpack: 'Escola',
+      book: 'Livros',
+      cap: 'Cursos',
+      briefcase: 'Trabalho',
+      monitor: 'Software',
+      game: 'Jogos',
+      film: 'Cinema',
+      music: 'Música',
+      repeat: 'Assinaturas',
+      ball: 'Esportes',
+      plane: 'Voos',
+      suitcase: 'Bagagem',
+      beach: 'Férias',
+      coin: 'Dinheiro',
+      banknote: 'Espécie',
+      bank: 'Banco',
+      card: 'Cartão',
+      piggy: 'Poupança',
+      chart: 'Investimentos',
+      receipt: 'Contas',
+      shield: 'Seguros',
+      star: 'Favoritos',
+      more: 'Outros',
+    },
     title: 'Categorias',
     newCategory: 'Nova',
     typeAria: 'Tipo de categoria',
@@ -580,5 +650,3 @@ const ptBR: Messages = {
     reconnectNote: 'Os dados param de atualizar até lá. Reconecte e depois sincronize.',
   },
 }
-
-export const messages: Record<'en' | 'pt-BR', Messages> = { en, 'pt-BR': ptBR }

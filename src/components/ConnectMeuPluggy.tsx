@@ -19,7 +19,7 @@ type State =
  * server. After connecting, shows the new item ID to put in PLUGGY_ITEM_IDS.
  */
 export function ConnectMeuPluggy() {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const [state, setState] = useState<State>({ step: 'idle' })
   const [copied, setCopied] = useState(false)
 
@@ -90,7 +90,7 @@ export function ConnectMeuPluggy() {
             connectorIds={state.connectorIds}
             selectedConnectorId={state.connectorIds[0]}
             includeSandbox={false}
-            language={locale === 'pt-BR' ? 'pt' : 'en'}
+            language="pt"
             onSuccess={({ item }) => setState({ step: 'connected', itemId: item.id })}
             onError={() => setState({ step: 'error', message: t.connect.failed })}
             onClose={() => setState((s) => (s.step === 'open' ? { step: 'idle' } : s))}

@@ -2,7 +2,6 @@ import type { Repository } from './repository'
 import { DEMO_SUBCATEGORIES, buildSeed } from './seed'
 import { applyEdit, defaultCategories } from './edits'
 import { DEFAULT_CATEGORIES } from './categoryCatalog'
-import { getLocale } from '../i18n/locale'
 import type { Category, Snapshot, Subcategory } from './types'
 
 const KEY = 'trove.demoOwner'
@@ -31,9 +30,9 @@ function write(owner: DemoOwner) {
   }
 }
 
-/** First run: the default categories in the current language, and demo subcategories by description. */
+/** First run: the default categories, and demo subcategories by description. */
 function initialOwner(seed: Snapshot): DemoOwner {
-  const { categories, subcategories } = defaultCategories(getLocale() === 'pt-BR' ? 'pt' : 'en', (c, i) => `${c}-${i}`)
+  const { categories, subcategories } = defaultCategories((c, i) => `${c}-${i}`)
   const stored: DemoOwner['stored'] = {}
   for (const t of seed.transactions) {
     const en = DEMO_SUBCATEGORIES[t.description]

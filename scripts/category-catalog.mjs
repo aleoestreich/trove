@@ -32,7 +32,7 @@ export const CATEGORY_COLOR_NAMES: Record<CategoryColor, { en: string; pt: strin
 export const CATEGORY_ICONS = ${JSON.stringify(icons)} as const
 export type CategoryIconKey = (typeof CATEGORY_ICONS)[number]
 
-/** Icon labels, for the picker's accessible names (English in the pack). */
+/** Icon labels as the pack has them (English); the app shows the pt-BR names in src/i18n/messages.ts. */
 export const CATEGORY_ICON_LABELS: Record<string, string> = ${JSON.stringify(
   Object.fromEntries(json.icons.flatMap((g) => g.icons.map((i) => [i.key, i.label]))),
 )}
@@ -46,7 +46,7 @@ export interface DefaultCategory {
   subcategories: { en: string; pt: string }[]
 }
 
-/** Seeded on first run, in the app's language. */
+/** Seeded on first run, with the Portuguese names. */
 export const DEFAULT_CATEGORIES: DefaultCategory[] = ${JSON.stringify(defaults, null, 2)}
 `
 writeFileSync(new URL('../src/data/categoryCatalog.ts', import.meta.url), out)

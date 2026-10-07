@@ -25,18 +25,17 @@ describe('account types', () => {
     expect(accountType(eur)).toBe('checking')
   })
 
-  it('labels each by its kind, in both languages', () => {
+  it('labels each by its kind', () => {
     const list = [acc('c', { name: 'Conta Pré-paga' }), acc('s', { subtype: 'SAVINGS_ACCOUNT' }), usd, card('k')]
-    expect([...accountTypeLabels(list, messages.en).values()]).toEqual(['Checking', 'Savings', 'USD balance', 'Credit card'])
-    expect([...accountTypeLabels(list, messages['pt-BR']).values()]).toEqual(['Conta corrente', 'Poupança', 'Saldo em dólar', 'Cartão de crédito'])
+    expect([...accountTypeLabels(list, messages).values()]).toEqual(['Conta corrente', 'Poupança', 'Saldo em dólar', 'Cartão de crédito'])
   })
 
   it('names other foreign balances by currency', () => {
-    expect(accountTypeLabels([eur], messages.en).get('eur')).toBe('EUR balance')
+    expect(accountTypeLabels([eur], messages).get('eur')).toBe('Saldo em EUR')
   })
 
   it('adds the account name when a bank has two of the same kind', () => {
-    const labels = accountTypeLabels([card('a', 'Platinum'), card('b', 'Black'), acc('c')], messages.en)
-    expect([...labels.values()]).toEqual(['Credit card · Platinum', 'Credit card · Black', 'Checking'])
+    const labels = accountTypeLabels([card('a', 'Platinum'), card('b', 'Black'), acc('c')], messages)
+    expect([...labels.values()]).toEqual(['Cartão de crédito · Platinum', 'Cartão de crédito · Black', 'Conta corrente'])
   })
 })

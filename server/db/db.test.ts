@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { EditError } from '../../src/data/edits.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
-import { inTransaction } from './connection.js'
+import { dbErrorCode, inTransaction } from './connection.js'
 import { readSnapshot } from './read.js'
 import { save, syncFrom, type Fetched } from './sync.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
@@ -44,14 +44,14 @@ suite('database', () => {
   afterAll(() => pool.end())
   beforeEach(async () => {
     await pool.query(`TRUNCATE app_settings, categories, subcategories, transactions, accounts, account_balances, card_bills, bank_connections, exchange_rates, sync_runs, sync_jobs, sync_job_items CASCADE`)
-    await ensureSeeded(pool, 'pt')
+    await ensureSeeded(pool)
   })
 
-  it('seeds the default categories once, in the app’s language', async () => {
+  it('seeds the default categories once, in Portuguese', async () => {
     const names = (await pool.query(`SELECT name FROM categories ORDER BY sort_order`)).rows.map((r) => r.name)
     expect(names.slice(0, 3)).toEqual(['Moradia', 'Mercado', 'Restaurantes'])
     await pool.query(`DELETE FROM categories`)
-    await ensureSeeded(pool, 'en')
+    await ensureSeeded(pool)
     expect((await pool.query(`SELECT count(*)::int AS n FROM categories`)).rows[0].n).toBe(0)
   })
 
@@ -253,5 +253,13 @@ describe('sync window', () => {
   it('goes back a year on the first sync and overlaps later ones by 35 days', () => {
     expect(syncFrom(null, new Date(2026, 9, 6))).toBe('2025-10-01')
     expect(syncFrom(new Date('2026-10-01T00:00:00Z'), now)).toBe('2026-08-27')
+  })
+})
+
+describe('database errors', () => {
+  it('gives an out-of-date schema its own code, for the app to explain', () => {
+    expect([dbErrorCode({ code: '42P01' }), dbErrorCode({ code: '42703' }), dbErrorCode({ code: '23505' }), dbErrorCode(new Error('x'))]).toEqual([
+      'schema_outdated', 'schema_outdated', 'database', 'database',
+    ])
   })
 })
