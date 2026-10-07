@@ -1,28 +1,42 @@
-import type { Cents } from '../data/types'
-import type { AverageIncome as Average } from '../lib/summary'
+import { useCallback, useRef, useState } from 'react'
+import type { IncomeAverage } from '../data/incomeAverage'
 import { formatMonthShort } from '../lib/dates'
 import { formatCompactMoney, formatMoney, formatPercent } from '../lib/money'
+import { useIsDesktop } from '../lib/useIsDesktop'
 import { useI18n } from '../i18n/I18nProvider'
 import { CardTitle } from './ui'
+import { IncomeFilterPill, IncomeFilterPopover, IncomeFilterSheet } from './IncomeFilter'
 
 /**
- * Average income: the monthly average (complete months), lowest and highest
- * months, how the current month compares, and a bar per month with a dashed
- * average line. Phones stack it; desktop puts the figures beside the chart.
+ * Average income, counting the income categories chosen with the pill: the
+ * monthly average (complete months), lowest and highest months, how the
+ * current month compares, and a bar per month with a dashed average line.
+ * Phones stack it; desktop puts the figures beside the chart.
  */
-export function AverageIncomeCard({ average, perMonth }: { average: Average; perMonth: { month: string; income: Cents }[] }) {
+export function AverageIncomeCard({ average }: { average: IncomeAverage }) {
   const { t } = useI18n()
   const a = t.overview.avgIncome
+  const desktop = useIsDesktop()
+  const [picking, setPicking] = useState(false)
+  const pill = useRef<HTMLButtonElement>(null)
+  const closePicker = useCallback(() => setPicking(false), [])
+  const current = average.currentMonth
+  const perMonth = [...average.months, current].map((m) => ({ month: m.month, income: m.total }))
   const scale = Math.max(1, average.average, ...perMonth.map((m) => m.income)) * 1.15
   const last = perMonth.length - 1
-  const above = average.current.vsAverage >= 0
-  const pct = `${above ? '+' : '−'}${formatPercent(Math.abs(average.current.vsAverage), 1)}`
+  const above = current.vsAverage >= 0
+  const pct = `${above ? '+' : '−'}${formatPercent(Math.abs(current.vsAverage), 1)}`
   const avgShare = average.average / scale
 
   return (
     <div className="flex flex-col gap-3.5 lg:flex-row lg:gap-8">
       <div className="flex flex-col gap-3.5 lg:w-[360px] lg:shrink-0">
-        <CardTitle subtitle={a.sub(average.months)}>{a.title}</CardTitle>
+        <CardTitle subtitle={a.sub(average.months.length)}>{a.title}</CardTitle>
+        <div className="relative flex flex-col">
+          <IncomeFilterPill onOpen={() => setPicking((p) => !p)} pillRef={pill} expanded={picking} />
+          {picking && desktop && <IncomeFilterPopover currentMonth={current.month} onClose={closePicker} returnTo={pill} />}
+        </div>
+        {picking && !desktop && <IncomeFilterSheet currentMonth={current.month} onClose={closePicker} returnTo={pill} />}
         <div className="flex flex-col gap-1">
           <div className="flex items-baseline gap-1">
             <span className="tabular text-[30px] leading-9 font-bold tracking-[-0.02em] text-ink lg:text-[34px] lg:leading-10">{formatMoney(average.average)}</span>
@@ -30,15 +44,15 @@ export function AverageIncomeCard({ average, perMonth }: { average: Average; per
           </div>
           <span className="tabular text-[13px] leading-[18px] text-ink-2">
             {a.range(
-              formatCompactMoney(average.lowest.amount),
+              formatCompactMoney(average.lowest.total),
               formatMonthShort(average.lowest.month),
-              formatCompactMoney(average.highest.amount),
+              formatCompactMoney(average.highest.total),
               formatMonthShort(average.highest.month),
             )}
           </span>
           <span className="tabular text-[13px] leading-[18px] text-muted">
             {/* Early in the month nothing may have come in yet: a "−100%" would only alarm. */}
-            {average.current.amount > 0 ? a.current(formatMoney(average.current.amount), pct, above) : a.currentNone(formatMoney(0))}
+            {current.total > 0 ? a.current(formatMoney(current.total), pct, above) : a.currentNone(formatMoney(0))}
           </span>
         </div>
       </div>

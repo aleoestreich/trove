@@ -130,6 +130,18 @@ export interface Snapshot {
   fetchedAt?: string
   /** Live data: when each bank connection last synced. */
   sync?: SyncInfo
+  /** Which income counts in the average income (none excluded when absent). */
+  incomeFilter?: IncomeFilter
+}
+
+/**
+ * The average income's categories, stored as exclusions, so a category or
+ * subcategory created later counts by default.
+ */
+export interface IncomeFilter {
+  excludedCategoryIds: string[]
+  excludedSubcategoryIds: string[]
+  excludeUncategorized: boolean
 }
 
 export interface SyncInfo {

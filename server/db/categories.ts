@@ -2,8 +2,9 @@
 // and applying edits with the same rules as src/data/edits.ts.
 
 import type pg from 'pg'
-import { EditError, checkBulk, defaultCategories, type BulkResult, type Edit } from '../../src/data/edits.js'
-import type { Category, Subcategory } from '../../src/data/types.js'
+import { EditError, checkBulk, checkIncomeFilter, defaultCategories, type BulkResult, type Edit } from '../../src/data/edits.js'
+import { NO_FILTER, pruneIncomeFilter } from '../../src/data/incomeAverage.js'
+import type { Category, IncomeFilter, Subcategory } from '../../src/data/types.js'
 import { inTransaction, type Db } from './connection.js'
 import { readSnapshot } from './read.js'
 
@@ -51,6 +52,49 @@ export async function readCategories(db: Db): Promise<{ categories: Category[]; 
     categories: cats.rows.map((c) => ({ id: c.id, name: c.name, type: c.type, color: c.color, icon: c.icon, sortOrder: c.sort_order })),
     subcategories: subs.rows.map((s) => ({ id: s.id, categoryId: s.category_id, name: s.name, sortOrder: s.sort_order })),
   }
+}
+
+/**
+ * The average income's filter, in app_settings under `income_avg_filter` (one
+ * user, one row), as exclusions. Nothing stored: nothing excluded.
+ */
+const INCOME_FILTER_KEY = 'income_avg_filter'
+interface StoredIncomeFilter {
+  income_avg_excluded_category_ids: string[]
+  income_avg_excluded_subcategory_ids: string[]
+  income_avg_exclude_uncategorized: boolean
+}
+
+export async function readIncomeFilter(db: Db): Promise<IncomeFilter> {
+  const r = await db.query<{ value: Partial<StoredIncomeFilter> }>(`SELECT value FROM app_settings WHERE key = $1`, [INCOME_FILTER_KEY])
+  const v = r.rows[0]?.value
+  if (!v) return NO_FILTER
+  return {
+    excludedCategoryIds: v.income_avg_excluded_category_ids ?? [],
+    excludedSubcategoryIds: v.income_avg_excluded_subcategory_ids ?? [],
+    excludeUncategorized: v.income_avg_exclude_uncategorized ?? false,
+  }
+}
+
+async function writeIncomeFilter(db: Db, f: IncomeFilter): Promise<void> {
+  const value: StoredIncomeFilter = {
+    income_avg_excluded_category_ids: f.excludedCategoryIds,
+    income_avg_excluded_subcategory_ids: f.excludedSubcategoryIds,
+    income_avg_exclude_uncategorized: f.excludeUncategorized,
+  }
+  await db.query(
+    `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, now())
+     ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    [INCOME_FILTER_KEY, JSON.stringify(value)],
+  )
+}
+
+/** After a delete: the filter keeps only IDs that still exist. */
+async function pruneStoredIncomeFilter(db: Db): Promise<void> {
+  const current = await readIncomeFilter(db)
+  if (current.excludedCategoryIds.length === 0 && current.excludedSubcategoryIds.length === 0) return
+  const { categories, subcategories } = await readCategories(db)
+  await writeIncomeFilter(db, pruneIncomeFilter(current, categories, subcategories))
 }
 
 const notFound = (what: string) => new EditError('not_found', `No such ${what}.`)
@@ -115,6 +159,7 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
     case 'deleteCategory':
       // Its subcategories go with it (CASCADE); its transactions become uncategorized (SET NULL).
       await one(`DELETE FROM categories WHERE id = $1`, [e.id], 'category')
+      await pruneStoredIncomeFilter(db)
       return null
     case 'createSubcategory': {
       const s = e.subcategory
@@ -131,6 +176,7 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
     case 'deleteSubcategory':
       // Its transactions keep their category (subcategory_id SET NULL).
       await one(`DELETE FROM subcategories WHERE id = $1`, [e.id], 'subcategory')
+      await pruneStoredIncomeFilter(db)
       return null
     case 'linkSubcategory': {
       await one(`SELECT 1 FROM categories WHERE id = $1`, [e.categoryId], 'category')
@@ -152,6 +198,12 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
       return categorizeMany(db, e, connections(itemIds))
     case 'restoreCategories':
       return restoreCategories(db, e, connections(itemIds))
+    case 'setIncomeFilter': {
+      // The same rules as the app (checkIncomeFilter), on the stored categories.
+      const { categories, subcategories } = await readCategories(db)
+      await writeIncomeFilter(db, checkIncomeFilter(categories, subcategories, e.filter))
+      return null
+    }
   }
 }
 

@@ -102,36 +102,3 @@ export function balances(accounts: Account[]): Balances {
   }
   return { cash, cardDebt, net: cash - cardDebt }
 }
-
-export interface AverageIncome {
-  /** Average monthly income over the complete months. */
-  average: Cents
-  /** How many complete months it's based on. */
-  months: number
-  lowest: { month: string; amount: Cents }
-  highest: { month: string; amount: Cents }
-  /** Income so far in the current month, and how it compares with the average (%). */
-  current: { month: string; amount: Cents; vsAverage: number }
-}
-
-/**
- * Average monthly income (transfers excluded) from per-month totals, oldest
- * first, the last being the current month. The current month is still in
- * progress, so it's left out of the average, lowest and highest, and only
- * compared with the average. Null without a complete month with data.
- */
-export function averageIncome(perMonth: { month: string; income: Cents }[]): AverageIncome | null {
-  const current = perMonth.at(-1)
-  const complete = perMonth.slice(0, -1)
-  if (!current || complete.length === 0) return null
-  const average = Math.round(complete.reduce((s, m) => s + m.income, 0) / complete.length)
-  const byAmount = [...complete].sort((a, b) => a.income - b.income)
-  const pick = (m: { month: string; income: Cents }) => ({ month: m.month, amount: m.income })
-  return {
-    average,
-    months: complete.length,
-    lowest: pick(byAmount[0]),
-    highest: pick(byAmount[byAmount.length - 1]),
-    current: { ...pick(current), vsAverage: average > 0 ? ((current.income - average) / average) * 100 : 0 },
-  }
-}

@@ -43,6 +43,8 @@ export function errorMessage(code: string | undefined, status?: number, reason?:
     mixed_types: e.bulkMixedTypes,
     category_type: e.bulkCategoryType,
     subcategory_category: e.bulkSubcategory,
+    nothing_selected: e.nothingSelected,
+    not_income: e.notIncome,
   }
   if (reason && bulk[reason]) return bulk[reason]
   const byCode: Record<string, string> = {
@@ -81,7 +83,15 @@ export function createApiRepository(fetchFn: Fetch = (...a) => fetch(...a)): Rep
       return (await res.json()) as Snapshot
     },
     async edit(e) {
-      const res = await post('/api/edits', e)
+      // The income filter has its own route (it answers with the recalculated average, unused here).
+      const res =
+        e.op === 'setIncomeFilter'
+          ? await request(fetchFn, '/api/settings/income-average-filter', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(e.filter),
+            })
+          : await post('/api/edits', e)
       if (!res.ok) throw await failure(res)
       return e.op === 'categorizeMany' ? ((await res.json()) as BulkResult) : null
     },

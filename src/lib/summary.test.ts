@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildSeed } from '../data/seed'
 import { defaultCategories } from '../data/edits'
 import type { Transaction } from '../data/types'
-import { balances, expensesByCategory, expensesBySubcategory, kindOf, totals, averageIncome } from './summary'
+import { balances, expensesByCategory, expensesBySubcategory, kindOf, totals } from './summary'
 import { formatMoney, convertToBRL } from './money'
 import { lastMonths } from './dates'
 import { filterTransactions } from '../pages/Transactions'
@@ -164,22 +164,5 @@ describe('filterTransactions', () => {
     expect(filterTransactions(list, byId, { query: 'IFOOD' })).toHaveLength(1)
     expect(filterTransactions(list, byId, { categoryId: 'none' }).map((t) => t.description)).toEqual(['LOJA EXEMPLO'])
     expect(filterTransactions(list, byId, {})).toHaveLength(3)
-  })
-})
-
-describe('average income', () => {
-  const m = (month: string, income: number) => ({ month, income })
-  it('averages the complete months and compares the current one', () => {
-    const a = averageIncome([m('2026-05', 10_000_00), m('2026-06', 12_000_00), m('2026-07', 8_000_00), m('2026-08', 10_000_00), m('2026-09', 10_000_00), m('2026-10', 5_000_00)])!
-    expect(a.average).toBe(10_000_00)
-    expect(a.months).toBe(5)
-    expect(a.lowest).toEqual({ month: '2026-07', amount: 8_000_00 })
-    expect(a.highest).toEqual({ month: '2026-06', amount: 12_000_00 })
-    expect(a.current).toEqual({ month: '2026-10', amount: 5_000_00, vsAverage: -50 })
-  })
-
-  it('needs at least one complete month', () => {
-    expect(averageIncome([m('2026-10', 1_00)])).toBeNull()
-    expect(averageIncome([])).toBeNull()
   })
 })

@@ -5,7 +5,8 @@
 
 import { kindOf } from './categories.js'
 import { CATEGORY_COLORS, CATEGORY_ICONS, DEFAULT_CATEGORIES } from './categoryCatalog.js'
-import type { Category, CategoryType, Snapshot, Subcategory } from './types.js'
+import { hasSelection, normalizeIncomeFilter, pruneIncomeFilter } from './incomeAverage.js'
+import type { Category, CategoryType, IncomeFilter, Snapshot, Subcategory } from './types.js'
 
 export type Edit =
   /** Sets a transaction's category and subcategory (null: uncategorized / none). */
@@ -28,6 +29,8 @@ export type Edit =
   | { op: 'categorizeMany'; transactionIds: string[]; categoryId: string; subcategoryId: string }
   /** Puts back what categorizeMany replaced (its BulkResult's `previous`). */
   | { op: 'restoreCategories'; items: PreviousCategory[] }
+  /** Which income categories count in the average income (stored as exclusions). */
+  | { op: 'setIncomeFilter'; filter: IncomeFilter }
 
 /** A transaction's category before a bulk change. `editedAt`: when it was last set by hand (server only). */
 export interface PreviousCategory {
@@ -44,7 +47,7 @@ export interface BulkResult {
 }
 
 /** Why a bulk change is refused (EditError.reason), for the app to explain. */
-export type BulkReason = 'transfer' | 'mixed_types' | 'category_type' | 'subcategory_category'
+export type BulkReason = 'transfer' | 'mixed_types' | 'category_type' | 'subcategory_category' | 'nothing_selected' | 'not_income'
 
 /** The most transactions one bulk change may touch. */
 export const BULK_MAX = 2000
@@ -136,6 +139,22 @@ export function validateEdit(e: unknown): Edit {
       if (new Set(out.map((i) => i.id)).size !== out.length) bad('items')
       return { op: 'restoreCategories', items: out }
     }
+    case 'setIncomeFilter': {
+      const f = (x.filter ?? {}) as Record<string, unknown>
+      const ids = (v: unknown, what: string) => {
+        const list = Array.isArray(v) ? v.map((i) => id(i, what)) : bad(what)
+        return list.length > 1000 ? bad(what) : [...new Set(list)]
+      }
+      if (typeof f.excludeUncategorized !== 'boolean') bad('excludeUncategorized')
+      return {
+        op: 'setIncomeFilter',
+        filter: {
+          excludedCategoryIds: ids(f.excludedCategoryIds, 'categories'),
+          excludedSubcategoryIds: ids(f.excludedSubcategoryIds, 'subcategories'),
+          excludeUncategorized: f.excludeUncategorized as boolean,
+        },
+      }
+    }
     default:
       return bad('op')
   }
@@ -182,12 +201,12 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
     }
     case 'deleteCategory': {
       cat(e.id)
-      return {
+      return withPrunedFilter({
         ...s,
         categories: s.categories.filter((c) => c.id !== e.id),
         subcategories: s.subcategories.filter((x) => x.categoryId !== e.id),
         transactions: mapTx((t) => (t.categoryId === e.id ? { ...t, categoryId: null, subcategoryId: null } : t)),
-      }
+      })
     }
     case 'createSubcategory': {
       cat(e.subcategory.categoryId)
@@ -203,11 +222,11 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
     }
     case 'deleteSubcategory':
       sub(e.id)
-      return {
+      return withPrunedFilter({
         ...s,
         subcategories: s.subcategories.filter((x) => x.id !== e.id),
         transactions: mapTx((t) => (t.subcategoryId === e.id ? { ...t, subcategoryId: null } : t)),
-      }
+      })
     case 'linkSubcategory': {
       const x = sub(e.id)
       cat(e.categoryId)
@@ -234,7 +253,30 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
       }
       return { ...s, transactions: mapTx((t) => (byId.has(t.id) ? { ...t, categoryId: byId.get(t.id)!.categoryId, subcategoryId: byId.get(t.id)!.subcategoryId } : t)) }
     }
+    case 'setIncomeFilter':
+      return { ...s, incomeFilter: checkIncomeFilter(s.categories, s.subcategories, e.filter) }
   }
+}
+
+/** A deleted category or subcategory leaves the income filter (the server does the same). */
+function withPrunedFilter(s: Snapshot): Snapshot {
+  return s.incomeFilter ? { ...s, incomeFilter: pruneIncomeFilter(s.incomeFilter, s.categories, s.subcategories) } : s
+}
+
+/**
+ * The rules of the income filter: only income categories and their
+ * subcategories, and at least one option left counted. Returns it in
+ * canonical form (see normalizeIncomeFilter).
+ */
+export function checkIncomeFilter(categories: Category[], subcategories: Subcategory[], filter: IncomeFilter): IncomeFilter {
+  const income = new Set(categories.filter((c) => c.type === 'income').map((c) => c.id))
+  const subsById = new Map(subcategories.map((x) => [x.id, x]))
+  if (!filter.excludedCategoryIds.every((id) => income.has(id))) throw new EditError('invalid', 'Only income categories can be excluded.', 'not_income')
+  if (!filter.excludedSubcategoryIds.every((id) => income.has(subsById.get(id)?.categoryId ?? '')))
+    throw new EditError('invalid', 'Only subcategories of income categories can be excluded.', 'not_income')
+  const normalized = normalizeIncomeFilter(filter, categories, subcategories)
+  if (!hasSelection(normalized, categories, subcategories)) throw new EditError('invalid', 'Selecione pelo menos uma categoria', 'nothing_selected')
+  return normalized
 }
 
 /**

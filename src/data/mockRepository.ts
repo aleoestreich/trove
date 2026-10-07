@@ -2,7 +2,7 @@ import type { Repository } from './repository'
 import { DEMO_SUBCATEGORIES, buildSeed } from './seed'
 import { applyEdit, checkBulk, defaultCategories } from './edits'
 import { DEFAULT_CATEGORIES } from './categoryCatalog'
-import type { Category, Snapshot, Subcategory } from './types'
+import type { Category, IncomeFilter, Snapshot, Subcategory } from './types'
 
 const KEY = 'trove.demoOwner'
 
@@ -11,6 +11,8 @@ interface DemoOwner {
   categories: Category[]
   subcategories: Subcategory[]
   stored: Record<string, { categoryId: string | null; subcategoryId: string | null; hidden: boolean }>
+  /** The average income's filter (the database keeps it in app_settings). */
+  incomeFilter?: IncomeFilter
 }
 
 function read(): DemoOwner | null {
@@ -50,6 +52,7 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
     ...seed,
     categories: owner.categories,
     subcategories: owner.subcategories,
+    incomeFilter: owner.incomeFilter,
     transactions: seed.transactions.map((t) => {
       if (t.transfer) return t
       const s = owner.stored[t.id]
@@ -82,7 +85,7 @@ export function createMockRepository(today: Date = new Date()): Repository {
       for (const t of next.transactions) {
         if (!t.transfer) stored[t.id] = { categoryId: t.categoryId, subcategoryId: t.subcategoryId ?? null, hidden: !!t.hidden }
       }
-      write({ categories: next.categories, subcategories: next.subcategories, stored })
+      write({ categories: next.categories, subcategories: next.subcategories, stored, incomeFilter: next.incomeFilter })
       return previous && { updated: previous.length, previous }
     },
     async startSync() {

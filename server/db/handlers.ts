@@ -8,12 +8,22 @@
 //   POST /api/sync     { connectionIds? }: start a background sync (default: every connection)
 //        202 SyncJob (the running one if a sync is already in progress) · 403 not in PLUGGY_ITEM_IDS
 //   GET  /api/sync     the latest sync job, for progress: 200 { job: SyncJob | null }
+//   GET  /api/overview/income-average             the average income card under the saved filter
+//        200 { average, months, lowest, highest, currentMonth, allAverage, filter } (figures null before a complete month)
+//   GET  /api/overview/income-average/categories  every income category and subcategory, and
+//        uncategorized, with their monthly average and per-month totals (the picker's live preview)
+//   PUT  /api/settings/income-average-filter      { excludedCategoryIds, excludedSubcategoryIds, excludeUncategorized }
+//        200 the new income-average payload · 400 invalid (reason nothing_selected / not_income)
 //
 // All fail closed (503) without the database or Pluggy settings. Responses are
 // no-store. Errors carry status codes and fixed messages, never amounts,
 // descriptions, connection strings or credentials.
 
 import { EditError, validateEdit } from '../../src/data/edits.js'
+import { filterLabel, incomeAverage, incomeOptions, summarizeIncomeFilter, NO_FILTER } from '../../src/data/incomeAverage.js'
+import type { Snapshot } from '../../src/data/types.js'
+import { messages } from '../../src/i18n/messages.js'
+import { brazilDate } from '../pluggy/map.js'
 import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 import { historyStart } from '../pluggy/finance.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
@@ -121,4 +131,89 @@ export async function syncStatus(_request: Request, config: DbConfig, deps: Part
   } catch (e) {
     return json(500, { error: dbErrorCode(e), message: dbErrorMessage(e) })
   }
+}
+
+/** The month in progress in Brazil (YYYY-MM). */
+const currentMonthOf = (now: Date) => brazilDate(now.toISOString()).slice(0, 7)
+
+/** GET /api/overview/income-average's body, from a snapshot. Also the answer to a saved filter. */
+export function incomeAveragePayload(s: Snapshot, currentMonth: string) {
+  const filter = s.incomeFilter ?? NO_FILTER
+  const a = incomeAverage(s.transactions, s.categories, s.subcategories, filter, currentMonth)
+  const f = messages.overview.avgIncome.filter
+  const summary = summarizeIncomeFilter(filter, s.categories, s.subcategories, messages.transactions.uncategorized)
+  return {
+    average: a?.average ?? null,
+    months: a?.months ?? [],
+    lowest: a?.lowest ?? null,
+    highest: a?.highest ?? null,
+    currentMonth: a?.currentMonth ?? null,
+    allAverage: a?.allAverage ?? null,
+    filter: { ...filter, label: filterLabel(summary, f), included: summary.included.length, total: summary.total },
+  }
+}
+
+/** Reads the snapshot (7 months, as the app) for the income routes; a Response when it can't. */
+async function snapshotFor(config: DbConfig, deps: Partial<HandlerDeps>): Promise<Snapshot | Response> {
+  if (!config.pluggy || !config.databaseUrl) return notConfigured()
+  const pool = getPool(config.databaseUrl)
+  await ensureSeeded(pool)
+  const snapshot = await readSnapshot(pool, config.pluggy.itemIds, historyStart(deps.now?.() ?? new Date(), 1))
+  return snapshot ?? json(409, { error: 'never_synced' })
+}
+
+const failed = (e: unknown) =>
+  e instanceof Error && e.message.startsWith('Missing exchange rate')
+    ? json(500, { error: 'missing_rate', message: e.message })
+    : json(500, { error: dbErrorCode(e), message: dbErrorMessage(e) })
+
+export async function incomeAverageRoute(_request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}): Promise<Response> {
+  try {
+    const s = await snapshotFor(config, deps)
+    if (s instanceof Response) return s
+    return json(200, incomeAveragePayload(s, currentMonthOf(deps.now?.() ?? new Date())))
+  } catch (e) {
+    return failed(e)
+  }
+}
+
+export async function incomeCategoriesRoute(_request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}): Promise<Response> {
+  try {
+    const s = await snapshotFor(config, deps)
+    if (s instanceof Response) return s
+    const o = incomeOptions(s.transactions, s.categories, s.subcategories, currentMonthOf(deps.now?.() ?? new Date()))
+    const cats = new Map(s.categories.map((c) => [c.id, c]))
+    const subs = new Map(s.subcategories.map((x) => [x.id, x]))
+    return json(200, {
+      months: o.months,
+      categories: o.categories.map((c) => ({
+        ...c,
+        name: cats.get(c.id)!.name,
+        color: cats.get(c.id)!.color,
+        icon: cats.get(c.id)!.icon,
+        subcategories: c.subcategories.map((x) => ({ ...x, name: subs.get(x.id)!.name })),
+      })),
+      uncategorized: o.uncategorized,
+    })
+  } catch (e) {
+    return failed(e)
+  }
+}
+
+/** PUT /api/settings/income-average-filter: validates and saves the exclusions, then answers with the recalculated card. */
+export async function saveIncomeFilterRoute(request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}): Promise<Response> {
+  if (!config.pluggy || !config.databaseUrl) return notConfigured()
+  let edit
+  try {
+    edit = validateEdit({ op: 'setIncomeFilter', filter: await request.json() })
+  } catch (e) {
+    return json(400, { error: 'invalid', message: e instanceof EditError ? e.message : 'Invalid JSON.' })
+  }
+  try {
+    await applyEditSql(getPool(config.databaseUrl), edit)
+  } catch (e) {
+    if (e instanceof EditError) return json(400, { error: e.code, reason: e.reason, message: e.message })
+    return failed(e)
+  }
+  return incomeAverageRoute(request, config, deps)
 }

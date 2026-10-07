@@ -7,6 +7,7 @@ import { clearRateCache, ratesToBRL } from './rates.js'
 import { clearFinanceCache, finance, historyStart } from './finance.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
 import { defaultCategories } from '../../src/data/edits.js'
+import { incomeAverage, NO_FILTER } from '../../src/data/incomeAverage.js'
 import type { Transaction } from '../../src/data/types.js'
 
 const config: PluggyConfig = { clientId: 'cid', clientSecret: 'super-secret', itemIds: ['item-1'], baseUrl: 'https://api.pluggy.ai' }
@@ -413,6 +414,19 @@ describe('mapping to Trove', () => {
     }
     // The edited Pix is no longer paired, so its twin counts as income on its own.
     expect([of('pix-out'), of('pix-in'), of('bill-out')]).toEqual(['gifts', null, 'housing'])
+  })
+
+  it('counts USD income in the average income by its BRL value at the stored rate', () => {
+    const { categories, subcategories } = defaultCategories((c, i) => `${c}-${i}`)
+    const s = toSnapshot({
+      ...data([
+        tx({ id: 'aug', accountId: 'acc-usd', type: 'CREDIT', amount: 1000, currencyCode: 'USD', date: '2026-08-10T15:00:00.000Z' }),
+        tx({ id: 'sep', accountId: 'acc-usd', type: 'CREDIT', amount: 2000, currencyCode: 'USD', date: '2026-09-10T15:00:00.000Z' }),
+      ]),
+      owner: { categories, subcategories, stored: new Map() },
+    })
+    // US$ 1.000 and US$ 2.000 at R$ 5,50: R$ 5.500 and R$ 11.000.
+    expect(incomeAverage(s.transactions, categories, subcategories, NO_FILTER, '2026-10')!.average).toBe(8_250_00)
   })
 
   it('ignores accounts and transactions from connections that were not requested', () => {

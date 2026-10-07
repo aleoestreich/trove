@@ -108,7 +108,7 @@ use today can be read later without fetching it again.
 | `sync_job_items` | (`job_id`, `connection_id`) | One per connection in a job: queued, running, ok or failed, with counts or an error code |
 | `sync_runs` | generated `id` | Log of each connection sync: what triggered it, how many rows changed, and errors as status codes only |
 | `webhook_events` | `event_id` (Pluggy's) | Webhook deliveries already handled, so a repeated delivery runs once |
-| `app_settings` | `key` | App-wide values: when the default categories were seeded, when anything last synced |
+| `app_settings` | `key` | App-wide values: when the default categories were seeded, when anything last synced, and the average income's filter (`income_avg_filter`) |
 
 Transactions that disappear are kept, not deleted. A pending card purchase can
 come back under a new ID once it posts; when a sync no longer finds the old
@@ -210,6 +210,38 @@ subcategoryId }`:
   editedAt }] }`. Undo sends `previous` back as
   `{ op: 'restoreCategories', items }`, which restores each value and edited
   mark in one transaction.
+
+### Average income filter
+
+The "Renda média" card on Overview counts only the income categories and
+subcategories chosen with its pill. The choice is stored once in the
+database (so phone and desktop share it), in `app_settings` under
+`income_avg_filter`, as exclusions, so any income category or subcategory
+created later counts by default:
+
+```json
+{
+  "income_avg_excluded_category_ids": [],
+  "income_avg_excluded_subcategory_ids": [],
+  "income_avg_exclude_uncategorized": false
+}
+```
+
+No row means nothing is excluded. Deleting an excluded category or
+subcategory removes its ID. The calculation lives in
+`src/data/incomeAverage.ts`, shared by the app and the server: income only
+(no own transfers, card bill payments, hidden transactions or expenses), in
+BRL (foreign income at the stored rate), over the last 6 complete months.
+
+| Route | Answer |
+|---|---|
+| `GET /api/overview/income-average` | `{ average, months: [{ month, total }], lowest, highest, currentMonth, allAverage, filter }`; `filter` holds the exclusions and the pill's label |
+| `GET /api/overview/income-average/categories` | Every income category, its subcategories and "Sem categoria", with the monthly average and the total per month (enough for the picker's live preview) |
+| `PUT /api/settings/income-average-filter` | Saves `{ excludedCategoryIds, excludedSubcategoryIds, excludeUncategorized }` and answers with the recalculated `GET /api/overview/income-average` body; `400` with `reason: nothing_selected` ("Selecione pelo menos uma categoria") or `not_income` |
+
+The app computes the same figures from the snapshot it already has (the
+filter comes with `GET /api/finance`), so the card and the preview need no
+extra request; saving goes through the `PUT`.
 
 ## Reads
 
