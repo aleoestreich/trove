@@ -379,7 +379,10 @@ export function toSnapshot(input: PluggyData): Snapshot {
     })
 
   // Sort chronologically so pairing is stable, then newest first for the app.
-  transactions.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+  // Within a day, by Pluggy's full timestamp (the day alone would leave same-day
+  // transactions in ID order, which reads as random).
+  const at = new Map(data.transactions.map((t) => [t.id, Date.parse(t.date) || 0]))
+  transactions.sort((a, b) => a.date.localeCompare(b.date) || at.get(a.id)! - at.get(b.id)! || a.id.localeCompare(b.id))
   pairOwnTransfers(transactions, genericTransfers)
   // Own-transfer pairing may have taken some candidates.
   const byId = new Map(transactions.map((t) => [t.id, t]))
