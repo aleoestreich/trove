@@ -10,9 +10,9 @@ import { SyncBar } from '../components/SyncBar'
 import { balanceHistory, cashByCurrency, cashByInstitution } from '../lib/history'
 import { installmentPlans, upcomingByMonth } from '../lib/installments'
 import { currentBill, isIdleCard } from '../lib/bills'
-import { dayOfMonth, formatFullDate, formatMonth, formatMonthName, formatMonthShort, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
+import { dayOfMonth, formatFullDate, formatMonthName, formatMonthShort, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
 import { formatMoney, formatPercent } from '../lib/money'
-import { Badge, Card, CardTitle, IconDisc, MonthSwitcher, Overline, PageHeader, Progress, SeeAll, Swatch } from '../components/ui'
+import { Badge, Card, CardTitle, IconDisc, MonthSwitcher, Overline, PageHeader, Progress, RangeSwitcher, SeeAll, Swatch, parseRange, type Range } from '../components/ui'
 import { InstitutionBadge } from '../components/BankBadge'
 import { CashFlowChart, NetWorthChart, StackedMonthChart, seriesColor } from '../components/charts'
 import { TransactionRow } from '../components/TransactionRow'
@@ -28,19 +28,21 @@ const TOP_CATEGORIES = 5
 const CURRENCY_COLORS: Record<string, string> = { BRL: 'var(--series-1)', USD: 'var(--series-3)', EUR: 'var(--series-4)' }
 
 export function Dashboard() {
-  const { accounts, transactions, categories, subcategories, incomeFilter, categoriesById, institutionsById, insights } = useData()
+  const { accounts, transactions, allTransactions, categories, subcategories, incomeFilter, categoriesById, institutionsById, insights } = useData()
   const isDesktop = useIsDesktop()
   const [params, setParams] = useSearchParams()
   const { t, categoryName } = useI18n()
   const latest = monthKey(toISO(new Date()))
   const month = params.get('m') ?? latest
-  const months = useMemo(() => lastMonths(latest, MONTHS_OF_HISTORY), [latest])
+  // The period of the multi-month charts (net worth, income vs expenses, spending by category).
+  const range = parseRange(params.get('r'))
+  const months = useMemo(() => lastMonths(latest, range), [latest, range])
   const [selected, setSelected] = useState<Transaction | null>(null)
 
   const bal = balances(accounts)
 
   // Net worth history (month ends; the last point is today) and the change since last month.
-  const history = useMemo(() => balanceHistory(accounts, transactions, months), [accounts, transactions, months])
+  const history = useMemo(() => balanceHistory(accounts, allTransactions, months), [accounts, allTransactions, months])
   const netPoints = history.map((h) => ({ label: formatMonthShort(h.month), net: h.net, cash: h.cash, cardDebt: h.cardDebt }))
   const previous = history.length > 1 ? history[history.length - 2].net : history[0].net
   const change = bal.net - previous
@@ -54,15 +56,16 @@ export function Dashboard() {
     accounts.filter((a) => a.type === 'BANK' && a.foreign?.currency === currency).reduce((s, a) => s + a.foreign!.balance, 0)
 
   // Hidden transactions count nowhere here (balances aside: those are the bank's).
-  const counted = useMemo(() => visible(transactions), [transactions])
+  // Everything loaded (up to a year for the charts); the month in detail is always within it.
+  const counted = useMemo(() => visible(allTransactions), [allTransactions])
 
   // Cash flow.
   const flow = useMemo(
     () => months.map((m) => ({ month: m, label: formatMonthShort(m), ...totals(inMonth(counted, m), categoriesById) })),
     [counted, categoriesById, months],
   )
-  // Figures for the selected month (the current one by default).
-  const thisMonth = flow.find((f) => f.month === month) ?? flow[flow.length - 1]
+  // The cash flow card's figures: the current month (the month picker belongs to "Mês em detalhe").
+  const thisMonth = flow[flow.length - 1]
   // Average income: the last 6 complete months, the current one compared with it,
   // counting the income categories chosen on the card (src/data/incomeAverage.ts, shared with the server).
   const avgIncome = useMemo(
@@ -107,19 +110,33 @@ export function Dashboard() {
   const byCategory = expensesByCategory(monthTxs, categoriesById)
 
   const nwLabel = t.overview.netWorthChart(
-    MONTHS_OF_HISTORY,
+    range,
     formatMoney(history[0].net),
     formatMoney(history[history.length - 1].net),
   )
 
-  const setMonth = (m: string) => setParams({ m }, { replace: true })
+  // Each control keeps the other's choice in the address.
+  const setParam = (key: 'm' | 'r', value: string) =>
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p)
+        next.set(key, value)
+        return next
+      },
+      { replace: true },
+    )
+  const setMonth = (m: string) => setParam('m', m)
+  const setRange = (r: Range) => setParam('r', String(r))
 
   return (
     <>
       <PageHeader title={t.nav.overview} subtitle={t.overview.subtitle(formatFullDate(toISO(new Date())))}>
-        <MonthSwitcher variant="compact" month={month} latest={latest} count={MONTHS_OF_HISTORY} onChange={setMonth} />
+        <RangeSwitcher value={range} onChange={setRange} />
       </PageHeader>
       <SyncBar className="mb-3" />
+      <div className="mb-3 lg:hidden">
+        <RangeSwitcher value={range} onChange={setRange} />
+      </div>
 
       {/* Phones: one column in reading order. Desktop: a 12-column grid, reordered. */}
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-12 lg:gap-5">
@@ -199,7 +216,7 @@ export function Dashboard() {
         {/* 3. Income vs expenses */}
         <Card className="flex flex-col gap-3.5 lg:order-6 lg:col-span-6 lg:gap-4">
           <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
-            <CardTitle subtitle={t.overview.lastMonths(MONTHS_OF_HISTORY)}>{t.overview.incomeVsExpenses}</CardTitle>
+            <CardTitle subtitle={t.overview.lastMonths(range)}>{t.overview.incomeVsExpenses}</CardTitle>
             <div className="flex flex-wrap gap-x-4 gap-y-1.5 lg:pt-0.5">
               <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-2">
                 <Swatch color="var(--income)" />
@@ -282,7 +299,7 @@ export function Dashboard() {
 
         {/* 5. Spending trend */}
         <Card className="flex flex-col gap-3.5 lg:order-7 lg:col-span-6 lg:gap-4">
-          <CardTitle subtitle={t.overview.lastMonths(MONTHS_OF_HISTORY)}>{t.overview.spendingByCategory}</CardTitle>
+          <CardTitle subtitle={t.overview.lastMonths(range)}>{t.overview.spendingByCategory}</CardTitle>
           <StackedMonthChart data={trendData} series={trendSeries} colors={trendColors} label={t.overview.spendingByCategory} />
           <ul className="flex flex-wrap gap-x-3.5 gap-y-2 lg:gap-x-4 lg:border-t lg:border-line lg:pt-3.5">
             {trendSeries.map((s, i) => (
@@ -296,9 +313,11 @@ export function Dashboard() {
 
         {/* 6. One month in detail */}
         <Card className="flex flex-col gap-4 !pb-2 lg:order-10 lg:col-span-8 lg:!pb-5">
-          <div className="flex items-baseline justify-between gap-3">
+          <div className="flex items-center justify-between gap-3">
             <CardTitle>{t.overview.monthInDetail}</CardTitle>
-            <span className="hidden text-[13px] text-muted lg:inline">{formatMonth(month)}</span>
+            <div className="hidden lg:block">
+              <MonthSwitcher variant="compact" month={month} latest={latest} count={MONTHS_OF_HISTORY} onChange={setMonth} />
+            </div>
           </div>
           <div className="-my-1 lg:hidden">
             <MonthSwitcher month={month} latest={latest} count={MONTHS_OF_HISTORY} onChange={setMonth} />

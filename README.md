@@ -117,6 +117,10 @@ between accounts, and card bill payments.
 - **Average income** (Overview) averages the last 6 complete months of
   income in the categories chosen on its card (all by default; the choice is
   saved in the database and shared between devices).
+- **Overview periods:** the multi-month charts (net worth, income vs
+  expenses, spending by category) show 3 months, 6 months (default) or 1 year,
+  chosen at the top of the Overview (kept in the address, `?r=3|6|12`). The
+  month picker belongs to "Mês em detalhe" and changes only that card.
 - **Previsão do fim do mês** (Overview, then its detail page) projects what
   is left in the chosen accounts (checking accounts in BRL by default) on the
   last day of the month: today's balance + the salary still expected (its
@@ -134,8 +138,9 @@ between accounts, and card bill payments.
   price increases, and totals them per month and year (stopped ones out,
   yearly ones divided by 12). Answers such as "Não é recorrente" are saved in
   the database and kept when detection runs again after each sync.
-- The insights read 14 months of transactions (a year is needed for yearly
-  charges); every screen still shows the last 6.
+- The app reads 14 months of transactions: the insights need a year for
+  yearly charges and the Overview's charts can show one. Lists and month
+  filters still cover the last 6 months.
 - **Account and card names:** any account or card can be renamed on Contas
   (the pencil next to it). The name is shown everywhere in Trove and saved
   in the database (`accounts.nickname`), a column a sync never writes;

@@ -28,6 +28,8 @@ export interface NetWorthPoint {
 export function NetWorthChart({ points, label }: { points: NetWorthPoint[]; label: string }) {
   const data = points.map((p) => ({ ...p, value: reais(p.net) }))
   const last = data.length - 1
+  // A year: every other month is labelled (always the latest), so labels don't collide.
+  const labelled = (i: number) => data.length <= 6 || (last - i) % 2 === 0
   return (
     <div className="h-[140px] lg:h-auto lg:flex-1" role="img" aria-label={label}>
       <ResponsiveContainer width="100%" height="100%">
@@ -48,13 +50,13 @@ export function NetWorthChart({ points, label }: { points: NetWorthPoint[]; labe
                 fill={p.index === last ? 'var(--ink)' : 'var(--muted)'}
                 fontWeight={p.index === last ? 500 : 400}
               >
-                {p.payload.value}
+                {labelled(p.index) ? p.payload.value : ''}
               </text>
             )}
           />
           <YAxis
             orientation="right"
-            width={44}
+            width={52}
             tickLine={false}
             axisLine={false}
             tickCount={3}
@@ -100,12 +102,13 @@ function NetWorthTooltip({ active, payload, label }: { active?: boolean; payload
 // labels underneath. The last column is the current month.
 
 function MonthLabels({ labels, highlight = labels.length - 1 }: { labels: string[]; highlight?: number }) {
+  const dense = labels.length > 6
   return (
     <div className="flex h-5" aria-hidden>
       {labels.map((l, i) => (
         <span
           key={i}
-          className={`flex-1 text-center text-[11px] leading-5 lg:text-xs whitespace-nowrap ${i === highlight ? 'font-medium text-ink' : 'text-muted'}`}
+          className={`min-w-0 flex-1 text-center leading-5 lg:text-xs whitespace-nowrap ${dense ? 'text-[10px]' : 'text-[11px]'} ${i === highlight ? 'font-medium text-ink' : 'text-muted'}`}
         >
           {l}
         </span>
@@ -126,6 +129,7 @@ export function CashFlowChart({ data, label }: { data: CashFlowPoint[]; label: s
   // Round the scale up to a tidy number of thousands of reais.
   const step = 5_000_00
   const top = Math.ceil(max / step) * step
+  const dense = data.length > 6
   return (
     <div role="img" aria-label={label}>
       <div className="relative h-32 lg:h-44">
@@ -133,9 +137,9 @@ export function CashFlowChart({ data, label }: { data: CashFlowPoint[]; label: s
         <div className="absolute inset-x-0 top-4 border-t border-dashed border-line" />
         <div className="absolute inset-x-0 top-4 bottom-0 flex items-end border-b border-line">
           {data.map((d, i) => (
-            <div key={i} className="flex h-full flex-1 items-end justify-center gap-0.5">
-              <div className="w-3.5 rounded-t-[4px] bg-income lg:w-5" style={{ height: `${(d.income / top) * 100}%` }} />
-              <div className="w-3.5 rounded-t-[4px] bg-ink-2 lg:w-5" style={{ height: `${(d.expenses / top) * 100}%` }} />
+            <div key={i} className="flex h-full min-w-0 flex-1 items-end justify-center gap-0.5">
+              <div className={`rounded-t-[4px] bg-income ${dense ? 'w-2 lg:w-3' : 'w-3.5 lg:w-5'}`} style={{ height: `${(d.income / top) * 100}%` }} />
+              <div className={`rounded-t-[4px] bg-ink-2 ${dense ? 'w-2 lg:w-3' : 'w-3.5 lg:w-5'}`} style={{ height: `${(d.expenses / top) * 100}%` }} />
             </div>
           ))}
         </div>
@@ -174,6 +178,8 @@ export function StackedMonthChart({
   const totals = data.map((d) => series.reduce((s, x) => s + Number(d[x.key] ?? 0), 0))
   const max = Math.max(1, ...totals)
   const last = highlight === 'first' ? 0 : data.length - 1
+  // A year: narrower bars, and on phones only the highlighted month's total above its bar.
+  const dense = data.length > 6
   const colorOf = (j: number) => colors?.[j] ?? seriesColor(j)
   /** The month's values per series, largest first, without empty ones. */
   const breakdown = (i: number) =>
@@ -199,12 +205,14 @@ export function StackedMonthChart({
             onBlur={() => setOpen(null)}
             // Focus already opens it on a tap; clicking keeps it open. Tapping elsewhere blurs and closes it.
             onClick={() => setOpen(i)}
-            className={`flex h-full flex-1 flex-col items-center justify-end gap-1 rounded-t-sm focus-visible:outline-2 focus-visible:outline-accent ${open === i ? 'bg-track/60' : ''}`}
+            className={`flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1 rounded-t-sm focus-visible:outline-2 focus-visible:outline-accent ${open === i ? 'bg-track/60' : ''}`}
           >
-            <span className={`tabular text-[11px] leading-[14px] lg:text-xs whitespace-nowrap ${i === last ? 'font-medium text-ink' : 'text-muted'}`}>
+            <span
+              className={`tabular leading-[14px] whitespace-nowrap ${dense ? 'text-[10px]' : 'text-[11px] lg:text-xs'} ${i === last ? 'font-medium text-ink' : 'text-muted'} ${dense && i !== last ? 'invisible lg:visible' : ''}`}
+            >
               {formatCompact(Math.round(reais(totals[i])))}
             </span>
-            <span className="flex w-[26px] flex-col-reverse lg:w-9 gap-0.5 overflow-hidden rounded-t-[4px]" style={{ height: `max(2px, calc(${(totals[i] / max) * 100}% - 18px))` }}>
+            <span className={`flex flex-col-reverse gap-0.5 overflow-hidden rounded-t-[4px] ${dense ? 'w-4 lg:w-7' : 'w-[26px] lg:w-9'}`} style={{ height: `max(2px, calc(${(totals[i] / max) * 100}% - 18px))` }}>
               {series.map((s, j) => {
                 const v = Number(d[s.key] ?? 0)
                 return v > 0 ? <span key={s.key} className="block min-h-0.5" style={{ flexGrow: v, flexBasis: 0, background: colorOf(j) }} /> : null
