@@ -117,6 +117,25 @@ between accounts, and card bill payments.
 - **Average income** (Overview) averages the last 6 complete months of
   income in the categories chosen on its card (all by default; the choice is
   saved in the database and shared between devices).
+- **Previsão do fim do mês** (Overview, then its detail page) projects what
+  is left in the chosen accounts (checking accounts in BRL by default) on the
+  last day of the month: today's balance + the salary still expected (its
+  6-month average, on its usual day) − card bills due this month − recurring
+  charges paid by debit, Pix or boleto − the usual day-to-day spending. Each
+  value is counted once: card installments and subscriptions are inside the
+  bills. The accounts, day-to-day spending and freelance income are settings
+  saved in the database.
+- **Fora do padrão** compares each expense category with its own average:
+  the last complete month vs the 6 before it, or, from day 11, the month so
+  far vs the same days of those months. Beyond ±15% is unusual; categories
+  averaging under R$ 100 are left out.
+- **Recorrentes** finds charges the same merchant repeats every month (or
+  every year) at a similar amount and day, flags new ones, stopped ones and
+  price increases, and totals them per month and year (stopped ones out,
+  yearly ones divided by 12). Answers such as "Não é recorrente" are saved in
+  the database and kept when detection runs again after each sync.
+- The insights read 14 months of transactions (a year is needed for yearly
+  charges); every screen still shows the last 6.
 - **Hidden transactions** are left out of every total, chart, average,
   category breakdown and installments total. Balances, net worth and card
   bills still include them, as they are the bank's figures.

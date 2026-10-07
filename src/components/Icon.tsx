@@ -50,6 +50,12 @@ const paths = {
   // Average income filter
   filterLines: 'M4 6h16 M7 12h10 M10 18h4',
   chevronUp: 'M6 15l6-6 6 6',
+  // Insights: status arrows (never colour alone), the recurring badges and facts
+  arrowUp: 'M12 19V5 M6 11l6-6 6 6',
+  arrowDown: 'M12 5v14 M6 13l6 6 6-6',
+  pause: 'M9 6v12 M15 6v12',
+  receipt: 'M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21Z M9 8h6 M9 12h6 M9 16h3',
+  calendar: 'M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z M4 10h16 M8 3v4 M16 3v4',
 } as const
 
 /** The pack's file names (ui/<name>.svg) in camelCase. A test checks this list against the files. */

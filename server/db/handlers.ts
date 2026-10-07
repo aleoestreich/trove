@@ -8,7 +8,7 @@
 //   POST /api/sync     { connectionIds? }: start a background sync (default: every connection)
 //        202 SyncJob (the running one if a sync is already in progress) · 403 not in PLUGGY_ITEM_IDS
 //   GET  /api/sync     the latest sync job, for progress: 200 { job: SyncJob | null }
-//   (The three income routes below are one function, api/income-average.ts, through vercel.json rewrites.)
+//   (The three income routes below share one function, api/insights.ts, with the insight routes in server/db/insights.ts, through vercel.json rewrites.)
 //   GET  /api/overview/income-average             the average income card under the saved filter
 //        200 { average, months, lowest, highest, currentMonth, allAverage, filter } (figures null before a complete month)
 //   GET  /api/overview/income-average/categories  every income category and subcategory, and
@@ -28,7 +28,7 @@ import { brazilDate } from '../pluggy/map.js'
 import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
 import { dbErrorCode, dbErrorMessage, getPool } from './connection.js'
-import { historyStart, readSnapshot, readSyncInfo } from './read.js'
+import { analysisStart, readSnapshot, readSyncInfo } from './read.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
 import { waitUntil } from '@vercel/functions'
 
@@ -56,7 +56,7 @@ export async function financeFromDb(_request: Request, config: DbConfig, deps: P
   const pool = getPool(config.databaseUrl)
   try {
     await ensureSeeded(pool)
-    const snapshot = await readSnapshot(pool, config.pluggy.itemIds, historyStart(deps.now?.() ?? new Date(), 1))
+    const snapshot = await readSnapshot(pool, config.pluggy.itemIds, analysisStart(deps.now?.() ?? new Date()))
     if (!snapshot) return json(409, { error: 'never_synced', sync: await readSyncInfo(pool, config.pluggy.itemIds) })
     return json(200, snapshot)
   } catch (e) {
@@ -158,7 +158,7 @@ async function snapshotFor(config: DbConfig, deps: Partial<HandlerDeps>): Promis
   if (!config.pluggy || !config.databaseUrl) return notConfigured()
   const pool = getPool(config.databaseUrl)
   await ensureSeeded(pool)
-  const snapshot = await readSnapshot(pool, config.pluggy.itemIds, historyStart(deps.now?.() ?? new Date(), 1))
+  const snapshot = await readSnapshot(pool, config.pluggy.itemIds, analysisStart(deps.now?.() ?? new Date()))
   return snapshot ?? json(409, { error: 'never_synced' })
 }
 
@@ -221,7 +221,7 @@ export async function saveIncomeFilterRoute(request: Request, config: DbConfig, 
 /**
  * The three average income routes in one Vercel Function (the Hobby plan
  * allows 12 per deployment, the login middleware included). vercel.json
- * rewrites the public paths to /api/income-average?view=…; the original path
+ * rewrites the public paths to /api/insights?view=…; the original path
  * is also recognised, whichever one the request carries.
  */
 export function incomeRoutes(request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}): Promise<Response> {

@@ -1,4 +1,4 @@
-import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
+import { HashRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import { DataGate, DataProvider, useDataSource, useSync } from './state'
 import { createMockRepository } from './data/mockRepository'
 import { createApiRepository, withDemoFallback } from './data/apiRepository'
@@ -8,6 +8,9 @@ import { Accounts } from './pages/Accounts'
 import { Installments } from './pages/Installments'
 import { Categories } from './pages/Categories'
 import { HiddenTransactions } from './pages/Transactions'
+import { Projection } from './pages/Projection'
+import { UnusualAll, UnusualCategory } from './pages/UnusualCategory'
+import { Recurring } from './pages/Recurring'
 import { Snackbar, SyncBar } from './components/SyncBar'
 import { Icon, type IconName } from './components/Icon'
 import { Wordmark } from './components/Logo'
@@ -18,6 +21,12 @@ import { isDeployed } from './lib/useIsDesktop'
 // Deployed: data from the database via /api (demo data until configured and synced).
 // Local development: demo data.
 const repository = isDeployed() ? withDemoFallback(createApiRepository(), createMockRepository()) : createMockRepository()
+
+/** The insight pages open from the Overview, so its tab stays current there. */
+function useOverviewDetail(): boolean {
+  const { pathname } = useLocation()
+  return pathname.startsWith('/insights') || pathname === '/recurring'
+}
 
 const tabs: { to: string; label: keyof Messages['nav']; icon: IconName }[] = [
   { to: '/', label: 'overview', icon: 'overview' },
@@ -45,6 +54,7 @@ export function App() {
  */
 function Shell() {
   const { t } = useI18n()
+  const overviewDetail = useOverviewDetail()
   const isDemo = useDataSource() === 'demo'
   return (
     <div className="mx-auto min-h-dvh max-w-[480px] pb-[calc(78px+env(safe-area-inset-bottom))] lg:flex lg:max-w-none lg:pb-0">
@@ -79,6 +89,10 @@ function Shell() {
                     <Route path="/installments" element={<Installments />} />
                     <Route path="/transactions/hidden" element={<HiddenTransactions />} />
                     <Route path="/categories" element={<Categories />} />
+                    <Route path="/insights/projection" element={<Projection />} />
+                    <Route path="/insights/unusual" element={<UnusualAll />} />
+                    <Route path="/insights/unusual/:categoryId" element={<UnusualCategory />} />
+                    <Route path="/recurring" element={<Recurring />} />
                   </Routes>
                 </DataGate>
               }
@@ -98,17 +112,20 @@ function Shell() {
               to={tab.to}
               end
               className={({ isActive }) =>
-                `flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 px-0.5 ${isActive ? 'text-accent' : 'text-muted'}`
+                `flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 px-0.5 ${isActive || (tab.to === '/' && overviewDetail) ? 'text-accent' : 'text-muted'}`
               }
             >
-              {({ isActive }) => (
+              {({ isActive: exact }) => {
+                const isActive = exact || (tab.to === '/' && overviewDetail)
+                return (
                 <>
                   <span className={`flex h-[30px] w-[52px] items-center justify-center rounded-full ${isActive ? 'bg-accent-soft' : ''}`}>
                     <Icon name={tab.icon} className="size-[22px]" />
                   </span>
                   <span className={`max-w-full truncate text-[11px] leading-4 ${isActive ? 'font-medium' : ''}`}>{t.nav[tab.label]}</span>
                 </>
-              )}
+                )
+              }}
             </NavLink>
           ))}
         </div>
@@ -121,6 +138,7 @@ function Shell() {
 /** Desktop navigation: logo, pages, and at the bottom demo note, language and sign out. */
 function Sidebar() {
   const { t } = useI18n()
+  const overviewDetail = useOverviewDetail()
   const isDemo = useDataSource() === 'demo'
   const syncInfo = useSync().info
   return (
@@ -135,7 +153,7 @@ function Sidebar() {
             to={tab.to}
             end
             className={({ isActive }) =>
-              `flex h-12 items-center gap-3 rounded-sm px-3 text-[15px] ${isActive ? 'bg-accent-soft font-medium text-accent' : 'text-ink-2 hover:bg-track'}`
+              `flex h-12 items-center gap-3 rounded-sm px-3 text-[15px] ${isActive || (tab.to === '/' && overviewDetail) ? 'bg-accent-soft font-medium text-accent' : 'text-ink-2 hover:bg-track'}`
             }
           >
             <Icon name={tab.icon} className="size-[22px] shrink-0" />

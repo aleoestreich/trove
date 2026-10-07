@@ -3,10 +3,10 @@
 // (server/pluggy/map.ts), then the stored categories, subcategories and
 // "hidden" flags are applied.
 
-import { MONTHS_OF_HISTORY, type Snapshot, type SyncInfo, type TransferOverride } from '../../src/data/types.js'
+import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Snapshot, type SyncInfo, type TransferOverride } from '../../src/data/types.js'
 import { toSnapshot } from '../pluggy/map.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
-import { readCategories, readIncomeFilter } from './categories.js'
+import { readCategories, readIncomeFilter, readProjectionSettings, readRecurringOverrides } from './categories.js'
 import type { Db } from './connection.js'
 
 /** When each configured connection last synced; overall = the oldest of them (null until all have). */
@@ -58,7 +58,13 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string): Pro
       ),
     },
   })
-  return { ...snapshot, sync, incomeFilter: await readIncomeFilter(db) }
+  return {
+    ...snapshot,
+    sync,
+    incomeFilter: await readIncomeFilter(db),
+    projectionSettings: await readProjectionSettings(db),
+    recurringOverrides: await readRecurringOverrides(db),
+  }
 }
 
 /**
@@ -68,4 +74,9 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string): Pro
 export function historyStart(now: Date, extra = 0): string {
   const d = new Date(now.getFullYear(), now.getMonth() - (MONTHS_OF_HISTORY - 1) - extra, 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
+
+/** First day of the oldest month the insights need (MONTHS_OF_ANALYSIS, the current one included). */
+export function analysisStart(now: Date): string {
+  return historyStart(now, MONTHS_OF_ANALYSIS - MONTHS_OF_HISTORY)
 }

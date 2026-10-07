@@ -6,7 +6,8 @@
 import { kindOf } from './categories.js'
 import { CATEGORY_COLORS, CATEGORY_ICONS, DEFAULT_CATEGORIES } from './categoryCatalog.js'
 import { hasSelection, normalizeIncomeFilter, pruneIncomeFilter } from './incomeAverage.js'
-import type { Category, CategoryType, IncomeFilter, Snapshot, Subcategory, TransferOverride } from './types.js'
+import { RECURRING_ACTIONS, applyRecurringAction, type RecurringAction } from './recurring.js'
+import type { Category, CategoryType, IncomeFilter, ProjectionSettings, Snapshot, Subcategory, TransferOverride } from './types.js'
 
 export type Edit =
   /** Sets a transaction's category and subcategory (null: uncategorized / none). */
@@ -33,6 +34,10 @@ export type Edit =
   | { op: 'setTransferOverride'; transactionId: string; value: TransferOverride }
   /** Which income categories count in the average income (stored as exclusions). */
   | { op: 'setIncomeFilter'; filter: IncomeFilter }
+  /** What the month-end projection counts. */
+  | { op: 'setProjectionSettings'; settings: ProjectionSettings }
+  /** A hand-set answer about a detected recurring charge, given on `at` (ISO date). */
+  | { op: 'recurringAction'; id: string; action: RecurringAction; at: string }
 
 /** A transaction's category before a bulk change. `editedAt`: when it was last set by hand (server only). */
 export interface PreviousCategory {
@@ -160,6 +165,24 @@ export function validateEdit(e: unknown): Edit {
         },
       }
     }
+    case 'setProjectionSettings': {
+      const v = (x.settings ?? {}) as Record<string, unknown>
+      if (typeof v.includeDaily !== 'boolean') bad('includeDaily')
+      if (typeof v.includeFreelance !== 'boolean') bad('includeFreelance')
+      let accountIds: string[] | null = null
+      if (v.accountIds !== null) {
+        const list = Array.isArray(v.accountIds) ? v.accountIds.map((a) => id(a, 'account')) : bad('accounts')
+        // At least one account; a null list means the default ones.
+        if (list.length === 0 || list.length > 100) bad('accounts')
+        accountIds = [...new Set(list)]
+      }
+      return { op: 'setProjectionSettings', settings: { accountIds, includeDaily: v.includeDaily as boolean, includeFreelance: v.includeFreelance as boolean } }
+    }
+    case 'recurringAction': {
+      if (!(RECURRING_ACTIONS as readonly unknown[]).includes(x.action)) bad('action')
+      if (typeof x.at !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(x.at)) bad('at')
+      return { op: 'recurringAction', id: id(x.id, 'recurring charge'), action: x.action as RecurringAction, at: x.at as string }
+    }
     default:
       return bad('op')
   }
@@ -260,6 +283,12 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
     }
     case 'setIncomeFilter':
       return { ...s, incomeFilter: checkIncomeFilter(s.categories, s.subcategories, e.filter) }
+    case 'setProjectionSettings':
+      return { ...s, projectionSettings: e.settings }
+    case 'recurringAction': {
+      const overrides = s.recurringOverrides ?? {}
+      return { ...s, recurringOverrides: { ...overrides, [e.id]: applyRecurringAction(overrides[e.id], e.action, e.at) } }
+    }
     case 'setTransferOverride': {
       tx(e.transactionId)
       // A transfer has no category; "neither" leaves it uncategorized until one is chosen.

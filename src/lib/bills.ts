@@ -1,6 +1,6 @@
-import type { Account, Cents, Transaction } from '../data/types'
-import { addMonths, toISO } from './dates'
-import type { InstallmentPlan } from './installments'
+import type { Account, Cents, Transaction } from '../data/types.js'
+import { addMonths, toISO } from './dates.js'
+import type { InstallmentPlan } from './installments.js'
 
 /** The card bill to show: the open one, or the closed one still to be paid. */
 export interface CardBill {

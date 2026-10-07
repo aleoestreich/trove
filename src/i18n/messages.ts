@@ -347,6 +347,156 @@ export interface Messages {
     reconnect: (banks: string) => string
     reconnectNote: string
   }
+  /** Month-end projection, unusual categories and recurring charges. */
+  insights: {
+    back: string
+    projection: {
+      title: string
+      today: (date: string) => string
+      shouldRemain: (date: string) => string
+      range: (min: string, max: string) => string
+      lowNote: (value: string, date: string, beforeSalary: boolean) => string
+      lowShort: (value: string, date: string) => string
+      todayTag: string
+      chart: (today: string, low: string, lowDate: string, end: string, endDate: string) => string
+      tooltipProjected: string
+      tooltipActual: string
+      lines: { saldoHoje: string; receitas: string; faturas: string; recorrentes: string; diaADia: string; total: string }
+      tiles: { saldoHoje: string; receitas: string; faturas: string; recorrentes: string; diaADia: string }
+      seeDetails: string
+      seeDetailsShort: string
+      subtitle: (month: string, today: string) => string
+      legend: { actual: string; projected: string; band: string }
+      howTitle: string
+      howSub: string
+      waterfall: { saldo: string; receitas: string; faturas: string; recorrentes: string; diaADia: string; sobra: string }
+      waterfallChart: (saldo: string, receitas: string, faturas: string, recorrentes: string, diaADia: string, end: string) => string
+      notes: {
+        saldo: (accounts: string) => string
+        receitas: (day: number | null, freelance: boolean) => string
+        receitasNone: string
+        faturas: (cards: string, installments: string) => string
+        faturasNone: string
+        recorrentes: (names: string) => string
+        recorrentesNone: string
+        diaADia: (perDay: string) => string
+        diaADiaOff: string
+      }
+      nextTitle: string
+      nextNone: string
+      event: {
+        bill: (bank: string) => string
+        billMeta: string
+        billMetaInstallments: (amount: string) => string
+        recurringMeta: (method: string) => string
+        salary: string
+        freelance: string
+        estimated: string
+      }
+      methods: { card: string; debit: string; pix: string; boleto: string }
+      settingsTitle: string
+      accountsLabel: string
+      accountsDefault: string
+      dailyLabel: string
+      dailyNote: string
+      freelanceLabel: string
+      freelanceNote: string
+      accountsSheetNote: string
+      apply: string
+      atLeastOne: string
+      empty: string
+      and: string
+      /** "Unimed, Aluguel e mais 4". */
+      andMore: (names: string, n: number) => string
+    }
+    unusual: {
+      title: string
+      subMonth: (month: string) => string
+      subMtd: (month: string, day: number) => string
+      subDesktop: (month: string, from: string, to: string) => string
+      subDesktopMtd: (month: string, day: number) => string
+      headline: (name: string, pct: string, delta: string, above: boolean) => string
+      compare: (now: string, month: string, avg: string) => string
+      compareShort: (now: string, avg: string) => string
+      rowLabel: (name: string, pct: string, above: boolean, normal: boolean) => string
+      legend: { above: string; below: string; band: string }
+      normalLabel: string
+      normalItem: (name: string, pct: string) => string
+      seeAll: string
+      allNormal: string
+      allTitle: string
+      allSub: (month: string) => string
+      detail: {
+        subUnusual: (month: string) => string
+        subNormal: (month: string) => string
+        vs: (month: string, from: string, to: string) => string
+        vsMtd: (month: string, day: number) => string
+        above: string
+        below: string
+        compare: (now: string, month: string, avg: string, delta: string) => string
+        avgLabel: (amount: string) => string
+        chart: (name: string, months: string, avg: string) => string
+        legendAvg: string
+        driversUp: string
+        driversDown: string
+        driversSub: (month: string) => string
+        legendAvgShort: string
+        subNote: (now: string, avg: string) => string
+        countNote: (count: number, month: string, avg: string) => string
+        insideBand: string
+        noSubcategory: string
+        factShare: (name: string, pct: string, delta: string, total: string, up: boolean) => string
+        factNext: (month: string, name: string, amount: string) => string
+        factNextMtd: (month: string, name: string, amount: string) => string
+        seeTransactions: (name: string) => string
+        notFound: string
+      }
+    }
+    recurring: {
+      title: string
+      cardTitle: string
+      subtitle: string
+      activeCount: (n: number) => string
+      perMonth: string
+      perYear: string
+      totalsNote: (n: number, hasYearly: boolean) => string
+      desktopSub: (n: number) => string
+      seeAll: string
+      badge: { up: string; upLong: string; new: string; stopped: string }
+      short: {
+        up: (from: string, to: string, yearly: boolean) => string
+        new: (amount: string, yearly: boolean, since: string) => string
+        stopped: (amount: string, since: string) => string
+      }
+      alertsTitle: (n: number) => string
+      head: {
+        up: (from: string, to: string) => string
+        new: (amount: string, foreign: string | null, yearly: boolean) => string
+        stopped: (date: string) => string
+      }
+      body: {
+        up: (pct: string, date: string, perYear: string) => string
+        new: (dates: string, account: string, perYear: string) => string
+        stopped: (amount: string, month: string) => string
+      }
+      actions: { understood: string; seeCharges: string; notRecurring: string; confirm: string; stillPaying: string; markCancelled: string }
+      largestFirst: string
+      meta: { monthly: (day: number, account: string) => string; yearly: (month: string, perMonth: string) => string }
+      per: { month: string; year: string; yearDesktop: (perMonth: string) => string }
+      freq: { monthly: (day: number) => string; yearly: (month: string) => string }
+      stoppedTitle: (n: number) => string
+      stoppedMeta: (date: string) => string
+      footer: string
+      empty: string
+      table: { name: string; frequency: string; account: string; amount: string }
+      account: { card: (bank: string) => string; debit: (bank: string) => string; pix: (bank: string) => string; boleto: (bank: string) => string }
+      historyTitle: string
+      historyCount: (n: number) => string
+      priceChart: (name: string, prices: string) => string
+      flagUp: (delta: string) => string
+      dates: (list: string[]) => string
+    }
+  }
 }
 
 export const messages: Messages = {
@@ -731,5 +881,181 @@ export const messages: Messages = {
     problemFor: (bank, reason) => `${bank}: ${reason}`,
     reconnect: (banks) => `${banks} precisa ser reconectado no app Meu Pluggy.`,
     reconnectNote: 'Os dados param de atualizar até lá. Reconecte e depois sincronize.',
+  },
+  insights: {
+    back: 'Visão geral',
+    projection: {
+      title: 'Previsão do fim do mês',
+      today: (date) => `hoje, ${date}`,
+      shouldRemain: (date) => `Deve sobrar em ${date}`,
+      range: (min, max) => `Entre ${min} e ${max}, conforme a renda e os gastos`,
+      lowNote: (value, date, beforeSalary) => `Ponto mais baixo: ${value} em ${date}${beforeSalary ? ', antes do salário' : ''}`,
+      lowShort: (value, date) => `Mín. ${value} · ${date}`,
+      todayTag: 'hoje',
+      chart: (today, low, lowDate, end, endDate) => `Saldo previsto dia a dia: ${today} hoje, mínimo de ${low} em ${lowDate}, ${end} em ${endDate}`,
+      tooltipProjected: 'Previsto',
+      tooltipActual: 'Saldo real',
+      lines: {
+        saldoHoje: 'Saldo hoje',
+        receitas: '+ Receitas previstas',
+        faturas: '− Faturas a pagar',
+        recorrentes: '− Recorrentes no débito e Pix',
+        diaADia: '− Gastos do dia a dia',
+        total: '= Deve sobrar',
+      },
+      tiles: { saldoHoje: 'Saldo hoje', receitas: '+ Receitas', faturas: '− Faturas', recorrentes: '− Recorrentes', diaADia: '− Dia a dia' },
+      seeDetails: 'Ver detalhes da previsão',
+      seeDetailsShort: 'Ver detalhes',
+      subtitle: (month, today) => `${month} · atualizada hoje, ${today}`,
+      legend: { actual: 'Saldo real', projected: 'Previsto', band: 'Margem' },
+      howTitle: 'Como chegamos nesse valor',
+      howSub: 'Cada valor entra uma vez só',
+      waterfall: { saldo: 'Saldo hoje', receitas: 'Receitas', faturas: 'Faturas', recorrentes: 'Recorr.', diaADia: 'Dia a dia', sobra: 'Sobra' },
+      waterfallChart: (saldo, receitas, faturas, recorrentes, diaADia, end) =>
+        `Saldo hoje ${saldo}, mais receitas ${receitas}, menos faturas ${faturas}, menos recorrentes ${recorrentes}, menos dia a dia ${diaADia}, igual a ${end}`,
+      notes: {
+        saldo: (accounts) => `Contas: ${accounts}`,
+        receitas: (day, freelance) =>
+          `${freelance ? 'Salário e freelance' : 'Salário'}, média de 6 meses${day ? ` · cai por volta do dia ${day}` : ''}`,
+        receitasNone: 'O salário deste mês já entrou',
+        faturas: (cards, installments) => `${cards} · já incluem ${installments} em parcelas`,
+        faturasNone: 'Nenhuma fatura vence até o fim do mês',
+        recorrentes: (names) => `${names} · as do cartão já estão nas faturas`,
+        recorrentesNone: 'Nenhuma até o fim do mês · as do cartão já estão nas faturas',
+        diaADia: (perDay) => `${perDay} por dia no débito e Pix, média de 3 meses`,
+        diaADiaOff: 'Fora do cálculo',
+      },
+      nextTitle: 'Próximos lançamentos',
+      nextNone: 'Nada previsto até o fim do mês.',
+      event: {
+        bill: (bank) => `Fatura ${bank}`,
+        billMeta: 'Cartão de crédito',
+        billMetaInstallments: (amount) => `Cartão de crédito · inclui ${amount} em parcelas`,
+        recurringMeta: (method) => `Recorrente · ${method}`,
+        salary: 'Salário',
+        freelance: 'Freelance',
+        estimated: 'Estimado · média de 6 meses',
+      },
+      methods: { card: 'cartão', debit: 'débito', pix: 'Pix', boleto: 'boleto' },
+      settingsTitle: 'O que entra no cálculo',
+      accountsLabel: 'Contas consideradas',
+      accountsDefault: 'sem poupança nem saldo em moeda estrangeira',
+      dailyLabel: 'Incluir gastos do dia a dia',
+      dailyNote: 'Estimativa do que sai no débito e Pix fora das recorrentes',
+      freelanceLabel: 'Incluir freelance',
+      freelanceNote: 'Renda que varia muito; fica de fora por padrão',
+      accountsSheetNote: 'O saldo destas contas entra na previsão.',
+      apply: 'Aplicar',
+      atLeastOne: 'Escolha pelo menos uma conta.',
+      empty: 'Ainda não há histórico suficiente para prever. Volte depois de 2 meses de dados.',
+      and: 'e',
+      andMore: (names, n) => `${names} e mais ${n}`,
+    },
+    unusual: {
+      title: 'Fora do padrão',
+      subMonth: (month) => `${month} comparado à média de cada categoria nos 6 meses anteriores`,
+      subMtd: (month, day) => `${month} até o dia ${day}, comparado aos mesmos dias dos 6 meses anteriores`,
+      subDesktop: (month, from, to) => `${month} vs. a média de cada categoria (${from}–${to})`,
+      subDesktopMtd: (month, day) => `${month} até o dia ${day} vs. os mesmos dias dos 6 meses anteriores`,
+      headline: (name, pct, delta, above) =>
+        above ? `${name} está ${pct} acima da sua média de 6 meses (+${delta}).` : `${name} está ${pct} abaixo da sua média de 6 meses (−${delta}).`,
+      compare: (now, month, avg) => `${now} em ${month} · média ${avg}`,
+      compareShort: (now, avg) => `${now} · média ${avg}`,
+      rowLabel: (name, pct, above, normal) =>
+        `${name}: ${pct} ${above ? 'acima' : 'abaixo'} da média${normal ? ', dentro do normal' : ''}`,
+      legend: { above: 'Acima da média', below: 'Abaixo da média', band: 'Faixa normal (±15%)' },
+      normalLabel: 'Dentro do normal:',
+      normalItem: (name, pct) => (pct ? `${name} (${pct})` : name),
+      seeAll: 'Ver todas as categorias',
+      allNormal: 'Tudo dentro do normal este mês',
+      allTitle: 'Todas as categorias',
+      allSub: (month) => `${month} comparado à média de cada categoria`,
+      detail: {
+        subUnusual: (month) => `Fora do padrão em ${month}`,
+        subNormal: (month) => `Dentro do normal em ${month}`,
+        vs: (month, from, to) => `${month} vs. média de ${from} a ${to}`,
+        vsMtd: (month, day) => `${month} até o dia ${day} vs. os mesmos dias dos 6 meses anteriores`,
+        above: 'acima da sua média',
+        below: 'abaixo da sua média',
+        compare: (now, month, avg, delta) => `${now} em ${month} · média ${avg} (${delta})`,
+        avgLabel: (amount) => `média ${amount}`,
+        chart: (name, months, avg) => `Gastos com ${name} por mês: ${months}. Média de 6 meses ${avg}.`,
+        legendAvg: 'Média de 6 meses',
+        driversUp: 'O que puxou o aumento',
+        driversDown: 'O que puxou a queda',
+        driversSub: (month) => `Por subcategoria, ${month} vs. média`,
+        legendAvgShort: 'Média',
+        subNote: (now, avg) => `${now} vs. média ${avg}`,
+        countNote: (count, month, avg) => `${count} ${count === 1 ? 'lançamento' : 'lançamentos'} em ${month} · média de ${avg} por mês`,
+        insideBand: 'Dentro do normal (±15%)',
+        noSubcategory: 'Sem subcategoria',
+        factShare: (name, pct, delta, total, up) => `${name} explica ${pct} ${up ? 'do aumento' : 'da queda'} (${delta} de ${total}).`,
+        factNext: (month, name, amount) => `Se ${month} seguir a média, ${name} volta para cerca de ${amount}.`,
+        factNextMtd: (month, name, amount) => `Se o resto de ${month} seguir a média, ${name} fecha em cerca de ${amount}.`,
+        seeTransactions: (name) => `Ver transações de ${name}`,
+        notFound: 'Esta categoria não tem comparação neste mês.',
+      },
+    },
+    recurring: {
+      title: 'Recorrentes',
+      cardTitle: 'Assinaturas e recorrentes',
+      subtitle: 'Cobranças que se repetem todo mês ou todo ano',
+      activeCount: (n) => `Ativas · ${n}`,
+      perMonth: 'Por mês',
+      perYear: 'Por ano',
+      totalsNote: (n, hasYearly) =>
+        `Soma ${n === 1 ? 'da ativa' : `das ${n} ativas`}.${hasYearly ? ' A anual entra dividida por 12 no total por mês.' : ''} As paradas ficam fora.`,
+      desktopSub: (n) => `${n} ${n === 1 ? 'ativa' : 'ativas'} · as paradas ficam fora dos totais`,
+      seeAll: 'Ver todas as recorrentes',
+      badge: { up: 'Aumento', upLong: 'Aumento de preço', new: 'Nova', stopped: 'Parou' },
+      short: {
+        up: (from, to, yearly) => `${from} → ${to} ${yearly ? 'por ano' : 'por mês'}`,
+        new: (amount, yearly, since) => `≈ ${amount} ${yearly ? 'por ano' : 'por mês'} desde ${since}`,
+        stopped: (amount, since) => `${amount} · sem cobrança desde ${since}`,
+      },
+      alertsTitle: (n) => `Alertas · ${n}`,
+      head: {
+        up: (from, to) => `${from} → ${to}`,
+        new: (amount, foreign, yearly) => `${foreign ? `${foreign} ≈ ` : ''}${amount}/${yearly ? 'ano' : 'mês'}`,
+        stopped: (date) => `Última cobrança: ${date}`,
+      },
+      body: {
+        up: (pct, date, perYear) => `+${pct} desde ${date}${date.endsWith('.') ? '' : '.'} São ${perYear} a mais por ano.`,
+        new: (dates, account, perYear) => `Cobrada em ${dates} · ${account}. Soma ${perYear} por ano.`,
+        stopped: (amount, month) => `${amount} até ${month}. Nenhuma cobrança desde então.`,
+      },
+      actions: {
+        understood: 'Entendi',
+        seeCharges: 'Ver cobranças',
+        notRecurring: 'Não é recorrente',
+        confirm: 'Confirmar',
+        stillPaying: 'Ainda pago',
+        markCancelled: 'Marcar como cancelada',
+      },
+      largestFirst: 'Maior valor primeiro',
+      meta: {
+        monthly: (day, account) => `Todo dia ${day} · ${account}`,
+        yearly: (month, perMonth) => `Anual · ${month} · ≈ ${perMonth}/mês`,
+      },
+      per: { month: 'por mês', year: 'por ano', yearDesktop: (perMonth) => `por ano (≈ ${perMonth}/mês)` },
+      freq: { monthly: (day) => `Mensal · dia ${day}`, yearly: (month) => `Anual · ${month}` },
+      stoppedTitle: (n) => `Paradas · ${n}`,
+      stoppedMeta: (date) => `Última cobrança ${date} · fora dos totais`,
+      footer:
+        'Uma cobrança vira recorrente quando o mesmo estabelecimento cobra um valor parecido (até 10% de diferença) em 2 meses seguidos, ou 1 vez por ano em 2 anos. Toque numa linha para ver o histórico ou dizer que não é recorrente.',
+      empty: 'Nenhuma cobrança recorrente encontrada ainda.',
+      table: { name: 'Nome', frequency: 'Frequência', account: 'Conta', amount: 'Valor' },
+      account: {
+        card: (bank) => `Cartão ${bank}`,
+        debit: (bank) => `Débito ${bank}`,
+        pix: (bank) => `Pix ${bank}`,
+        boleto: (bank) => `Boleto ${bank}`,
+      },
+      historyTitle: 'Histórico de cobranças',
+      historyCount: (n) => `${n} ${n === 1 ? 'cobrança' : 'cobranças'}`,
+      priceChart: (name, prices) => `Preço de ${name} por mês: ${prices}`,
+      flagUp: (delta) => `+${delta}`,
+      dates: (list) => (list.length <= 1 ? list.join('') : `${list.slice(0, -1).join(', ')} e ${list[list.length - 1]}`),
+    },
   },
 }

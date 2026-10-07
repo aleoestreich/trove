@@ -83,15 +83,17 @@ export function createApiRepository(fetchFn: Fetch = (...a) => fetch(...a)): Rep
       return (await res.json()) as Snapshot
     },
     async edit(e) {
-      // The income filter has its own route (it answers with the recalculated average, unused here).
+      // Settings have their own routes (they answer with the recalculated figures, unused here).
+      const put = (url: string, body: unknown) =>
+        request(fetchFn, url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const res =
         e.op === 'setIncomeFilter'
-          ? await request(fetchFn, '/api/settings/income-average-filter', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(e.filter),
-            })
-          : await post('/api/edits', e)
+          ? await put('/api/settings/income-average-filter', e.filter)
+          : e.op === 'setProjectionSettings'
+            ? await put('/api/insights/projection/settings', e.settings)
+            : e.op === 'recurringAction'
+              ? await post(`/api/recurring/${encodeURIComponent(e.id)}/action`, { action: e.action })
+              : await post('/api/edits', e)
       if (!res.ok) throw await failure(res)
       return e.op === 'categorizeMany' ? ((await res.json()) as BulkResult) : null
     },

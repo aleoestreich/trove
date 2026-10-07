@@ -1,8 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/api/overview/income-average", "destination": "/api/income-average?view=card" },
-    { "source": "/api/overview/income-average/categories", "destination": "/api/income-average?view=categories" },
-    { "source": "/api/settings/income-average-filter", "destination": "/api/income-average?view=filter" }
+    { "source": "/api/overview/income-average", "destination": "/api/insights?view=card" },
+    { "source": "/api/overview/income-average/categories", "destination": "/api/insights?view=categories" },
+    { "source": "/api/settings/income-average-filter", "destination": "/api/insights?view=filter" },
+    { "source": "/api/insights/projection", "destination": "/api/insights?view=projection" },
+    { "source": "/api/insights/projection/settings", "destination": "/api/insights?view=projection-settings" },
+    { "source": "/api/insights/unusual-categories", "destination": "/api/insights?view=unusual" },
+    { "source": "/api/recurring", "destination": "/api/insights?view=recurring" },
+    { "source": "/api/recurring/:id/action", "destination": "/api/insights?view=recurring-action&id=:id" }
   ]
 }

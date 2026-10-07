@@ -4,7 +4,9 @@
 import type pg from 'pg'
 import { EditError, checkBulk, checkIncomeFilter, defaultCategories, type BulkResult, type Edit } from '../../src/data/edits.js'
 import { NO_FILTER, pruneIncomeFilter } from '../../src/data/incomeAverage.js'
-import type { Category, IncomeFilter, Subcategory } from '../../src/data/types.js'
+import { DEFAULT_PROJECTION_SETTINGS } from '../../src/data/projection.js'
+import { applyRecurringAction } from '../../src/data/recurring.js'
+import type { Category, IncomeFilter, ProjectionSettings, RecurringOverride, Subcategory } from '../../src/data/types.js'
 import { inTransaction, type Db } from './connection.js'
 import { readSnapshot } from './read.js'
 
@@ -95,6 +97,34 @@ async function pruneStoredIncomeFilter(db: Db): Promise<void> {
   if (current.excludedCategoryIds.length === 0 && current.excludedSubcategoryIds.length === 0) return
   const { categories, subcategories } = await readCategories(db)
   await writeIncomeFilter(db, pruneIncomeFilter(current, categories, subcategories))
+}
+
+/** The month-end projection's settings, in app_settings under `projection_settings`. Nothing stored: the defaults. */
+const PROJECTION_KEY = 'projection_settings'
+/** Hand-set answers about recurring charges, in app_settings under `recurring_overrides`, by recurring charge ID. */
+const RECURRING_KEY = 'recurring_overrides'
+
+export async function readProjectionSettings(db: Db): Promise<ProjectionSettings> {
+  const r = await db.query<{ value: Partial<ProjectionSettings> }>(`SELECT value FROM app_settings WHERE key = $1`, [PROJECTION_KEY])
+  const v = r.rows[0]?.value
+  return {
+    accountIds: Array.isArray(v?.accountIds) ? v.accountIds : DEFAULT_PROJECTION_SETTINGS.accountIds,
+    includeDaily: typeof v?.includeDaily === 'boolean' ? v.includeDaily : DEFAULT_PROJECTION_SETTINGS.includeDaily,
+    includeFreelance: typeof v?.includeFreelance === 'boolean' ? v.includeFreelance : DEFAULT_PROJECTION_SETTINGS.includeFreelance,
+  }
+}
+
+export async function readRecurringOverrides(db: Db): Promise<Record<string, RecurringOverride>> {
+  const r = await db.query<{ value: Record<string, RecurringOverride> }>(`SELECT value FROM app_settings WHERE key = $1`, [RECURRING_KEY])
+  return r.rows[0]?.value ?? {}
+}
+
+async function writeSetting(db: Db, key: string, value: unknown): Promise<void> {
+  await db.query(
+    `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, now())
+     ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    [key, JSON.stringify(value)],
+  )
 }
 
 const notFound = (what: string) => new EditError('not_found', `No such ${what}.`)
@@ -214,6 +244,17 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
       // The same rules as the app (checkIncomeFilter), on the stored categories.
       const { categories, subcategories } = await readCategories(db)
       await writeIncomeFilter(db, checkIncomeFilter(categories, subcategories, e.filter))
+      return null
+    }
+    case 'setProjectionSettings':
+      await writeSetting(db, PROJECTION_KEY, e.settings)
+      return null
+    case 'recurringAction': {
+      // The row is locked so two answers given at once both stay.
+      await db.query(`INSERT INTO app_settings (key, value) VALUES ($1, '{}'::jsonb) ON CONFLICT (key) DO NOTHING`, [RECURRING_KEY])
+      const r = await db.query<{ value: Record<string, RecurringOverride> }>(`SELECT value FROM app_settings WHERE key = $1 FOR UPDATE`, [RECURRING_KEY])
+      const all = r.rows[0]?.value ?? {}
+      await writeSetting(db, RECURRING_KEY, { ...all, [e.id]: applyRecurringAction(all[e.id], e.action, e.at) })
       return null
     }
   }

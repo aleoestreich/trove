@@ -273,19 +273,46 @@ BRL (foreign income at the stored rate), over the last 6 complete months.
 | `GET /api/overview/income-average/categories` | Every income category, its subcategories and "Sem categoria", with the monthly average and the total per month (enough for the picker's live preview) |
 | `PUT /api/settings/income-average-filter` | Saves `{ excludedCategoryIds, excludedSubcategoryIds, excludeUncategorized }` and answers with the recalculated `GET /api/overview/income-average` body; `400` with `reason: nothing_selected` ("Selecione pelo menos uma categoria") or `not_income` |
 
-The three routes are one Vercel Function (`api/income-average.ts`); `vercel.json`
-rewrites the paths above to it, as the Hobby plan allows 12 functions per
-deployment.
+These routes and the insight routes below are one Vercel Function
+(`api/insights.ts`); `vercel.json` rewrites their paths to it, as the Hobby
+plan allows 12 functions per deployment.
 
 The app computes the same figures from the snapshot it already has (the
 filter comes with `GET /api/finance`), so the card and the preview need no
 extra request; saving goes through the `PUT`.
 
+## Insights: projection, unusual categories and recurring charges
+
+The calculations live in `src/data/projection.ts`, `src/data/unusual.ts` and
+`src/data/recurring.ts`, shared by the app and the server
+(`server/db/insights.ts`). Two more `app_settings` rows hold what they need
+(no migration: the table exists already):
+
+- `projection_settings`: `{ accountIds, includeDaily, includeFreelance }`
+  (`accountIds: null` means the checking accounts in BRL). No row: the
+  defaults (day-to-day spending on, freelance off).
+- `recurring_overrides`: the answers about recurring charges, by recurring
+  charge ID (the merchant as a slug): `{ status, statusAt, increaseDismissedAt }`,
+  with `status` one of `confirmed`, `not_recurring`, `cancelled`,
+  `still_active`. Detection runs on every read, so it follows each sync and
+  each category change, and these answers are applied on top.
+
+| Route | Answer |
+|---|---|
+| `GET /api/insights/projection` | `{ available, asOf, endDate, end, low, range, breakdown, daily, events, settings }`; `available: false` without 2 months of salary history |
+| `PUT /api/insights/projection/settings` | Saves `{ accountIds, includeDaily, includeFreelance }` and answers with the recalculated projection; `400` when invalid (e.g. no account) |
+| `GET /api/insights/unusual-categories` | `{ month, compareFrom, compareTo, mode, days, unusual, normal }` |
+| `GET /api/recurring` | `{ monthTotal, yearTotal, active, stopped, alerts }` |
+| `POST /api/recurring/:id/action` | `{ action }`: `confirm`, `not_recurring`, `cancelled`, `still_active` or `dismiss_increase`; answers with the recalculated list |
+
+The app computes the same from its snapshot, so the cards need no extra
+request; saving goes through the `PUT` and `POST` routes.
+
 ## Reads
 
 Every screen works from one snapshot (`GET /api/finance`): connections,
-accounts, the last 7 months of transactions (6 shown, plus one for the
-6-complete-month income average) and the categories. Totals, bills,
+accounts, the last 14 months of transactions (6 shown; the insights use the
+rest, as yearly charges need a year) and the categories. Totals, bills,
 installments and transfers are computed from it. The reads:
 
 1. **Connections and accounts:** `bank_connections` joined to `accounts`.

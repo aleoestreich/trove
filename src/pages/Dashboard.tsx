@@ -18,6 +18,7 @@ import { CashFlowChart, NetWorthChart, StackedMonthChart, seriesColor } from '..
 import { TransactionRow } from '../components/TransactionRow'
 import { AverageIncomeCard } from '../components/AverageIncome'
 import { TransactionSheet } from '../components/TransactionSheet'
+import { ProjectionCard, RecurringCard, UnusualCard } from '../components/insights/cards'
 import { useI18n } from '../i18n/I18nProvider'
 import { useIsDesktop } from '../lib/useIsDesktop'
 
@@ -26,7 +27,7 @@ const TOP_CATEGORIES = 5
 const CURRENCY_COLORS: Record<string, string> = { BRL: 'var(--series-1)', USD: 'var(--series-3)', EUR: 'var(--series-4)' }
 
 export function Dashboard() {
-  const { accounts, transactions, categories, subcategories, incomeFilter, categoriesById, institutionsById } = useData()
+  const { accounts, transactions, categories, subcategories, incomeFilter, categoriesById, institutionsById, insights } = useData()
   const isDesktop = useIsDesktop()
   const [params, setParams] = useSearchParams()
   const { t, categoryName } = useI18n()
@@ -142,8 +143,13 @@ export function Dashboard() {
           </div>
         </Card>
 
+        {/* Insights: month-end projection, unusual categories, recurring charges (desktop: right below net worth) */}
+        <ProjectionCard projection={insights.projection} />
+        <UnusualCard unusual={insights.unusual} />
+        <RecurringCard summary={insights.recurring} />
+
         {/* 2. Where the money is */}
-        <Card className="flex flex-col gap-4 lg:order-6 lg:col-span-4">
+        <Card className="flex flex-col gap-4 lg:order-9 lg:col-span-4">
           <CardTitle subtitle={t.overview.balancesNote}>{t.overview.whereMoney}</CardTitle>
           <div className="flex flex-col gap-2">
             <Overline className="lg:hidden">{t.overview.byCurrency}</Overline>
@@ -190,7 +196,7 @@ export function Dashboard() {
         </Card>
 
         {/* 3. Income vs expenses */}
-        <Card className="flex flex-col gap-3.5 lg:order-3 lg:col-span-6 lg:gap-4">
+        <Card className="flex flex-col gap-3.5 lg:order-6 lg:col-span-6 lg:gap-4">
           <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
             <CardTitle subtitle={t.overview.lastMonths(MONTHS_OF_HISTORY)}>{t.overview.incomeVsExpenses}</CardTitle>
             <div className="flex flex-wrap gap-x-4 gap-y-1.5 lg:pt-0.5">
@@ -240,7 +246,7 @@ export function Dashboard() {
 
         {/* 3b. Average income (desktop: full width after the two monthly charts) */}
         {avgIncome && (
-          <Card className="lg:order-5 lg:col-span-12">
+          <Card className="lg:order-8 lg:col-span-12">
             <AverageIncomeCard average={avgIncome} />
           </Card>
         )}
@@ -274,7 +280,7 @@ export function Dashboard() {
         </Card>
 
         {/* 5. Spending trend */}
-        <Card className="flex flex-col gap-3.5 lg:order-4 lg:col-span-6 lg:gap-4">
+        <Card className="flex flex-col gap-3.5 lg:order-7 lg:col-span-6 lg:gap-4">
           <CardTitle subtitle={t.overview.lastMonths(MONTHS_OF_HISTORY)}>{t.overview.spendingByCategory}</CardTitle>
           <StackedMonthChart data={trendData} series={trendSeries} colors={trendColors} label={t.overview.spendingByCategory} />
           <ul className="flex flex-wrap gap-x-3.5 gap-y-2 lg:gap-x-4 lg:border-t lg:border-line lg:pt-3.5">
@@ -288,7 +294,7 @@ export function Dashboard() {
         </Card>
 
         {/* 6. One month in detail */}
-        <Card className="flex flex-col gap-4 !pb-2 lg:order-7 lg:col-span-8 lg:!pb-5">
+        <Card className="flex flex-col gap-4 !pb-2 lg:order-10 lg:col-span-8 lg:!pb-5">
           <div className="flex items-baseline justify-between gap-3">
             <CardTitle>{t.overview.monthInDetail}</CardTitle>
             <span className="hidden text-[13px] text-muted lg:inline">{formatMonth(month)}</span>
