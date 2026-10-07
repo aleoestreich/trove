@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Repository } from './data/repository'
-import { SyncStartError } from './data/apiRepository'
+import { errorMessage, SyncStartError } from './data/apiRepository'
 import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/syncProblems'
 import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
-import { applyEdit, type Edit } from './data/edits'
+import { applyEdit, EditError, type Edit } from './data/edits'
 import type { Account, Category, Institution, Snapshot, Subcategory, SyncInfo, SyncJob } from './data/types'
 import { useI18n } from './i18n/I18nProvider'
+import { messages } from './i18n/messages'
 import { Button, EmptyState } from './components/ui'
 
 interface AppData extends Snapshot {
@@ -61,6 +62,9 @@ const SyncContext = createContext<SyncState>({
 /** A save that failed (shown as a message; the data is reloaded). */
 const EditErrorContext = createContext<{ message: string | null; dismiss(): void }>({ message: null, dismiss() {} })
 
+/** A failed load as a message: the browser's own (fetch) errors are in English. */
+const loadError = (e: unknown) => (e instanceof TypeError ? messages.errors.network : e instanceof Error ? e.message : String(e))
+
 const byOrder = <T extends { sortOrder: number; name: string }>(a: T, b: T) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)
 
 /**
@@ -80,7 +84,7 @@ export function DataProvider({ repository, children }: { repository: Repository;
     setError(null)
     load().catch((e) => {
       console.error(e)
-      setError(e instanceof Error ? e.message : String(e))
+      setError(loadError(e))
     })
   }, [load, attempt])
 
@@ -91,13 +95,13 @@ export function DataProvider({ repository, children }: { repository: Repository;
       try {
         setSnapshot((s) => s && applyEdit(s, e))
       } catch (err) {
-        setEditError(err instanceof Error ? err.message : String(err))
+        setEditError(errorMessage(err instanceof EditError ? err.code : undefined))
         return
       }
       queue.current = queue.current
         .then(() => repository.edit(e))
         .catch((err) => {
-          setEditError(err instanceof Error ? err.message : String(err))
+          setEditError(err instanceof EditError ? errorMessage(err.code) : err instanceof Error ? err.message : String(err))
           return load().catch(() => {})
         })
     },
@@ -134,7 +138,7 @@ export function DataProvider({ repository, children }: { repository: Repository;
       } finally {
         polling.current = false
       }
-      await load().catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      await load().catch((e) => setError(loadError(e)))
       const ok = current.items.filter((i) => i.status === 'ok')
       if (announce && ok.length === current.items.length) {
         setResult({ inserted: ok.reduce((s, i) => s + i.inserted, 0), updated: ok.reduce((s, i) => s + i.updated, 0), at: Date.now() })
@@ -274,7 +278,7 @@ export function DataGate({ children }: { children: ReactNode }) {
         }
       >
         {t.loadErrorBody}
-        {/* The server's message (e.g. "Pluggy refused the credentials"); never contains amounts or credentials. */}
+        {/* Why it failed, in Portuguese (see loadError); never amounts or credentials. */}
         <span className="mt-2 block text-[13px] leading-[18px] break-words text-muted">{error}</span>
       </EmptyState>
     )

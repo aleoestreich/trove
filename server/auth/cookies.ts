@@ -6,8 +6,6 @@
 export const SESSION_COOKIE = '__Host-trove_session'
 /** Encrypted state for one login round trip (10 minutes). */
 export const LOGIN_COOKIE = '__Host-trove_login'
-/** Language chosen in the app, set by the frontend (not secret). */
-export const LOCALE_COOKIE = 'trove_locale'
 
 export function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get('Cookie')

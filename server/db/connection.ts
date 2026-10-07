@@ -55,6 +55,12 @@ export async function inTransaction<T>(pool: pg.Pool, fn: (db: Db) => Promise<T>
   }
 }
 
+/** The API's error code for a database error: an out-of-date schema gets its own. */
+export function dbErrorCode(e: unknown): 'schema_outdated' | 'database' {
+  const code = (e as { code?: unknown })?.code
+  return code === '42P01' || code === '42703' ? 'schema_outdated' : 'database'
+}
+
 /** A message safe to return: database errors can quote values, so only their code is kept. */
 export function dbErrorMessage(e: unknown): string {
   const code = (e as { code?: unknown })?.code

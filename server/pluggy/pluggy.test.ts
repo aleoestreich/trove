@@ -10,7 +10,7 @@ import { defaultCategories } from '../../src/data/edits.js'
 import type { Transaction } from '../../src/data/types.js'
 
 const config: PluggyConfig = { clientId: 'cid', clientSecret: 'super-secret', itemIds: ['item-1'], baseUrl: 'https://api.pluggy.ai' }
-const categoriesById = new Map(defaultCategories('en', (c, i) => `${c}-${i}`).categories.map((c) => [c.id, c]))
+const categoriesById = new Map(defaultCategories((c, i) => `${c}-${i}`).categories.map((c) => [c.id, c]))
 
 /** Income and expenses the way the app counts them (src/lib/summary.ts): transfers excluded, uncategorized by sign. */
 function totals(txs: Transaction[]) {

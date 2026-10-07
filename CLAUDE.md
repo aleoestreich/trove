@@ -46,19 +46,20 @@ Run `npm test` and `npm run build` before pushing.
   once with `applyEdit`, and the server applies the same rules in SQL
   (`server/db/categories.ts`); keep the two in step, with tests on both.
 - **Categories** are stored in the database (seeded once from
-  `src/data/categoryCatalog.ts`, in the app's language). A transaction has a
+  `src/data/categoryCatalog.ts`, with the Portuguese names). A transaction has a
   category and subcategory (or none), a `transfer` kind (own transfer or card
   bill payment, which never have a category) and a `hidden` flag. Hidden
   transactions are left out of every total, chart, average, category
   breakdown and installments total (balances and card bills still include
   them: those are the bank's figures). Category colours are the `--cat-*`
   tokens; icons come from `src/assets/icons/` through `Icon`/`CategoryIcon`.
-- **Text** shown in the UI lives in `src/i18n/messages.ts`, in both `en` and
-  `pt-BR` (Brazilian Portuguese). Never hardcode UI strings. Format money and
-  dates with the helpers in `src/lib/money.ts` and `src/lib/dates.ts`, which
-  follow the active language.
+- **Text:** the app is Brazilian Portuguese (pt-BR) only, with no language
+  switch. UI text lives in `src/i18n/messages.ts`; never hardcode UI strings,
+  and never show the server's own error text (map its error code to a message).
+  Format money and dates with the helpers in `src/lib/money.ts` and
+  `src/lib/dates.ts`.
 - **Target devices:** Samsung Galaxy S25+ and Galaxy A17. Check layouts at
-  360px and 412px wide, in both languages and in light and dark mode.
+  360px and 412px wide, in light and dark mode.
 - **Colours** come from the tokens in `src/index.css`, never raw hex in
   components.
 - **Login:** the deployed site is private (Auth0 + `middleware.ts`, see

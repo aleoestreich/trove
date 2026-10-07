@@ -58,11 +58,11 @@ lines too.
   alone then isn't enough.
 - **Brute-force protection:** **Security** → **Attack Protection** → **Brute-force Protection** on (the default).
 
-## 4. Auth0: login page in Portuguese (optional)
+## 4. Auth0: login page in Portuguese
 
-In **Settings** → **General** → **Languages**, add **Portuguese (Brazil)**.
-Trove asks Auth0 for the language chosen in the app (EN / PT), or the
-device language on first visit.
+In **Settings** → **General** → **Languages**, add **Portuguese (Brazil)**
+and make it the **Default Language**. Trove always asks Auth0 for pt-BR
+(`ui_locales`); without it enabled, Auth0 shows its default language.
 
 ## 5. Vercel: nothing to add
 

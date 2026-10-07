@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
 import type { Category, CategoryType } from '../data/types'
-import { CATEGORY_COLORS, CATEGORY_COLOR_NAMES, CATEGORY_ICONS, CATEGORY_ICON_LABELS } from '../data/categoryCatalog'
+import { CATEGORY_COLORS, CATEGORY_COLOR_NAMES, CATEGORY_ICONS } from '../data/categoryCatalog'
 import { cleanName, newId } from '../data/edits'
 import { CategoryBadge, catInk, catTint, catVar } from '../components/CategoryBadge'
 import { CategoryIcon, Icon } from '../components/Icon'
@@ -17,7 +17,7 @@ import { useIsDesktop } from '../lib/useIsDesktop'
  */
 export function Categories() {
   const { categories, subcategories } = useData()
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const desktop = useIsDesktop()
   const [params, setParams] = useSearchParams()
   const type: CategoryType = params.get('type') === 'income' ? 'income' : 'expense'
@@ -98,7 +98,7 @@ export function Categories() {
               />
             ))}
           </div>
-          <p className="px-1 text-[13px] leading-[18px] text-muted" key={locale}>
+          <p className="px-1 text-[13px] leading-[18px] text-muted">
             {t.categoriesPage.listNote}
           </p>
         </div>
@@ -283,7 +283,7 @@ function CategoryEditor({
   onClose(): void
   onSaved(category: Category): void
 }) {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { categories, subcategories, transactions, edit } = useData()
   const [name, setName] = useState(category?.name ?? '')
   const [type, setType] = useState<CategoryType>(category?.type ?? defaultType)
@@ -301,7 +301,6 @@ function CategoryEditor({
   }, [transactions])
   const linkable = category ? subcategories.filter((s) => s.categoryId !== category.id) : []
   const catName = (id: string) => categories.find((c) => c.id === id)?.name ?? ''
-  const lang = locale === 'pt-BR' ? 'pt' : 'en'
 
   const save = () => {
     const n = cleanName(name)
@@ -375,7 +374,7 @@ function CategoryEditor({
                 type="button"
                 role="radio"
                 aria-checked={color === c}
-                aria-label={CATEGORY_COLOR_NAMES[c][lang]}
+                aria-label={CATEGORY_COLOR_NAMES[c].pt}
                 onClick={() => setColor(c)}
                 className="flex size-12 items-center justify-center rounded-full"
               >
@@ -400,7 +399,7 @@ function CategoryEditor({
                   type="button"
                   role="radio"
                   aria-checked={on}
-                  aria-label={CATEGORY_ICON_LABELS[key] ?? key}
+                  aria-label={t.categoriesPage.iconNames[key] ?? key}
                   onClick={() => setIcon(key)}
                   className={`flex h-12 items-center justify-center rounded-md ${on ? 'border-[1.5px]' : 'border border-transparent text-ink-2 hover:bg-track'}`}
                   style={on ? { borderColor: catVar(color), background: catTint(color), color: catInk(color) } : undefined}

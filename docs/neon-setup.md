@@ -100,7 +100,7 @@ use today can be read later without fetching it again.
 | `account_balances` | (`account_id`, `as_of`) | One balance per account per day. Pluggy only gives the current balance, so this builds the history |
 | `card_bills` | `id` (Pluggy bill ID) → `accounts` | A card's monthly statements: due date, total, minimum payment, finance charges. The card itself is a row in `accounts` |
 | `transactions` | `id` (Pluggy transaction ID) → `accounts` | Date, description, type, amount (and in the account's currency), status, operation type, Pluggy's category, installment *n* of *N*, purchase date and total, merchant, payment method, `card_bill_id`, `provider_id`; edits: `category_id`, `subcategory_id`, `is_hidden`, `category_edited_at` |
-| `categories` | `id` | Name, type (expense or income), colour key, icon key, order. The 10 defaults are seeded on first run, in the app's language |
+| `categories` | `id` | Name, type (expense or income), colour key, icon key, order. The 10 defaults are seeded on first run, with their Portuguese names |
 | `subcategories` | `id` → `categories`; unique name per category | Subcategories, deleted with their category |
 | `card_settings` | `account_id` → `accounts` | Closing and due days per card (not used yet: still kept per device) |
 | `exchange_rates` | (`currency_code`, `as_of`) | BRL per unit of a foreign currency, one per day, saved by the sync |

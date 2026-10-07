@@ -11,7 +11,6 @@ import { Categories } from './pages/Categories'
 import { HiddenTransactions } from './pages/Transactions'
 import { Snackbar, SyncBar } from './components/SyncBar'
 import { Icon, type IconName } from './components/Icon'
-import { LanguageSwitch } from './components/LanguageSwitch'
 import { Wordmark } from './components/Logo'
 import { I18nProvider, useI18n } from './i18n/I18nProvider'
 import type { Messages } from './i18n/messages'
@@ -61,9 +60,6 @@ function Shell() {
                 {t.demoData}
               </span>
             )}
-          </div>
-          <div className="mr-2">
-            <LanguageSwitch />
           </div>
         </div>
       </header>
@@ -158,9 +154,6 @@ function Sidebar() {
             <span className="text-xs leading-[17px] text-muted">{t.demoNote}</span>
           </div>
         )}
-        <div className="self-start">
-          <LanguageSwitch />
-        </div>
         {isDeployed() && (
           <div className="border-t border-line pt-3">
             <a href="/api/auth/logout" className="flex h-11 items-center gap-2 rounded-sm px-2 text-sm font-medium text-accent hover:bg-track">

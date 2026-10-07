@@ -8,7 +8,7 @@ import { lastMonths } from './dates'
 import { filterTransactions } from '../pages/Transactions'
 
 // The default categories (made-up transactions below).
-const { categories } = defaultCategories('en', (c, i) => `${c}-${i}`)
+const { categories } = defaultCategories((c, i) => `${c}-${i}`)
 const byId = new Map(categories.map((c) => [c.id, c]))
 /** `categoryId` "transfer" / "card-payment" make a transfer; null, an uncategorized transaction. */
 const tx = (amount: number, categoryId: string | null, extra: Partial<Transaction> = {}): Transaction => ({

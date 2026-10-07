@@ -7,21 +7,21 @@ import type { Category, Subcategory } from '../../src/data/types.js'
 import { inTransaction, type Db } from './connection.js'
 
 /**
- * Seeds the default categories and subcategories, in the app's language,
+ * Seeds the default categories and subcategories (pt-BR names),
  * the first time the app reads the database. Only once: deleting them all
  * later doesn't bring them back.
  */
-export async function ensureSeeded(pool: pg.Pool, lang: 'en' | 'pt'): Promise<void> {
+export async function ensureSeeded(pool: pg.Pool): Promise<void> {
   const done = await pool.query(`SELECT 1 FROM app_settings WHERE key = 'categories_seeded'`)
   if (done.rowCount) return
   await inTransaction(pool, async (db) => {
     // Whoever inserts the marker seeds; a request racing it does nothing.
     const won = await db.query(
       `INSERT INTO app_settings (key, value) VALUES ('categories_seeded', $1) ON CONFLICT (key) DO NOTHING RETURNING key`,
-      [JSON.stringify({ lang })],
+      [JSON.stringify({ lang: 'pt' })],
     )
     if (!won.rowCount) return
-    const { categories, subcategories } = defaultCategories(lang, () => crypto.randomUUID())
+    const { categories, subcategories } = defaultCategories(() => crypto.randomUUID())
     await db.query(
       `INSERT INTO categories (id, name, type, color, icon, sort_order)
        SELECT id, name, type, color, icon, sort_order FROM jsonb_to_recordset($1::jsonb)

@@ -1,55 +1,43 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import { errorMessage } from '../data/apiRepository'
 import { messages } from './messages'
-import { setActiveLocale } from './locale'
-import { formatCompact, formatMoney, formatRate } from '../lib/money'
-import { formatDay, formatMonth, formatMonthYear, formatShortDate } from '../lib/dates'
-
-/** Every leaf path in a messages object ("overview.netWorth", ...). */
-function keys(obj: object, prefix = ''): string[] {
-  return Object.entries(obj).flatMap(([k, v]) =>
-    v && typeof v === 'object' ? keys(v, `${prefix}${k}.`) : [`${prefix}${k}`],
-  )
-}
+import { formatCompact, formatCompactMoney, formatMoney, formatRate } from '../lib/money'
+import { formatDay, formatDayHeading, formatMonth, formatMonthYear, formatShortDate } from '../lib/dates'
 
 describe('messages', () => {
-  it('pt-BR has exactly the same keys as English', () => {
-    expect(keys(messages['pt-BR']).sort()).toEqual(keys(messages.en).sort())
-  })
-
   it('handles singular and plural', () => {
-    expect(messages.en.transactions.count(1, null)).toBe('1 transaction')
-    expect(messages.en.transactions.count(42, 'September 2026')).toBe('42 transactions in September')
-    expect(messages['pt-BR'].transactions.count(1, null)).toBe('1 transação')
-    expect(messages['pt-BR'].transactions.count(42, 'Setembro de 2026')).toBe('42 transações em setembro')
-    expect(messages['pt-BR'].installments.toGo(1)).toBe('1 restante')
-    expect(messages['pt-BR'].installments.toGo(7)).toBe('7 restantes')
+    expect(messages.transactions.count(1, null)).toBe('1 transação')
+    expect(messages.transactions.count(42, 'Setembro de 2026')).toBe('42 transações em setembro')
+    expect(messages.installments.toGo(1)).toBe('1 restante')
+    expect(messages.installments.toGo(7)).toBe('7 restantes')
   })
 })
 
-describe('formatting follows the language', () => {
-  afterEach(() => setActiveLocale('pt-BR'))
+/** Intl separates the symbol and "mil" with a no-break space. */
+const nb = (s: string) => s.replace(/ /g, '\u00a0')
 
-  it('pt-BR', () => {
-    setActiveLocale('pt-BR')
-    expect(formatMoney(123456)).toBe('R$ 1.234,56')
-    expect(formatMoney(341237, 'USD')).toBe('US$ 3.412,37')
+describe('formatting (pt-BR)', () => {
+  it('money, rates and chart labels', () => {
+    expect(formatMoney(123456)).toBe(nb('R$ 1.234,56'))
+    expect(formatMoney(123456, 'USD')).toBe(nb('US$ 1.234,56'))
     expect(formatRate(5.45)).toBe('5,45')
-    expect(formatCompact(15000)).toBe('15 mil')
+    expect(formatCompact(13400)).toBe(nb('13,4 mil'))
+    expect(formatCompactMoney(1990000)).toBe(nb('R$ 19,9 mil'))
+  })
+
+  it('dates', () => {
     expect(formatMonth('2026-09')).toBe('Setembro de 2026')
-    expect(formatDay('2026-09-27')).toBe('27 de set.')
+    expect(formatDay('2026-09-12')).toBe('12 set.')
+    expect(formatDayHeading('2026-09-28')).toBe('segunda, 28 set.')
     expect(formatShortDate('2026-10-08')).toBe('08/10')
     expect(formatMonthYear('2027-03')).toBe('03/2027')
   })
+})
 
-  it('English', () => {
-    setActiveLocale('en')
-    expect(formatMoney(123456)).toBe('R$1,234.56')
-    expect(formatMoney(341237, 'USD')).toBe('$3,412.37')
-    expect(formatRate(5.45)).toBe('5.45')
-    expect(formatCompact(15000)).toBe('15K')
-    expect(formatMonth('2026-09')).toBe('September 2026')
-    expect(formatDay('2026-09-27')).toBe('Sep 27')
-    expect(formatShortDate('2026-10-08')).toBe('Oct 8')
-    expect(formatMonthYear('2027-03')).toBe('Mar 2027')
+describe('errors', () => {
+  it('shows the API’s error codes in Portuguese, never the server’s text', () => {
+    expect(errorMessage('schema_outdated')).toMatch(/^As tabelas do banco de dados estão desatualizadas/)
+    expect(errorMessage('name_taken')).toBe('Já existe uma com esse nome.')
+    expect(errorMessage('something_new', 502)).toBe('A requisição falhou (HTTP 502).')
   })
 })

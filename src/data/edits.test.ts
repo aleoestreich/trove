@@ -3,7 +3,7 @@ import { EditError, applyEdit, defaultCategories, validateEdit } from './edits'
 import { createMockRepository } from './mockRepository'
 import type { Snapshot, Transaction } from './types'
 
-const { categories, subcategories } = defaultCategories('en', (c, i) => `${c}-${i}`)
+const { categories, subcategories } = defaultCategories((c, i) => `${c}-${i}`)
 const tx = (id: string, over: Partial<Transaction> = {}): Transaction => ({
   id, accountId: 'a', date: '2026-10-01', description: 'LOJA EXEMPLO', amount: -150_00, categoryId: 'groceries', status: 'POSTED', ...over,
 })
@@ -43,7 +43,7 @@ describe('applyEdit', () => {
 
   it('refuses a taken name, a missing category and a subcategory of another category', () => {
     const create = (name: string) => applyEdit(snapshot(), { op: 'createCategory', category: { id: 'x', name, type: 'expense', color: 'orange', icon: 'fork' } })
-    expect(() => create('groceries')).toThrow(EditError)
+    expect(() => create('mercado')).toThrow(EditError)
     expect(create('Pets').categories.at(-1)).toMatchObject({ name: 'Pets', sortOrder: categories.length })
     expect(() => applyEdit(snapshot(), { op: 'deleteCategory', id: 'nope' })).toThrow(EditError)
     expect(() => applyEdit(snapshot(), { op: 'categorize', transactionId: 't1', categoryId: 'restaurants', subcategoryId: 'groceries-0' })).toThrow(EditError)
