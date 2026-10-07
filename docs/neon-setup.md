@@ -42,6 +42,10 @@ Then run [`db/migrations/003_sync_jobs.sql`](../db/migrations/003_sync_jobs.sql)
 the same way: it adds `sync_jobs` and `sync_job_items` for the background
 sync.
 
+Then run [`db/migrations/004_category_edits.sql`](../db/migrations/004_category_edits.sql):
+it adds the transactions' `category_edited_at`, which marks a category set by
+an edit (see [Edits are never overwritten](#edits-are-never-overwritten)).
+
 ## 3. Give Vercel the connection string
 
 1. In Neon, open **Connect**, choose the database and role, and turn
@@ -95,7 +99,7 @@ use today can be read later without fetching it again.
 | `accounts` | `id` (Pluggy account ID) → `bank_connections` | Type, name, currency, balance; for cards: limit, available, minimum payment, close and due dates, brand |
 | `account_balances` | (`account_id`, `as_of`) | One balance per account per day. Pluggy only gives the current balance, so this builds the history |
 | `card_bills` | `id` (Pluggy bill ID) → `accounts` | A card's monthly statements: due date, total, minimum payment, finance charges. The card itself is a row in `accounts` |
-| `transactions` | `id` (Pluggy transaction ID) → `accounts` | Date, description, type, amount (and in the account's currency), status, operation type, Pluggy's category, installment *n* of *N*, purchase date and total, merchant, payment method, `card_bill_id`, `provider_id`; edits: `category_id`, `subcategory_id`, `is_hidden` |
+| `transactions` | `id` (Pluggy transaction ID) → `accounts` | Date, description, type, amount (and in the account's currency), status, operation type, Pluggy's category, installment *n* of *N*, purchase date and total, merchant, payment method, `card_bill_id`, `provider_id`; edits: `category_id`, `subcategory_id`, `is_hidden`, `category_edited_at` |
 | `categories` | `id` | Name, type (expense or income), colour key, icon key, order. The 10 defaults are seeded on first run, in the app's language |
 | `subcategories` | `id` → `categories`; unique name per category | Subcategories, deleted with their category |
 | `card_settings` | `account_id` → `accounts` | Closing and due days per card (not used yet: still kept per device) |
@@ -150,7 +154,7 @@ database transaction:
   connection;
 - new transactions get Trove's category guess, and existing ones keep their
   stored category, subcategory and `is_hidden`: a sync never overwrites
-  edits;
+  edits (see [Edits are never overwritten](#edits-are-never-overwritten));
 - the first sync goes back 12 months; later ones re-read from 35 days before
   the previous sync;
 - transactions in that window that Pluggy no longer returns are marked
@@ -167,6 +171,23 @@ sync succeeds. A connection whose `bank_connections.status` needs a reconnect
 in Meu Pluggy (`LOGIN_ERROR`, `OUTDATED`…) is flagged in the sync bar and on
 its card on Accounts. Pluggy's webhook changes nothing: data only moves on
 Sync.
+
+### Edits are never overwritten
+
+A category, subcategory or hidden flag set in the app stays as set:
+
+- **Same transaction updated by the bank** (new amount, description, status):
+  the upsert never writes `category_id`, `subcategory_id`, `is_hidden` or
+  `category_edited_at`.
+- **Transaction replaced under a new ID** (a pending card purchase that posts):
+  the old row is marked removed, and its edits move to the new row. The new
+  row is the one with the same bank ID (`provider_id`) or, failing that, a new
+  transaction in the same account with the same type and amount, at most 10
+  days from the pending one, nearest in date. Each edit moves once. Without
+  edits, the new row keeps its own guess.
+- **Transfer detection on read:** a transaction whose category was edited
+  (`category_edited_at` set) keeps that category even when it would be paired
+  as an own transfer or read as a card bill payment.
 
 ## Reads
 

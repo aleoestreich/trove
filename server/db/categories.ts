@@ -80,7 +80,7 @@ async function run(db: Db, e: Edit): Promise<void> {
     case 'categorize': {
       if (e.categoryId) await one(`SELECT 1 FROM categories WHERE id = $1`, [e.categoryId], 'category')
       if (e.subcategoryId) await one(`SELECT 1 FROM subcategories WHERE id = $1 AND category_id = $2`, [e.subcategoryId, e.categoryId], 'subcategory in that category')
-      await one(`UPDATE transactions SET category_id = $2, subcategory_id = $3 WHERE id = $1`, [e.transactionId, e.categoryId, e.subcategoryId], 'transaction')
+      await one(`UPDATE transactions SET category_id = $2, subcategory_id = $3, category_edited_at = now() WHERE id = $1`, [e.transactionId, e.categoryId, e.subcategoryId], 'transaction')
       return
     }
     case 'hide':

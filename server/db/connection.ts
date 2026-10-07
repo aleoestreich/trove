@@ -58,6 +58,6 @@ export async function inTransaction<T>(pool: pg.Pool, fn: (db: Db) => Promise<T>
 /** A message safe to return: database errors can quote values, so only their code is kept. */
 export function dbErrorMessage(e: unknown): string {
   const code = (e as { code?: unknown })?.code
-  if (code === '42P01' || code === '42703') return 'The database tables are out of date: run db/migrations/002_categories_and_sync.sql (docs/neon-setup.md).'
+  if (code === '42P01' || code === '42703') return 'The database tables are out of date: run the pending files in db/migrations (docs/neon-setup.md).'
   return typeof code === 'string' ? `Database error (${code}).` : 'Database unavailable.'
 }

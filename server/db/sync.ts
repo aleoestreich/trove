@@ -9,7 +9,8 @@
 //   category, subcategory and "hidden" flag: a sync never overwrites
 //   edits.
 // - Transactions in the fetched window that Pluggy no longer returns (e.g. a
-//   pending purchase that posted under a new ID) are marked removed, not deleted.
+//   pending purchase that posted under a new ID) are marked removed, not
+//   deleted; their edits move to the transaction that replaced them.
 // - Each run is logged in sync_runs with counts only; errors keep status
 //   codes, never amounts, descriptions or credentials.
 
@@ -302,6 +303,7 @@ export async function save(db: Db, f: Fetched, now: Date): Promise<SyncResult> {
      WHERE account_id = ANY($1::text[]) AND booked_on >= $2::date AND removed_at IS NULL AND NOT (id = ANY($3::text[]))`,
     [accounts.map((a) => a.id), f.from, ids, now],
   )
+  await carryEdits(db, new Set(ids.filter((id) => !existing.rows.some((r) => r.id === id))), now)
 
   for (const [currency, rate] of Object.entries(f.rates)) {
     await db.query(
@@ -319,4 +321,69 @@ export async function save(db: Db, f: Fetched, now: Date): Promise<SyncResult> {
   )
 
   return { connectionId: item.id, name, inserted, updated, removed: removed.rowCount ?? 0 }
+}
+
+/** Days between a pending transaction and the posted one that replaces it. */
+const REPLACED_WITHIN_DAYS = 10
+
+/**
+ * A bank can replace a transaction under a new ID (a pending card purchase
+ * that posts). The old row was just marked removed; its edits (category,
+ * subcategory, hidden) move to the new row, so they aren't lost to the guess.
+ * The new row is the one with the same bank ID (provider_id) or, failing that,
+ * a pending one with the same account, type and amount, nearest in date. Each
+ * row is matched at most once.
+ */
+async function carryEdits(db: Db, newIds: Set<string>, removedAt: Date) {
+  if (newIds.size === 0) return
+  const old = await db.query<Candidate>(
+    `SELECT id, account_id, provider_id, type, amount_cents::text AS amount, booked_on::text AS day, status,
+       category_id, subcategory_id, is_hidden, category_edited_at
+     FROM transactions WHERE removed_at = $1 AND (category_edited_at IS NOT NULL OR is_hidden)`,
+    [removedAt],
+  )
+  if (old.rows.length === 0) return
+  const fresh = await db.query<Candidate>(
+    `SELECT id, account_id, provider_id, type, amount_cents::text AS amount, booked_on::text AS day, status
+     FROM transactions WHERE id = ANY($1::text[])`,
+    [[...newIds]],
+  )
+  const days = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000
+  const pairs: { score: number; from: Candidate; to: Candidate }[] = []
+  for (const from of old.rows)
+    for (const to of fresh.rows) {
+      if (from.account_id !== to.account_id) continue
+      if (from.provider_id && from.provider_id === to.provider_id) pairs.push({ score: -1, from, to })
+      else if (from.status === 'PENDING' && from.type === to.type && from.amount === to.amount && days(from.day, to.day) <= REPLACED_WITHIN_DAYS)
+        pairs.push({ score: days(from.day, to.day), from, to })
+    }
+  pairs.sort((a, b) => a.score - b.score)
+  const used = new Set<string>()
+  for (const { from, to } of pairs) {
+    if (used.has(from.id) || used.has(to.id)) continue
+    used.add(from.id).add(to.id)
+    if (from.category_edited_at)
+      await db.query(`UPDATE transactions SET category_id = $2, subcategory_id = $3, category_edited_at = $4, is_hidden = $5 WHERE id = $1`, [
+        to.id,
+        from.category_id,
+        from.subcategory_id,
+        from.category_edited_at,
+        from.is_hidden,
+      ])
+    else await db.query(`UPDATE transactions SET is_hidden = $2 WHERE id = $1`, [to.id, from.is_hidden])
+  }
+}
+
+interface Candidate {
+  id: string
+  account_id: string
+  provider_id: string | null
+  type: string
+  amount: string
+  day: string
+  status: string | null
+  category_id?: string | null
+  subcategory_id?: string | null
+  is_hidden?: boolean
+  category_edited_at?: Date | null
 }

@@ -73,6 +73,32 @@ suite('database', () => {
     expect(await row('t1')).toMatchObject({ category_id: 'restaurants', subcategory_id: delivery, is_hidden: true })
   })
 
+  it('keeps edits when the bank replaces a pending transaction under a new ID', async () => {
+    const pending = (id: string, over: Partial<PluggyTransaction> = {}) => tx(id, { status: 'PENDING', category: 'Supermarkets', ...over })
+    await sync([pending('p1'), pending('p2', { amount: -80 }), pending('p3', { amount: -30, providerId: 'bank-3' } as Partial<PluggyTransaction>)])
+    const delivery = await subOf('restaurants', 'Delivery')
+    await applyEditSql(pool, { op: 'categorize', transactionId: 'p1', categoryId: 'restaurants', subcategoryId: delivery })
+    await applyEditSql(pool, { op: 'hide', transactionId: 'p2', hidden: true })
+    await applyEditSql(pool, { op: 'categorize', transactionId: 'p3', categoryId: 'home', subcategoryId: null })
+    // Posted under new IDs, two days later; p3 matched by the bank's ID despite a new amount.
+    const posted = (id: string, over: Partial<PluggyTransaction> = {}) => tx(id, { date: '2026-10-03T12:00:00.000Z', category: 'Supermarkets', ...over })
+    expect(await sync([posted('n1'), posted('n2', { amount: -80 }), posted('n3', { amount: -31, providerId: 'bank-3' } as Partial<PluggyTransaction>), posted('n4', { amount: -150 })]))
+      .toMatchObject({ inserted: 4, removed: 3 })
+    expect(await row('n1')).toMatchObject({ category_id: 'restaurants', subcategory_id: delivery, is_hidden: false })
+    expect(await row('n2')).toMatchObject({ category_id: 'groceries', is_hidden: true })
+    expect(await row('n3')).toMatchObject({ category_id: 'home' })
+    // Each edit moves once: the second purchase of the same amount keeps the guess.
+    expect(await row('n4')).toMatchObject({ category_id: 'groceries', is_hidden: false })
+    const edited = await pool.query(`SELECT id FROM transactions WHERE category_edited_at IS NOT NULL AND removed_at IS NULL ORDER BY id`)
+    expect(edited.rows.map((r) => r.id)).toEqual(['n1', 'n3'])
+  })
+
+  it('does not move a guess: an unedited pending transaction leaves the new one to its own guess', async () => {
+    await sync([tx('p1', { status: 'PENDING', category: 'Supermarkets' })])
+    await sync([tx('n1', { date: '2026-10-02T12:00:00.000Z', category: 'Restaurants' })])
+    expect((await row('n1')).category_id).toBe('restaurants')
+  })
+
   it('is idempotent: the same data synced again changes nothing and duplicates nothing', async () => {
     const data = [tx('t1', { category: 'Supermarkets' }), tx('t2')]
     const bills = [{ accountId: 'acc-1', bill: { id: 'b1', dueDate: '2026-10-10T03:00:00.000Z', totalAmount: 150 } }]

@@ -395,6 +395,26 @@ describe('mapping to Trove', () => {
     expect(totals(s.transactions)).toEqual({ income: 1000000, expenses: 4200, net: 995800 })
   })
 
+  it('keeps an edited category over transfer detection', () => {
+    const txs = [
+      tx({ id: 'pix-out', type: 'DEBIT', amount: 550, category: 'Transfer - PIX', date: '2026-09-10T12:00:00Z' }),
+      tx({ id: 'pix-in', accountId: 'acc-usd', type: 'CREDIT', amount: 100, currencyCode: 'USD', category: 'Transfer - PIX', date: '2026-09-10T18:00:00Z' }),
+      tx({ id: 'bill-out', type: 'DEBIT', amount: 850, category: 'Credit card payment' }),
+    ]
+    const stored = new Map([
+      ['pix-out', { categoryId: 'gifts', subcategoryId: null, hidden: false, edited: true }],
+      ['pix-in', { categoryId: null, subcategoryId: null, hidden: false }],
+      ['bill-out', { categoryId: 'housing', subcategoryId: null, hidden: false, edited: true }],
+    ])
+    const s = toSnapshot({ ...data(txs), owner: { categories: [], subcategories: [], stored } })
+    const of = (id: string) => {
+      const t = s.transactions.find((x) => x.id === id)!
+      return t.transfer ?? t.categoryId
+    }
+    // The edited Pix is no longer paired, so its twin counts as income on its own.
+    expect([of('pix-out'), of('pix-in'), of('bill-out')]).toEqual(['gifts', null, 'housing'])
+  })
+
   it('ignores accounts and transactions from connections that were not requested', () => {
     const other: PluggyAccount = { ...checking, id: 'x', itemId: 'someone-else' }
     const s = toSnapshot(data([tx({ accountId: 'x' })], [checking, other]))
