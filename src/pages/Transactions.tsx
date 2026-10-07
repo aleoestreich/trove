@@ -557,7 +557,7 @@ export function HiddenTransactions() {
                 <div className="flex min-w-0 flex-1 items-center gap-3 opacity-60">
                   <TransactionBadge tx={tx} categoriesById={categoriesById} />
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-[15px] leading-5 font-medium text-ink">{tx.description}</span>
+                    <span title={tx.description} className="truncate text-[15px] leading-5 font-medium text-ink">{tx.description}</span>
                     <CategoryLine tx={tx} compact />
                     <span className="truncate text-[13px] leading-[18px] text-muted">{accountLabel(tx.accountId)}</span>
                   </span>
@@ -766,7 +766,7 @@ function TransactionTable({
                 <span role="cell" className="flex min-w-0 items-center gap-3">
                   <TransactionBadge tx={tx} categoriesById={categoriesById} size={34} />
                   {/* The focusable part of the row: Enter opens the details (or toggles it while selecting). */}
-                  <button type="button" className="min-w-0 truncate text-left text-sm font-medium text-ink">
+                  <button type="button" title={tx.description} className="min-w-0 truncate text-left text-sm font-medium text-ink">
                     {tx.description}
                   </button>
                   {tx.installment && (
