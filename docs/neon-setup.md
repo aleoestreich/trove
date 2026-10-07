@@ -323,8 +323,9 @@ columns (`name`, `raw`…), never `nickname`, so a sync never changes it.
 ## Reads
 
 Every screen works from one snapshot (`GET /api/finance`): connections,
-accounts, the last 14 months of transactions (6 shown; the insights use the
-rest, as yearly charges need a year) and the categories. Totals, bills,
+accounts, every stored transaction (back to `HISTORY_START`, January 2025:
+Transações lists them all; the Overview and the insights use the months they
+need) and the categories. Totals, bills,
 installments and transfers are computed from it. The reads:
 
 1. **Connections and accounts:** `bank_connections` joined to `accounts`.

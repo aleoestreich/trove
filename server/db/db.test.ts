@@ -8,7 +8,7 @@ import { EditError, type BulkResult } from '../../src/data/edits.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
 import { dbErrorCode, inTransaction } from './connection.js'
-import { readSnapshot } from './read.js'
+import { readSnapshot, readStart } from './read.js'
 import { HISTORY_START, save, syncFrom, type Fetched } from './sync.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
 import { edits, incomeAverageRoute, incomeRoutes, incomeCategoriesRoute, saveIncomeFilterRoute, startSync, syncStatus } from './handlers.js'
@@ -516,6 +516,13 @@ suite('database', () => {
       const res = await insightRoutes(new Request('https://trove.test/api/recurring'), { pluggy: null, databaseUrl: null }, deps)
       expect(res.status).toBe(503)
     })
+  })
+})
+
+describe('read window', () => {
+  it('reads everything Sync stores, back to January 2025', () => {
+    expect(readStart(new Date(2026, 9, 7))).toBe('2025-01-01')
+    expect(readStart(new Date(2028, 0, 10))).toBe('2025-01-01')
   })
 })
 

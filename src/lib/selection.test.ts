@@ -60,3 +60,13 @@ describe('transactions page order', () => {
     expect(newestFirst(list).map((t) => t.id)).toEqual(['b', 'c', 'd', 'a'])
   })
 })
+
+describe('transactions page months', () => {
+  it('lists every month from the oldest transaction to now', async () => {
+    const { monthsWithData } = await import('../pages/Transactions')
+    const at = (date: string) => ({ id: date, accountId: 'a', date, description: 'LOJA EXEMPLO', amount: -1, categoryId: null, status: 'POSTED' as const })
+    expect(monthsWithData([at('2025-01-15'), at('2026-10-02')], '2026-10')).toHaveLength(22)
+    expect(monthsWithData([at('2025-01-15')], '2026-10')[0]).toBe('2025-01')
+    expect(monthsWithData([], '2026-10')).toEqual(['2026-10'])
+  })
+})

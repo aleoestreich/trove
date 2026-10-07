@@ -28,7 +28,7 @@ import { brazilDate } from '../pluggy/map.js'
 import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
 import { dbErrorCode, dbErrorMessage, getPool } from './connection.js'
-import { analysisStart, readSnapshot, readSyncInfo } from './read.js'
+import { readStart, readSnapshot, readSyncInfo } from './read.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
 import { waitUntil } from '@vercel/functions'
 
@@ -56,7 +56,7 @@ export async function financeFromDb(_request: Request, config: DbConfig, deps: P
   const pool = getPool(config.databaseUrl)
   try {
     await ensureSeeded(pool)
-    const snapshot = await readSnapshot(pool, config.pluggy.itemIds, analysisStart(deps.now?.() ?? new Date()))
+    const snapshot = await readSnapshot(pool, config.pluggy.itemIds, readStart(deps.now?.() ?? new Date()))
     if (!snapshot) return json(409, { error: 'never_synced', sync: await readSyncInfo(pool, config.pluggy.itemIds) })
     return json(200, snapshot)
   } catch (e) {
@@ -158,7 +158,7 @@ async function snapshotFor(config: DbConfig, deps: Partial<HandlerDeps>): Promis
   if (!config.pluggy || !config.databaseUrl) return notConfigured()
   const pool = getPool(config.databaseUrl)
   await ensureSeeded(pool)
-  const snapshot = await readSnapshot(pool, config.pluggy.itemIds, analysisStart(deps.now?.() ?? new Date()))
+  const snapshot = await readSnapshot(pool, config.pluggy.itemIds, readStart(deps.now?.() ?? new Date()))
   return snapshot ?? json(409, { error: 'never_synced' })
 }
 

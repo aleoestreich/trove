@@ -9,6 +9,7 @@ import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/typ
 import { readCategories, readIncomeFilter, readProjectionSettings, readRecurringOverrides } from './categories.js'
 import { withAccountNames } from '../../src/data/edits.js'
 import type { Db } from './connection.js'
+import { HISTORY_START } from './sync.js'
 
 /** When each configured connection last synced; overall = the oldest of them (null until all have). */
 export async function readSyncInfo(db: Db, itemIds: string[]): Promise<SyncInfo> {
@@ -81,7 +82,12 @@ export function historyStart(now: Date, extra = 0): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
-/** First day of the oldest month the insights need (MONTHS_OF_ANALYSIS, the current one included). */
-export function analysisStart(now: Date): string {
-  return historyStart(now, MONTHS_OF_ANALYSIS - MONTHS_OF_HISTORY)
+/**
+ * First day the app reads from: everything Sync stores (since HISTORY_START),
+ * or more if the insights' MONTHS_OF_ANALYSIS reach further back. Transações
+ * lists all of it; the insights and the Overview's charts use what they need.
+ */
+export function readStart(now: Date): string {
+  const analysis = historyStart(now, MONTHS_OF_ANALYSIS - MONTHS_OF_HISTORY)
+  return analysis < HISTORY_START ? analysis : HISTORY_START
 }

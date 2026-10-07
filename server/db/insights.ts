@@ -27,7 +27,7 @@ import { brazilDate } from '../pluggy/map.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
 import { dbErrorCode, dbErrorMessage, getPool } from './connection.js'
 import { incomeRoutes, type DbConfig, type HandlerDeps } from './handlers.js'
-import { analysisStart, readSnapshot } from './read.js'
+import { readStart, readSnapshot } from './read.js'
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -48,7 +48,7 @@ async function snapshotOf(config: DbConfig, deps: Partial<HandlerDeps>): Promise
   if (!config.pluggy || !config.databaseUrl) return json(503, { error: 'not_configured' })
   const pool = getPool(config.databaseUrl)
   await ensureSeeded(pool)
-  const s = await readSnapshot(pool, config.pluggy.itemIds, analysisStart(deps.now?.() ?? new Date()))
+  const s = await readSnapshot(pool, config.pluggy.itemIds, readStart(deps.now?.() ?? new Date()))
   return s ?? json(409, { error: 'never_synced' })
 }
 

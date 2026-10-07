@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
-import { MONTHS_OF_HISTORY } from '../data/seed'
 import type { Category, CategoryKind, Transaction } from '../data/types'
 import { formatDayHeading, formatMonth, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
 import { currentBill, inBill } from '../lib/bills'
@@ -35,6 +34,14 @@ export interface TransactionFilters {
  * (the server sorts same-day transactions by time, latest first).
  */
 export const newestFirst = (txs: Transaction[]): Transaction[] => [...txs].sort((a, b) => b.date.localeCompare(a.date))
+
+/** Every month from the oldest transaction to `latest`, oldest first (at least `latest`). */
+export function monthsWithData(transactions: Transaction[], latest: string): string[] {
+  const first = transactions.reduce((min, t) => (t.date < min ? t.date : min), `${latest}-01`)
+  const [y, m] = latest.split('-').map(Number)
+  const count = (y - Number(first.slice(0, 4))) * 12 + (m - Number(first.slice(5, 7))) + 1
+  return lastMonths(latest, Math.max(1, count))
+}
 
 /** The transactions matching the filters. Hidden ones are left out (they have their own view). */
 export function filterTransactions(transactions: Transaction[], categoriesById: Map<string, Category>, f: TransactionFilters): Transaction[] {
@@ -91,7 +98,8 @@ function nextDay(iso: string): string {
 }
 
 export function Transactions() {
-  const { transactions, accounts, institutionsById, categories, categoriesById } = useData()
+  // Every stored transaction (since the first sync's start), not just the months the Overview shows.
+  const { allTransactions: transactions, accounts, institutionsById, categories, categoriesById } = useData()
   const [params, setParams] = useSearchParams()
   const [selected, setSelected] = useState<Transaction | null>(null)
   const { t, categoryName } = useI18n()
@@ -263,7 +271,7 @@ export function Transactions() {
               </span>
             ) : (
             <FilterChip label={monthLabel} applied value={monthValue} onChange={(v) => set('m', v)}>
-              {lastMonths(latest, MONTHS_OF_HISTORY)
+              {monthsWithData(transactions, latest)
                 .reverse()
                 .map((m) => (
                   <option key={m} value={m}>
@@ -532,7 +540,7 @@ function HiddenLink({ count }: { count: number }) {
 
 /** Hidden transactions: grouped by day, no day totals, dimmed, each with Unhide. */
 export function HiddenTransactions() {
-  const { transactions, edit, categoriesById } = useData()
+  const { allTransactions: transactions, edit, categoriesById } = useData()
   const { t } = useI18n()
   const accountLabel = useAccountLabel()
   const days = useMemo(() => {

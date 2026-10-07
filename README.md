@@ -138,9 +138,10 @@ between accounts, and card bill payments.
   price increases, and totals them per month and year (stopped ones out,
   yearly ones divided by 12). Answers such as "Não é recorrente" are saved in
   the database and kept when detection runs again after each sync.
-- The app reads 14 months of transactions: the insights need a year for
-  yearly charges and the Overview's charts can show one. Lists and month
-  filters still cover the last 6 months.
+- The app reads every stored transaction (Sync stores them back to January
+  2025). Transações lists all of them, with a month filter from the oldest
+  month to now; the insights and the Overview's charts use the months they
+  need (up to a year).
 - **Account and card names:** any account or card can be renamed on Contas
   (the pencil next to it). The name is shown everywhere in Trove and saved
   in the database (`accounts.nickname`), a column a sync never writes;
