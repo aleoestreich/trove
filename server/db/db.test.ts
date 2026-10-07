@@ -211,7 +211,7 @@ suite('database', () => {
     it('one function serves the three routes, by the rewritten view or the original path', async () => {
       await income()
       const call = (method: string, path: string, body?: unknown) =>
-        incomeRoutes(new Request(`https://trove.test${path}`, { method, body: body && JSON.stringify(body) }), config(), deps)
+        incomeRoutes(new Request(`https://trove.test${path}`, { method, body: body === undefined ? undefined : JSON.stringify(body) }), config(), deps)
       expect((await (await call('GET', '/api/income-average?view=card')).json()).average).toBe(1100_00)
       expect((await (await call('GET', '/api/overview/income-average')).json()).average).toBe(1100_00)
       expect((await (await call('GET', '/api/income-average?view=categories')).json()).uncategorized.average).toBe(100_00)
