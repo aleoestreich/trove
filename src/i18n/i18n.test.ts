@@ -28,7 +28,8 @@ describe('formatting (pt-BR)', () => {
   it('dates', () => {
     expect(formatMonth('2026-09')).toBe('Setembro de 2026')
     expect(formatDay('2026-09-12')).toBe('12 set.')
-    expect(formatDayHeading('2026-09-28')).toBe('segunda, 28 set.')
+    expect(formatDayHeading('2026-09-28')).toBe('segunda, 28 set. 2026')
+    expect(formatDayHeading('2025-03-05')).toBe('quarta, 5 mar. 2025')
     expect(formatShortDate('2026-10-08')).toBe('08/10')
     expect(formatMonthYear('2027-03')).toBe('03/2027')
   })

@@ -113,10 +113,10 @@ export function formatFullDate(iso: string): string {
   return fmt({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(parse(iso))
 }
 
-/** Day heading: "segunda, 28 set." */
+/** Day heading in transaction lists, with the year: "segunda, 28 set. 2026". */
 export function formatDayHeading(iso: string): string {
   const weekday = fmt({ weekday: 'long' }).format(parse(iso)).replace('-feira', '')
-  return `${weekday}, ${formatDay(iso)}`
+  return `${weekday}, ${formatDay(iso)} ${iso.slice(0, 4)}`
 }
 
 /** "outubro" */
