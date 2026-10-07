@@ -11,7 +11,7 @@ import { dbErrorCode, inTransaction } from './connection.js'
 import { readSnapshot } from './read.js'
 import { save, syncFrom, type Fetched } from './sync.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
-import { edits, incomeAverageRoute, incomeCategoriesRoute, saveIncomeFilterRoute, startSync, syncStatus } from './handlers.js'
+import { edits, incomeAverageRoute, incomeRoutes, incomeCategoriesRoute, saveIncomeFilterRoute, startSync, syncStatus } from './handlers.js'
 import { previewAverage } from '../../src/data/incomeAverage.js'
 import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 
@@ -206,6 +206,20 @@ suite('database', () => {
       expect(body).toMatchObject({ average: 1000_00, allAverage: 1100_00, filter: { label: 'Salário, Freelance', included: 2, total: 3 } })
       // Stored, and part of the app's data.
       expect((await readSnapshot(pool, ['item-1'], '2026-04-01'))!.incomeFilter).toEqual(chosen)
+    })
+
+    it('one function serves the three routes, by the rewritten view or the original path', async () => {
+      await income()
+      const call = (method: string, path: string, body?: unknown) =>
+        incomeRoutes(new Request(`https://trove.test${path}`, { method, body: body && JSON.stringify(body) }), config(), deps)
+      expect((await (await call('GET', '/api/income-average?view=card')).json()).average).toBe(1100_00)
+      expect((await (await call('GET', '/api/overview/income-average')).json()).average).toBe(1100_00)
+      expect((await (await call('GET', '/api/income-average?view=categories')).json()).uncategorized.average).toBe(100_00)
+      expect((await (await call('GET', '/api/overview/income-average/categories')).json()).uncategorized.average).toBe(100_00)
+      expect((await call('PUT', '/api/income-average?view=filter', { ...none, excludeUncategorized: true })).status).toBe(200)
+      expect((await call('PUT', '/api/settings/income-average-filter', none)).status).toBe(200)
+      expect((await call('PUT', '/api/overview/income-average', none)).status).toBe(405)
+      expect((await call('GET', '/api/settings/income-average-filter')).status).toBe(405)
     })
 
     it('refuses a filter with nothing selected', async () => {

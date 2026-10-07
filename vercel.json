@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/api/overview/income-average", "destination": "/api/income-average?view=card" },
+    { "source": "/api/overview/income-average/categories", "destination": "/api/income-average?view=categories" },
+    { "source": "/api/settings/income-average-filter", "destination": "/api/income-average?view=filter" }
+  ]
+}

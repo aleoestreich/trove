@@ -239,6 +239,10 @@ BRL (foreign income at the stored rate), over the last 6 complete months.
 | `GET /api/overview/income-average/categories` | Every income category, its subcategories and "Sem categoria", with the monthly average and the total per month (enough for the picker's live preview) |
 | `PUT /api/settings/income-average-filter` | Saves `{ excludedCategoryIds, excludedSubcategoryIds, excludeUncategorized }` and answers with the recalculated `GET /api/overview/income-average` body; `400` with `reason: nothing_selected` ("Selecione pelo menos uma categoria") or `not_income` |
 
+The three routes are one Vercel Function (`api/income-average.ts`); `vercel.json`
+rewrites the paths above to it, as the Hobby plan allows 12 functions per
+deployment.
+
 The app computes the same figures from the snapshot it already has (the
 filter comes with `GET /api/finance`), so the card and the preview need no
 extra request; saving goes through the `PUT`.

@@ -8,6 +8,7 @@
 //   POST /api/sync     { connectionIds? }: start a background sync (default: every connection)
 //        202 SyncJob (the running one if a sync is already in progress) · 403 not in PLUGGY_ITEM_IDS
 //   GET  /api/sync     the latest sync job, for progress: 200 { job: SyncJob | null }
+//   (The three income routes below are one function, api/income-average.ts, through vercel.json rewrites.)
 //   GET  /api/overview/income-average             the average income card under the saved filter
 //        200 { average, months, lowest, highest, currentMonth, allAverage, filter } (figures null before a complete month)
 //   GET  /api/overview/income-average/categories  every income category and subcategory, and
@@ -216,4 +217,19 @@ export async function saveIncomeFilterRoute(request: Request, config: DbConfig, 
     return failed(e)
   }
   return incomeAverageRoute(request, config, deps)
+}
+
+/**
+ * The three average income routes in one Vercel Function (the Hobby plan
+ * allows 12 per deployment, the login middleware included). vercel.json
+ * rewrites the public paths to /api/income-average?view=…; the original path
+ * is also recognised, whichever one the request carries.
+ */
+export function incomeRoutes(request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}): Promise<Response> {
+  const url = new URL(request.url)
+  const view = url.searchParams.get('view') ?? (url.pathname.endsWith('/categories') ? 'categories' : url.pathname.endsWith('/income-average-filter') ? 'filter' : null)
+  if (request.method === 'GET' && view === 'categories') return incomeCategoriesRoute(request, config, deps)
+  if (request.method === 'GET' && view !== 'filter') return incomeAverageRoute(request, config, deps)
+  if (request.method === 'PUT' && view === 'filter') return saveIncomeFilterRoute(request, config, deps)
+  return Promise.resolve(json(405, { error: 'method_not_allowed' }))
 }
