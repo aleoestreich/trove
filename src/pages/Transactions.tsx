@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
 import { MONTHS_OF_HISTORY } from '../data/seed'
@@ -13,6 +14,9 @@ import { Amount, Button, EmptyState, PageHeader } from '../components/ui'
 import { CategoryLine, TransactionRow, useAccountLabel } from '../components/TransactionRow'
 import { TransactionBadge, catVar } from '../components/CategoryBadge'
 import { TransactionPanel, TransactionSheet } from '../components/TransactionSheet'
+import { BulkPanel, BulkSheet, UndoToast, type Applied } from '../components/BulkCategorize'
+import { SelectBox } from '../components/SelectBox'
+import { groupState, rangeIds, selectable, selectAllIds, summarize, toggleGroup, type CheckState } from '../lib/selection'
 import { useI18n } from '../i18n/I18nProvider'
 import { accountLabel } from '../lib/accountLabel'
 import { useIsDesktop } from '../lib/useIsDesktop'
@@ -87,6 +91,54 @@ export function Transactions() {
   const { t, categoryName } = useI18n()
   const desktop = useIsDesktop()
 
+  // Bulk selection. Phones enter a selection mode ("Selecionar" or a long
+  // press); desktop has a checkbox column and is selecting whenever a row is checked.
+  const [selecting, setSelecting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [applied, setApplied] = useState<Applied | null>(null)
+  const [flash, setFlash] = useState<Set<string>>(() => new Set())
+  const categorizeButton = useRef<HTMLButtonElement>(null)
+  const exitSelection = useCallback(() => {
+    setSelecting(false)
+    setSelectedIds(new Set())
+    setBulkOpen(false)
+  }, [])
+  useBackToExit(selecting && !desktop, exitSelection)
+  const toggle = (id: string) =>
+    setSelectedIds((s) => {
+      const next = new Set(s)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const startSelecting = (tx?: Transaction) => {
+    setSelecting(true)
+    setSelectedIds(new Set(tx && selectable(tx) ? [tx.id] : []))
+  }
+  const onApplied = (a: Applied) => {
+    exitSelection()
+    setApplied(a)
+    setFlash(new Set(a.ids))
+  }
+  const dismissApplied = useCallback(() => setApplied(null), [])
+  // The updated rows' tint fades out (flash-accent, 1.5 s).
+  useEffect(() => {
+    if (flash.size === 0) return
+    const timer = setTimeout(() => setFlash(new Set()), 1600)
+    return () => clearTimeout(timer)
+  }, [flash])
+  // Desktop: Esc clears the selection.
+  useEffect(() => {
+    if (!desktop || selectedIds.size === 0) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setSelectedIds(new Set())
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [desktop, selectedIds.size])
+  // "Selecionar" goes in the app's mobile header.
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null)
+  useEffect(() => setHeaderSlot(document.getElementById('header-actions')), [])
+
   const latest = monthKey(toISO(new Date()))
   const filters: TransactionFilters = {
     month: params.get('m') === 'all' ? undefined : (params.get('m') ?? latest),
@@ -119,6 +171,19 @@ export function Transactions() {
     for (const tx of filtered) groups.set(tx.date, [...(groups.get(tx.date) ?? []), tx])
     return [...groups].map(([date, txs]) => ({ date, label: formatDayHeading(date), txs, net: totals(txs, categoriesById).net }))
   }, [filtered, categoriesById])
+
+  // The selection, among the rows shown (the search and filters apply).
+  const chosen = useMemo(() => filtered.filter((tx) => selectedIds.has(tx.id)), [filtered, selectedIds])
+  const summary = useMemo(() => summarize(chosen, categoriesById), [chosen, categoriesById])
+  const mixed = summary.count > 0 && !summary.kind
+  // The bulk panel takes the details panel's place.
+  useEffect(() => {
+    if (chosen.length >= 2) setSelected(null)
+  }, [chosen.length])
+  const closeSheet = useCallback(() => {
+    setBulkOpen(false)
+    requestAnimationFrame(() => categorizeButton.current?.focus())
+  }, [])
 
   const hasFilters = params.has('a') || params.has('c') || params.has('type') || params.has('q')
   // Clearing keeps the month, and the bill when one is open.
@@ -255,39 +320,192 @@ export function Transactions() {
         {desktop ? (
           <div className="flex items-start gap-5">
             <div className="min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-surface">
-              {byDate.length === 0 ? empty : <TransactionTable days={byDate} selectedId={selected?.id} onSelect={setSelected} narrow={!!selected} />}
+              {byDate.length === 0 ? (
+                empty
+              ) : (
+                <TransactionTable
+                  days={byDate}
+                  shown={filtered}
+                  selectedId={selected?.id}
+                  onSelect={setSelected}
+                  narrow={chosen.length >= 2 ? 'bulk' : selected ? 'details' : 'none'}
+                  selectedIds={selectedIds}
+                  setSelectedIds={setSelectedIds}
+                  chosenCount={chosen.length}
+                  total={summary.total}
+                  flash={flash}
+                />
+              )}
             </div>
-            {selected && <TransactionPanel tx={selected} onClose={() => setSelected(null)} />}
+            {chosen.length >= 2 ? (
+              <BulkPanel txs={chosen} onClear={() => setSelectedIds(new Set())} onApplied={onApplied} />
+            ) : (
+              selected && <TransactionPanel tx={selected} onClose={() => setSelected(null)} />
+            )}
           </div>
         ) : byDate.length === 0 ? (
           empty
         ) : (
           <>
-            <div className="flex min-h-12 items-center justify-between gap-3 pr-1 pl-4">
-              <p className="text-[13px] leading-[18px] text-muted">{countText}</p>
-              {hiddenCount > 0 && <HiddenLink count={hiddenCount} />}
-            </div>
+            {selecting ? (
+              <div className="flex min-h-11 items-center justify-between gap-2 px-5 pb-1">
+                <span className="text-[13px] leading-[18px] text-muted">{t.bulk.totalSelected}</span>
+                <span className="tabular text-sm leading-5 font-medium text-ink">{formatMoney(summary.total, 'BRL', { signed: true })}</span>
+              </div>
+            ) : (
+              <div className="flex min-h-12 items-center justify-between gap-3 pr-1 pl-4">
+                <p className="text-[13px] leading-[18px] text-muted">{countText}</p>
+                {hiddenCount > 0 && <HiddenLink count={hiddenCount} />}
+              </div>
+            )}
             <div className="flex flex-col gap-4 px-4">
               {byDate.map((day) => (
                 <section key={day.date} className="flex flex-col gap-2">
-                  <div className="flex items-baseline justify-between px-1">
-                    <h2 className="text-[13px] leading-[18px] font-medium text-ink-2">{day.label}</h2>
+                  <div className="flex min-h-[18px] items-center justify-between px-1">
+                    <span className="flex min-w-0 items-center gap-0.5">
+                      {selecting && (
+                        <GroupCheckbox
+                          state={groupState(day.txs, selectedIds)}
+                          label={t.bulk.selectDay(day.label)}
+                          onToggle={() => setSelectedIds((s) => toggleGroup(day.txs, s))}
+                          className="-my-[13px] -ml-[11px] size-11"
+                        />
+                      )}
+                      <h2 className="text-[13px] leading-[18px] font-medium text-ink-2">{day.label}</h2>
+                    </span>
                     <DayTotal net={day.net} />
                   </div>
                   <div className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
                     {day.txs.map((tx) => (
-                      <TransactionRow key={tx.id} tx={tx} onSelect={setSelected} className="px-4" />
+                      <TransactionRow
+                        key={tx.id}
+                        tx={tx}
+                        onSelect={selecting ? () => toggle(tx.id) : setSelected}
+                        onLongPress={selecting ? undefined : startSelecting}
+                        select={selecting ? { checked: selectedIds.has(tx.id), disabled: !selectable(tx) } : undefined}
+                        className={`px-4 ${flash.has(tx.id) ? 'flash-accent' : ''}`}
+                      />
                     ))}
                   </div>
                 </section>
               ))}
             </div>
+            {/* Room for the action bar, which is taller than the tab bar. */}
+            {selecting && <div aria-hidden className="h-10" />}
           </>
         )}
 
         {!desktop && selected && <TransactionSheet tx={selected} onClose={() => setSelected(null)} />}
       </div>
+
+      {!desktop && !selecting && headerSlot && filtered.some(selectable) &&
+        createPortal(
+          <button
+            type="button"
+            onClick={() => startSelecting()}
+            className="inline-flex h-11 items-center gap-1.5 rounded-sm px-3 text-sm font-medium whitespace-nowrap text-accent hover:bg-accent-faint active:bg-track"
+          >
+            <Icon name="listCheck" className="size-[18px]" />
+            {t.bulk.select}
+          </button>,
+          headerSlot,
+        )}
+
+      {!desktop && selecting && (
+        <>
+          {/* Selection header, over the app's header. */}
+          <div
+            className="fixed inset-x-0 top-0 z-30 mx-auto max-w-[480px] pt-[env(safe-area-inset-top)]"
+            style={{ background: 'color-mix(in srgb, var(--accent) 10%, var(--page))' }}
+          >
+            <div className="flex h-14 items-center gap-1 px-1">
+              <button
+                type="button"
+                onClick={exitSelection}
+                aria-label={t.bulk.exitSelect}
+                className="flex size-12 shrink-0 items-center justify-center rounded-full text-ink active:bg-track"
+              >
+                <Icon name="close" className="size-[22px]" strokeWidth={2} />
+              </button>
+              <h1 aria-live="polite" className="min-w-0 flex-1 truncate text-xl leading-[26px] font-medium text-ink">
+                {t.bulk.selected(summary.count)}
+              </h1>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set(selectAllIds(filtered)))}
+                className="h-11 shrink-0 rounded-sm px-3 text-sm font-medium whitespace-nowrap text-accent active:bg-track"
+              >
+                {t.bulk.selectAll}
+              </button>
+            </div>
+          </div>
+          {/* Action bar, over the tab bar. */}
+          <div className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-[480px] flex-col gap-2 border-t border-line bg-surface px-4 pt-3 pb-[calc(20px+env(safe-area-inset-bottom))]">
+            <p className="text-center text-xs leading-4 text-muted">{mixed ? t.bulk.mixedNote : t.bulk.transfersNote}</p>
+            <button
+              ref={categorizeButton}
+              type="button"
+              disabled={summary.count === 0 || mixed}
+              onClick={() => setBulkOpen(true)}
+              className="flex h-12 items-center justify-center gap-2 rounded-md bg-accent text-[15px] font-medium text-surface disabled:opacity-40"
+            >
+              <Icon name="tag" className="size-5" />
+              {t.bulk.categorizeN(summary.count)}
+            </button>
+          </div>
+          {bulkOpen && <BulkSheet txs={chosen} onClose={closeSheet} onApplied={onApplied} />}
+        </>
+      )}
+
+      {applied && <UndoToast key={applied.ids.join()} applied={applied} onDone={dismissApplied} />}
     </>
+  )
+}
+
+/**
+ * While selecting on a phone, the Android back button leaves selection mode:
+ * an extra history entry is pushed on entry and taken back on exit.
+ */
+function useBackToExit(active: boolean, exit: () => void) {
+  useEffect(() => {
+    if (!active) return
+    window.history.pushState({ troveSelecting: true }, '')
+    let popped = false
+    const onPop = () => {
+      popped = true
+      exit()
+    }
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      // Our entry is still current (a filter change replaces it): take it back.
+      if (!popped && (window.history.state as { troveSelecting?: boolean } | null)?.troveSelecting) window.history.back()
+    }
+  }, [active, exit])
+}
+
+/** A day's (or the table's) three-state checkbox; a dashed, disabled box when nothing in it can be selected. */
+function GroupCheckbox({ state, label, onToggle, className, small = false }: { state: CheckState; label: string; onToggle(): void; className: string; small?: boolean }) {
+  if (state === 'disabled')
+    return (
+      <span aria-hidden className={`flex shrink-0 items-center justify-center opacity-45 ${className}`}>
+        <SelectBox state="disabled" small={small} />
+      </span>
+    )
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={state === 'on' ? true : state === 'mixed' ? 'mixed' : false}
+      aria-label={label}
+      onClick={(e) => {
+        e.stopPropagation()
+        onToggle()
+      }}
+      className={`flex shrink-0 items-center justify-center ${className}`}
+    >
+      <SelectBox state={state} small={small} />
+    </button>
   )
 }
 
@@ -373,66 +591,184 @@ function DayTotal({ net }: { net: number }) {
 }
 
 /**
- * With the details panel open, screens under 1280px drop the Account and
- * Category columns (the panel shows both) so descriptions keep their room.
+ * Columns: checkbox (20px), description, account (130px), category (184px),
+ * amount (120px). Next to the details panel, screens under 1536px drop the
+ * Account and Category columns (the panel shows both) so descriptions keep
+ * their room; next to the bulk panel, screens under 1280px.
  */
-const columnsFor = (narrow: boolean) =>
-  `grid gap-4 px-5 ${narrow ? 'grid-cols-[minmax(0,1fr)_130px] 2xl:grid-cols-[minmax(0,1fr)_150px_170px_130px]' : 'grid-cols-[minmax(0,1fr)_150px_170px_130px]'}`
+type Narrow = 'none' | 'details' | 'bulk'
+// Written out in full so Tailwind finds every class.
+const COLUMNS: Record<Narrow, string> = {
+  none: 'grid-cols-[20px_minmax(0,1fr)_130px_184px_120px]',
+  details: 'grid-cols-[20px_minmax(0,1fr)_120px] 2xl:grid-cols-[20px_minmax(0,1fr)_130px_184px_120px]',
+  bulk: 'grid-cols-[20px_minmax(0,1fr)_120px] xl:grid-cols-[20px_minmax(0,1fr)_130px_184px_120px]',
+}
+const columnsFor = (narrow: Narrow) => `grid gap-4 px-5 ${COLUMNS[narrow]}`
+const optionalFor = (narrow: Narrow) => (narrow === 'details' ? 'hidden 2xl:flex' : narrow === 'bulk' ? 'hidden xl:flex' : 'flex')
 
-/** Desktop: one table, day bands between the rows. The selected row is highlighted. */
+/**
+ * Desktop: one table, day bands between the rows, a checkbox column. While
+ * rows are checked, a selection bar replaces the column header; clicking a
+ * row then toggles it (shift + click: a range), otherwise it opens the details.
+ */
 function TransactionTable({
   days,
+  shown,
   selectedId,
   onSelect,
   narrow,
+  selectedIds,
+  setSelectedIds,
+  chosenCount,
+  total,
+  flash,
 }: {
   days: { date: string; label: string; txs: Transaction[]; net: number }[]
+  shown: Transaction[]
   selectedId?: string
   onSelect(tx: Transaction): void
-  narrow: boolean
+  narrow: Narrow
+  selectedIds: Set<string>
+  setSelectedIds(update: (s: Set<string>) => Set<string>): void
+  chosenCount: number
+  total: number
+  flash: Set<string>
 }) {
   const columns = columnsFor(narrow)
-  const optional = narrow ? 'hidden 2xl:flex' : 'flex'
+  const optional = optionalFor(narrow)
   const { categoriesById } = useData()
   const { t } = useI18n()
   const accountLabel = useAccountLabel()
+  const anchor = useRef<string | null>(null)
+  const selecting = chosenCount > 0
+  const allState = groupState(shown, selectedIds)
+  const all = selectAllIds(shown)
+
+  const pick = (tx: Transaction, shift: boolean) => {
+    // Read the anchor now: the updater runs later, after it moves to this row.
+    const from = anchor.current
+    setSelectedIds((s) => {
+      const next = new Set(s)
+      if (shift && from) for (const id of rangeIds(shown, from, tx.id)) next.add(id)
+      else if (next.has(tx.id)) next.delete(tx.id)
+      else next.add(tx.id)
+      return next
+    })
+    anchor.current = tx.id
+  }
+  const selectAllBox = (
+    <GroupCheckbox
+      state={allState}
+      small
+      label={t.bulk.selectAllAria}
+      onToggle={() => setSelectedIds((s) => toggleGroup(shown, s))}
+      className="relative h-6 w-5 before:absolute before:-inset-2.5"
+    />
+  )
+
   return (
     <div role="table" aria-label={t.nav.transactions}>
-      <div role="row" className={`${columns} label-caps border-b border-line py-3`}>
-        <span role="columnheader">{t.transactions.colDescription}</span>
-        <span role="columnheader" className={optional}>
-          {t.transactions.account}
-        </span>
-        <span role="columnheader" className={optional}>
-          {t.category}
-        </span>
-        <span role="columnheader" className="text-right">
-          {t.transactions.colAmount}
-        </span>
-      </div>
+      {selecting ? (
+        <div
+          role="row"
+          className="flex min-h-[52px] items-center gap-4 border-b border-line py-1 pr-3 pl-5"
+          style={{ background: 'color-mix(in srgb, var(--accent) 10%, var(--surface))' }}
+        >
+          {selectAllBox}
+          <span className="flex min-w-0 items-baseline gap-1.5">
+            <span aria-live="polite" className="text-sm font-medium whitespace-nowrap text-ink">
+              {t.bulk.selected(chosenCount)}
+            </span>
+            <span className="tabular text-sm whitespace-nowrap text-muted">· {formatMoney(total, 'BRL', { signed: true })}</span>
+          </span>
+          <span className="ml-auto flex items-center">
+            {allState !== 'on' && (
+              <button type="button" onClick={() => setSelectedIds(() => new Set(all))} className="h-10 rounded-sm px-3 text-sm font-medium whitespace-nowrap text-accent hover:bg-accent-faint">
+                {t.bulk.selectAllN(all.length)}
+              </button>
+            )}
+            <button type="button" onClick={() => setSelectedIds(() => new Set())} className="h-10 rounded-sm px-3 text-sm font-medium whitespace-nowrap text-ink-2 hover:bg-track">
+              {t.bulk.clearSelection}
+            </button>
+          </span>
+        </div>
+      ) : (
+        <div role="row" className={`${columns} label-caps items-center border-b border-line py-3`}>
+          <span role="columnheader" className="flex items-center justify-center">
+            {selectAllBox}
+          </span>
+          <span role="columnheader">{t.transactions.colDescription}</span>
+          <span role="columnheader" className={optional}>
+            {t.transactions.account}
+          </span>
+          <span role="columnheader" className={optional}>
+            {t.category}
+          </span>
+          <span role="columnheader" className="text-right">
+            {t.transactions.colAmount}
+          </span>
+        </div>
+      )}
       {days.map((day) => (
         <div key={day.date} role="rowgroup">
-          <div role="row" className="flex justify-between border-b border-line bg-page px-5 py-2.5">
-            <span role="rowheader" className="text-[13px] font-medium text-ink-2">
-              {day.label}
+          <div role="row" className="flex items-center justify-between border-b border-line bg-page px-5 py-2.5">
+            <span className="flex items-center gap-4">
+              <GroupCheckbox
+                state={groupState(day.txs, selectedIds)}
+                small
+                label={t.bulk.selectDay(day.label)}
+                onToggle={() => setSelectedIds((s) => toggleGroup(day.txs, s))}
+                className="relative h-6 w-5 before:absolute before:-inset-2.5"
+              />
+              <span role="rowheader" className="text-[13px] font-medium text-ink-2">
+                {day.label}
+              </span>
             </span>
             <DayTotal net={day.net} />
           </div>
           {day.txs.map((tx) => {
             const category = tx.categoryId ? categoriesById.get(tx.categoryId) : undefined
-            const on = tx.id === selectedId
+            const can = selectable(tx)
+            const checked = selectedIds.has(tx.id)
+            const on = checked || tx.id === selectedId
             return (
-              <button
+              <div
                 key={tx.id}
-                type="button"
                 role="row"
                 aria-selected={on}
-                onClick={() => onSelect(tx)}
-                className={`${columns} min-h-14 w-full items-center border-b border-line py-2 text-left ${on ? 'bg-accent-faint' : 'hover:bg-page'}`}
+                onClick={(e) => {
+                  if (!selecting) onSelect(tx)
+                  else if (can) pick(tx, e.shiftKey)
+                }}
+                className={`${columns} min-h-14 cursor-pointer items-center border-b border-line py-2 ${on ? 'bg-accent-faint' : 'hover:bg-page'} ${flash.has(tx.id) ? 'flash-accent' : ''}`}
               >
+                <span role="cell" className="flex items-center justify-center">
+                  {can ? (
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={checked}
+                      aria-label={tx.description}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        pick(tx, e.shiftKey)
+                      }}
+                      className="relative flex h-6 w-5 items-center justify-center before:absolute before:-inset-2.5"
+                    >
+                      <SelectBox state={checked ? 'on' : 'off'} small />
+                    </button>
+                  ) : (
+                    <span aria-hidden className="opacity-45">
+                      <SelectBox state="disabled" small />
+                    </span>
+                  )}
+                </span>
                 <span role="cell" className="flex min-w-0 items-center gap-3">
                   <TransactionBadge tx={tx} categoriesById={categoriesById} size={34} />
-                  <span className="min-w-0 truncate text-sm font-medium text-ink">{tx.description}</span>
+                  {/* The focusable part of the row: Enter opens the details (or toggles it while selecting). */}
+                  <button type="button" className="min-w-0 truncate text-left text-sm font-medium text-ink">
+                    {tx.description}
+                  </button>
                   {tx.installment && (
                     <span className="tabular inline-flex h-[22px] shrink-0 items-center rounded-full bg-track px-[7px] text-xs font-medium text-ink-2">
                       {tx.installment.number}/{tx.installment.total}
@@ -456,7 +792,7 @@ function TransactionTable({
                 <span role="cell">
                   <Amount cents={tx.amount} foreign={tx.foreign} transfer={!!tx.transfer} className="[&>span:first-child]:text-sm" />
                 </span>
-              </button>
+              </div>
             )
           })}
         </div>

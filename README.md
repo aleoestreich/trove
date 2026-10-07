@@ -106,6 +106,10 @@ between accounts, and card bill payments.
   once, when it happens, not again when the bill is paid.
 - A transaction counts as income or an expense by its category's type;
   uncategorized ones count by sign.
+- **Bulk categorization:** many transactions can get one category and
+  subcategory at once (Transações → Selecionar, or the checkbox column on
+  desktop), all or nothing, with Undo. Transfers can't be selected, and a
+  selection must be all expenses or all income.
 - **Hidden transactions** are left out of every total, chart, average,
   category breakdown and installments total. Balances, net worth and card
   bills still include them, as they are the bank's figures.

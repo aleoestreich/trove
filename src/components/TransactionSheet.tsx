@@ -114,26 +114,9 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
               aria-labelledby={`${variant}-category`}
               className={`-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:-mx-5 lg:px-5 ${panel ? 'lg:flex-wrap lg:overflow-visible' : ''}`}
             >
-              {options.map((c) => {
-                const on = c.id === category?.id
-                const style: CSSProperties = on ? { borderColor: catVar(c.color), background: `color-mix(in srgb, ${catVar(c.color)} 10%, var(--surface))` } : {}
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    onClick={() => setCategory(c)}
-                    style={style}
-                    className={`inline-flex h-12 shrink-0 items-center gap-2 rounded-full pr-3.5 pl-2 text-sm font-medium whitespace-nowrap ${
-                      on ? 'border-[1.5px] text-ink' : 'border border-line bg-surface text-ink-2 hover:bg-track'
-                    }`}
-                  >
-                    <CategoryBadge category={c} size={28} />
-                    {categoryName(c)}
-                  </button>
-                )
-              })}
+              {options.map((c) => (
+                <CategoryChip key={c.id} category={c} name={categoryName(c)} on={c.id === category?.id} onClick={() => setCategory(c)} />
+              ))}
             </div>
           )}
 
@@ -159,28 +142,70 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
   )
 }
 
-/** The chosen category's subcategories (tap the selected one again to clear it), and "+ New" to add one inline. */
-function SubcategoryPicker({
+/**
+ * A category chip with its badge (radio). Selected: a 1.5px border in the
+ * category's colour over a 10% tint. Sizes: 48px (details sheet), 40px (bulk
+ * sheet) and 36px (desktop bulk panel), each with at least a 44px touch area.
+ */
+export function CategoryChip({
+  category,
+  name,
+  on,
+  onClick,
+  size = 48,
+}: {
+  category: Category
+  name: string
+  on: boolean
+  onClick(): void
+  size?: 48 | 40 | 36
+}) {
+  const style: CSSProperties = on ? { borderColor: catVar(category.color), background: `color-mix(in srgb, ${catVar(category.color)} 10%, var(--surface))` } : {}
+  const height = size === 48 ? 'h-12 gap-2 pl-2' : size === 40 ? 'h-10 gap-[7px] pl-[7px] before:-inset-y-1' : 'h-9 gap-1.5 pl-1.5 before:-inset-y-1'
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={on}
+      onClick={onClick}
+      style={style}
+      className={`relative inline-flex shrink-0 items-center rounded-full pr-3.5 text-sm font-medium whitespace-nowrap before:absolute before:inset-x-0 ${height} ${
+        on ? 'border-[1.5px] text-ink' : 'border border-line bg-surface text-ink-2 hover:bg-track'
+      }`}
+    >
+      <CategoryBadge category={category} size={size === 48 ? 28 : size === 40 ? 26 : 24} />
+      {name}
+    </button>
+  )
+}
+
+/**
+ * The chosen category's subcategories and "+ New" to add one inline. In the
+ * details, tapping the selected one again clears it (the caller decides).
+ * Chips are 40px (34px on the desktop bulk panel) with a 44px+ touch area.
+ */
+export function SubcategoryPicker({
   variant,
   category,
   current,
   options,
   onPick,
   onAdd,
+  small = false,
 }: {
-  variant: 'sheet' | 'panel'
+  variant: string
   category: Category
   current: string | null
   options: { id: string; name: string }[]
   onPick(id: string): void
   onAdd(name: string): void
+  small?: boolean
 }) {
   const { t } = useI18n()
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
-  // 40px chips with a 48px touch area.
-  const chip = 'relative inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium before:absolute before:inset-x-0 before:-inset-y-1'
+  const chip = `relative inline-flex ${small ? 'h-[34px]' : 'h-10'} items-center gap-1.5 rounded-full px-3.5 text-sm font-medium before:absolute before:inset-x-0 before:-inset-y-1`
 
   const submit = () => {
     const n = name.trim().replace(/\s+/g, ' ')

@@ -3,7 +3,7 @@ import type { Repository } from './data/repository'
 import { errorMessage, SyncStartError } from './data/apiRepository'
 import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/syncProblems'
 import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
-import { applyEdit, EditError, type Edit } from './data/edits'
+import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
 import type { Account, Category, Institution, Snapshot, Subcategory, SyncInfo, SyncJob } from './data/types'
 import { useI18n } from './i18n/I18nProvider'
 import { messages } from './i18n/messages'
@@ -16,6 +16,13 @@ interface AppData extends Snapshot {
   institutionsById: Map<string, Institution>
   /** Applies a change at once and saves it (see src/data/edits.ts). */
   edit(edit: Edit): void
+  /**
+   * Bulk change: saved first (all or nothing), then shown. Rejects with a
+   * message for the UI; resolves with what it replaced, for undo.
+   */
+  categorizeMany(transactionIds: string[], categoryId: string, subcategoryId: string): Promise<BulkResult>
+  /** Undo of categorizeMany. */
+  restoreCategories(previous: PreviousCategory[]): Promise<void>
   /** Set (or clear, with null) a card's closing and due days; saved on this device. */
   setCardDays(accountId: string, days: CardDays | null): void
 }
@@ -99,13 +106,57 @@ export function DataProvider({ repository, children }: { repository: Repository;
         return
       }
       queue.current = queue.current
-        .then(() => repository.edit(e))
+        .then(() => repository.edit(e).then(() => {}))
         .catch((err) => {
           setEditError(err instanceof EditError ? errorMessage(err.code) : err instanceof Error ? err.message : String(err))
           return load().catch(() => {})
         })
     },
     [repository, load],
+  )
+
+  const snapshotRef = useRef(snapshot)
+  useEffect(() => {
+    snapshotRef.current = snapshot
+  }, [snapshot])
+  // Bulk edits wait for the server (the sheet shows saving and errors), in
+  // order with other edits, then update what's shown.
+  const save = useCallback(
+    async (e: Edit) => {
+      const saving = queue.current.then(() => repository.edit(e))
+      queue.current = saving.then(
+        () => {},
+        () => {},
+      )
+      let result
+      try {
+        result = await saving
+      } catch (err) {
+        throw new Error(err instanceof EditError ? errorMessage(err.code, undefined, err.reason) : err instanceof Error ? err.message : String(err))
+      }
+      // The saved change, shown; if it no longer applies here, reload what's stored.
+      try {
+        const current = snapshotRef.current
+        if (current) setSnapshot(applyEdit(current, e))
+      } catch {
+        void load().catch(() => {})
+      }
+      return result
+    },
+    [repository, load],
+  )
+  const categorizeMany = useCallback(
+    async (transactionIds: string[], categoryId: string, subcategoryId: string) => {
+      const result = await save({ op: 'categorizeMany', transactionIds, categoryId, subcategoryId })
+      return result ?? { updated: transactionIds.length, previous: [] }
+    },
+    [save],
+  )
+  const restoreCategories = useCallback(
+    async (items: PreviousCategory[]) => {
+      if (items.length) await save({ op: 'restoreCategories', items })
+    },
+    [save],
   )
 
   const [cardDays, setCardDaysState] = useState(readCardDays)
@@ -229,9 +280,11 @@ export function DataProvider({ repository, children }: { repository: Repository;
       subcategoriesById: new Map(subcategories.map((s) => [s.id, s])),
       institutionsById: new Map(snapshot.institutions.map((i) => [i.id, i])),
       edit,
+      categorizeMany,
+      restoreCategories,
       setCardDays,
     }
-  }, [snapshot, edit, cardDays, setCardDays])
+  }, [snapshot, edit, categorizeMany, restoreCategories, cardDays, setCardDays])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

@@ -2,9 +2,10 @@
 // and applying edits with the same rules as src/data/edits.ts.
 
 import type pg from 'pg'
-import { EditError, defaultCategories, type Edit } from '../../src/data/edits.js'
+import { EditError, checkBulk, defaultCategories, type BulkResult, type Edit } from '../../src/data/edits.js'
 import type { Category, Subcategory } from '../../src/data/types.js'
 import { inTransaction, type Db } from './connection.js'
+import { readSnapshot } from './read.js'
 
 /**
  * Seeds the default categories and subcategories (pt-BR names),
@@ -62,16 +63,23 @@ function asEditError(e: unknown): unknown {
   return e
 }
 
-/** Applies one (validated) edit in a database transaction. */
-export async function applyEditSql(pool: pg.Pool, e: Edit): Promise<void> {
+/** What a bulk edit returns: categorizeMany's changes (for undo), or restoreCategories' count. */
+export type EditOutcome = BulkResult | { updated: number } | null
+
+/**
+ * Applies one (validated) edit in a database transaction: all of it or none.
+ * `itemIds`: the configured connections; bulk edits only touch their
+ * transactions (required for those).
+ */
+export async function applyEditSql(pool: pg.Pool, e: Edit, ctx: { itemIds?: string[] } = {}): Promise<EditOutcome> {
   try {
-    await inTransaction(pool, (db) => run(db, e))
+    return await inTransaction(pool, (db) => run(db, e, ctx.itemIds))
   } catch (err) {
     throw asEditError(err)
   }
 }
 
-async function run(db: Db, e: Edit): Promise<void> {
+async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<EditOutcome> {
   const one = async (sql: string, params: unknown[], what: string) => {
     const r = await db.query(sql, params)
     if (!r.rowCount) throw notFound(what)
@@ -81,11 +89,11 @@ async function run(db: Db, e: Edit): Promise<void> {
       if (e.categoryId) await one(`SELECT 1 FROM categories WHERE id = $1`, [e.categoryId], 'category')
       if (e.subcategoryId) await one(`SELECT 1 FROM subcategories WHERE id = $1 AND category_id = $2`, [e.subcategoryId, e.categoryId], 'subcategory in that category')
       await one(`UPDATE transactions SET category_id = $2, subcategory_id = $3, category_edited_at = now() WHERE id = $1`, [e.transactionId, e.categoryId, e.subcategoryId], 'transaction')
-      return
+      return null
     }
     case 'hide':
       await one(`UPDATE transactions SET is_hidden = $2 WHERE id = $1`, [e.transactionId, e.hidden], 'transaction')
-      return
+      return null
     case 'createCategory': {
       const c = e.category
       await db.query(
@@ -93,7 +101,7 @@ async function run(db: Db, e: Edit): Promise<void> {
          VALUES ($1, $2, $3, $4, $5, (SELECT coalesce(max(sort_order) + 1, 0) FROM categories))`,
         [c.id, c.name, c.type, c.color, c.icon],
       )
-      return
+      return null
     }
     case 'updateCategory': {
       const c = e.changes
@@ -102,12 +110,12 @@ async function run(db: Db, e: Edit): Promise<void> {
         [e.id, c.name ?? null, c.type ?? null, c.color ?? null, c.icon ?? null],
         'category',
       )
-      return
+      return null
     }
     case 'deleteCategory':
       // Its subcategories go with it (CASCADE); its transactions become uncategorized (SET NULL).
       await one(`DELETE FROM categories WHERE id = $1`, [e.id], 'category')
-      return
+      return null
     case 'createSubcategory': {
       const s = e.subcategory
       await db.query(
@@ -115,15 +123,15 @@ async function run(db: Db, e: Edit): Promise<void> {
          VALUES ($1, $2, $3, (SELECT coalesce(max(sort_order) + 1, 0) FROM subcategories WHERE category_id = $2))`,
         [s.id, s.categoryId, s.name],
       )
-      return
+      return null
     }
     case 'renameSubcategory':
       await one(`UPDATE subcategories SET name = $2 WHERE id = $1`, [e.id, e.name], 'subcategory')
-      return
+      return null
     case 'deleteSubcategory':
       // Its transactions keep their category (subcategory_id SET NULL).
       await one(`DELETE FROM subcategories WHERE id = $1`, [e.id], 'subcategory')
-      return
+      return null
     case 'linkSubcategory': {
       await one(`SELECT 1 FROM categories WHERE id = $1`, [e.categoryId], 'category')
       const moved = await db.query(
@@ -134,11 +142,75 @@ async function run(db: Db, e: Edit): Promise<void> {
       )
       if (!moved.rowCount) {
         await one(`SELECT 1 FROM subcategories WHERE id = $1`, [e.id], 'subcategory')
-        return // already there
+        return null // already there
       }
       // Its transactions move with it.
       await db.query(`UPDATE transactions SET category_id = $2 WHERE subcategory_id = $1`, [e.id, e.categoryId])
-      return
+      return null
     }
+    case 'categorizeMany':
+      return categorizeMany(db, e, connections(itemIds))
+    case 'restoreCategories':
+      return restoreCategories(db, e, connections(itemIds))
   }
+}
+
+const connections = (itemIds: string[] | undefined) => itemIds ?? fail('Bulk edits need the configured connections.')
+const fail = (message: string): never => {
+  throw new Error(message)
+}
+
+/**
+ * The same category on many transactions. Locks them, checks the rules
+ * (checkBulk) on the transactions as the app shows them (transfers are
+ * detected on read), then updates them all and marks them edited, so a sync
+ * never changes them. Returns the previous values for undo.
+ */
+async function categorizeMany(db: Db, e: Extract<Edit, { op: 'categorizeMany' }>, itemIds: string[]): Promise<BulkResult> {
+  const rows = await db.query<{ id: string; category_id: string | null; subcategory_id: string | null; category_edited_at: Date | null; day: string }>(
+    `SELECT t.id, t.category_id, t.subcategory_id, t.category_edited_at, t.booked_on::text AS day
+     FROM transactions t JOIN accounts a ON a.id = t.account_id
+     WHERE t.id = ANY($1::text[]) AND t.removed_at IS NULL AND a.connection_id = ANY($2::text[])
+     FOR UPDATE OF t`,
+    [e.transactionIds, itemIds],
+  )
+  // Every ID must be a live transaction of a configured connection.
+  if (rows.rowCount !== e.transactionIds.length) throw new EditError('not_found', 'No such transaction.')
+  // Transfer pairs are matched within a day, so reading from the earliest day is enough.
+  const from = rows.rows.reduce((min, r) => (r.day < min ? r.day : min), rows.rows[0].day)
+  const snapshot = await readSnapshot(db, itemIds, from)
+  if (!snapshot) throw new EditError('not_found', 'No such transaction.')
+  checkBulk(snapshot, e)
+  await db.query(
+    `UPDATE transactions SET category_id = $2, subcategory_id = $3, category_edited_at = now() WHERE id = ANY($1::text[])`,
+    [e.transactionIds, e.categoryId, e.subcategoryId],
+  )
+  const byId = new Map(rows.rows.map((r) => [r.id, r]))
+  return {
+    updated: rows.rowCount,
+    previous: e.transactionIds.map((id) => {
+      const r = byId.get(id)!
+      return { id, categoryId: r.category_id, subcategoryId: r.subcategory_id, editedAt: r.category_edited_at?.toISOString() ?? null }
+    }),
+  }
+}
+
+/** Undo of categorizeMany: puts each transaction's previous values back, all or none. */
+async function restoreCategories(db: Db, e: Extract<Edit, { op: 'restoreCategories' }>, itemIds: string[]): Promise<{ updated: number }> {
+  const items = JSON.stringify(e.items.map((i) => ({ id: i.id, category_id: i.categoryId, subcategory_id: i.subcategoryId, edited_at: i.editedAt ?? null })))
+  // A subcategory must still belong to its category (a missing one fails on the foreign key).
+  const wrong = await db.query(
+    `SELECT 1 FROM jsonb_to_recordset($1::jsonb) AS r(id text, category_id text, subcategory_id text)
+     JOIN subcategories s ON s.id = r.subcategory_id WHERE s.category_id IS DISTINCT FROM r.category_id`,
+    [items],
+  )
+  if (wrong.rowCount) throw new EditError('invalid', 'The subcategory belongs to another category.', 'subcategory_category')
+  const updated = await db.query(
+    `UPDATE transactions t SET category_id = r.category_id, subcategory_id = r.subcategory_id, category_edited_at = r.edited_at
+     FROM jsonb_to_recordset($1::jsonb) AS r(id text, category_id text, subcategory_id text, edited_at timestamptz), accounts a
+     WHERE t.id = r.id AND a.id = t.account_id AND a.connection_id = ANY($2::text[])`,
+    [items, itemIds],
+  )
+  if (updated.rowCount !== e.items.length) throw new EditError('not_found', 'No such transaction.')
+  return { updated: updated.rowCount }
 }

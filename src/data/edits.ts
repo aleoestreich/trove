@@ -3,6 +3,7 @@
 // stores them) and the server, which applies the same rules in SQL
 // (server/db/edits.ts). Imports only types and data, so the server can use it.
 
+import { kindOf } from './categories.js'
 import { CATEGORY_COLORS, CATEGORY_ICONS, DEFAULT_CATEGORIES } from './categoryCatalog.js'
 import type { Category, CategoryType, Snapshot, Subcategory } from './types.js'
 
@@ -20,11 +21,39 @@ export type Edit =
   | { op: 'deleteSubcategory'; id: string }
   /** Moves a subcategory to another category, with every transaction that uses it. */
   | { op: 'linkSubcategory'; id: string; categoryId: string }
+  /**
+   * Sets the same category and subcategory on many transactions, all or none
+   * (see checkBulk). The server answers with a BulkResult, for undo.
+   */
+  | { op: 'categorizeMany'; transactionIds: string[]; categoryId: string; subcategoryId: string }
+  /** Puts back what categorizeMany replaced (its BulkResult's `previous`). */
+  | { op: 'restoreCategories'; items: PreviousCategory[] }
+
+/** A transaction's category before a bulk change. `editedAt`: when it was last set by hand (server only). */
+export interface PreviousCategory {
+  id: string
+  categoryId: string | null
+  subcategoryId: string | null
+  editedAt?: string | null
+}
+
+/** What categorizeMany changed: the count, and the values it replaced. */
+export interface BulkResult {
+  updated: number
+  previous: PreviousCategory[]
+}
+
+/** Why a bulk change is refused (EditError.reason), for the app to explain. */
+export type BulkReason = 'transfer' | 'mixed_types' | 'category_type' | 'subcategory_category'
+
+/** The most transactions one bulk change may touch. */
+export const BULK_MAX = 2000
 
 export class EditError extends Error {
   constructor(
     readonly code: 'not_found' | 'invalid' | 'name_taken',
     message: string,
+    readonly reason?: BulkReason,
   ) {
     super(message)
   }
@@ -88,6 +117,25 @@ export function validateEdit(e: unknown): Edit {
       return { op: 'deleteSubcategory', id: id(x.id, 'id') }
     case 'linkSubcategory':
       return { op: 'linkSubcategory', id: id(x.id, 'id'), categoryId: id(x.categoryId, 'category') }
+    case 'categorizeMany': {
+      const ids = Array.isArray(x.transactionIds) ? x.transactionIds.map((v) => id(v, 'transaction')) : bad('transactions')
+      if (ids.length === 0 || ids.length > BULK_MAX || new Set(ids).size !== ids.length) bad('transactions')
+      return { op: 'categorizeMany', transactionIds: ids, categoryId: id(x.categoryId, 'category'), subcategoryId: id(x.subcategoryId, 'subcategory') }
+    }
+    case 'restoreCategories': {
+      const items = Array.isArray(x.items) ? x.items : bad('items')
+      if (items.length === 0 || items.length > BULK_MAX) bad('items')
+      const out = items.map((v): PreviousCategory => {
+        const i = (v ?? {}) as Record<string, unknown>
+        const categoryId = optId(i.categoryId, 'category')
+        const subcategoryId = optId(i.subcategoryId, 'subcategory')
+        if (subcategoryId && !categoryId) bad('subcategory without a category')
+        const editedAt = i.editedAt == null ? null : typeof i.editedAt === 'string' && !Number.isNaN(Date.parse(i.editedAt)) ? i.editedAt : bad('editedAt')
+        return { id: id(i.id, 'transaction'), categoryId, subcategoryId, editedAt }
+      })
+      if (new Set(out.map((i) => i.id)).size !== out.length) bad('items')
+      return { op: 'restoreCategories', items: out }
+    }
     default:
       return bad('op')
   }
@@ -172,7 +220,44 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
         transactions: mapTx((t) => (t.subcategoryId === e.id ? { ...t, categoryId: e.categoryId } : t)),
       }
     }
+    case 'categorizeMany': {
+      checkBulk(s, e)
+      const ids = new Set(e.transactionIds)
+      return { ...s, transactions: mapTx((t) => (ids.has(t.id) ? { ...t, categoryId: e.categoryId, subcategoryId: e.subcategoryId } : t)) }
+    }
+    case 'restoreCategories': {
+      const byId = new Map(e.items.map((i) => [i.id, i]))
+      for (const i of e.items) {
+        tx(i.id)
+        if (i.categoryId) cat(i.categoryId)
+        if (i.subcategoryId && sub(i.subcategoryId).categoryId !== i.categoryId) fail('invalid', 'subcategory of another category')
+      }
+      return { ...s, transactions: mapTx((t) => (byId.has(t.id) ? { ...t, categoryId: byId.get(t.id)!.categoryId, subcategoryId: byId.get(t.id)!.subcategoryId } : t)) }
+    }
   }
+}
+
+/**
+ * The rules of a bulk change, checked against the transactions as the app
+ * shows them (the server builds the same view first):
+ * - every transaction exists;
+ * - none is a transfer (own transfer or card bill payment: no category);
+ * - all are of one kind, expenses or income;
+ * - the category is of that kind, and the subcategory belongs to it.
+ * Returns the previous values. Throws EditError with a `reason`.
+ */
+export function checkBulk(s: Snapshot, e: { transactionIds: string[]; categoryId: string; subcategoryId: string }): PreviousCategory[] {
+  const categoriesById = new Map(s.categories.map((c) => [c.id, c]))
+  const byId = new Map(s.transactions.map((t) => [t.id, t]))
+  const txs = e.transactionIds.map((id) => byId.get(id) ?? fail('not_found', 'transaction'))
+  if (txs.some((t) => t.transfer)) throw new EditError('invalid', 'Transfers between own accounts and card bill payments have no category.', 'transfer')
+  const kinds = new Set(txs.map((t) => kindOf(t, categoriesById)))
+  if (kinds.size !== 1) throw new EditError('invalid', 'Select only expenses or only income.', 'mixed_types')
+  const category = categoriesById.get(e.categoryId) ?? fail('not_found', 'category')
+  if (category.type !== [...kinds][0]) throw new EditError('invalid', 'The category is not of the transactions’ type.', 'category_type')
+  const sub = s.subcategories.find((x) => x.id === e.subcategoryId) ?? fail('not_found', 'subcategory')
+  if (sub.categoryId !== e.categoryId) throw new EditError('invalid', 'The subcategory belongs to another category.', 'subcategory_category')
+  return txs.map((t) => ({ id: t.id, categoryId: t.categoryId, subcategoryId: t.subcategoryId ?? null }))
 }
 
 function fail(code: EditError['code'], what: string): never {

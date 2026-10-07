@@ -93,4 +93,63 @@ describe('demo repository', () => {
     expect(s.transactions.find((t) => t.id === first.id)!.hidden).toBe(true)
     expect(s.transactions.some((t) => t.categoryId === 'transport')).toBe(false)
   })
+  it('bulk categorize returns what it replaced, and undo restores it', async () => {
+    const repo = createMockRepository(today)
+    const before = await repo.load()
+    const ids = before.transactions.filter((t) => !t.transfer && t.amount < 0 && t.categoryId !== 'income').slice(0, 3).map((t) => t.id)
+    const result = await repo.edit({ op: 'categorizeMany', transactionIds: ids, categoryId: 'restaurants', subcategoryId: 'restaurants-0' })
+    expect(result!.updated).toBe(3)
+    expect((await repo.load()).transactions.filter((t) => ids.includes(t.id)).every((t) => t.categoryId === 'restaurants')).toBe(true)
+    await repo.edit({ op: 'restoreCategories', items: result!.previous })
+    const restored = (await repo.load()).transactions.filter((t) => ids.includes(t.id))
+    expect(restored.map((t) => [t.categoryId, t.subcategoryId ?? null])).toEqual(
+      before.transactions.filter((t) => ids.includes(t.id)).map((t) => [t.categoryId, t.subcategoryId ?? null]),
+    )
+  })
+})
+
+describe('bulk categorize', () => {
+  const bulk = (transactionIds: string[], categoryId = 'restaurants', subcategoryId = 'restaurants-0') =>
+    ({ op: 'categorizeMany', transactionIds, categoryId, subcategoryId }) as const
+  const reason = (f: () => unknown) => {
+    try {
+      f()
+    } catch (e) {
+      return e instanceof EditError ? e.reason ?? e.code : 'other'
+    }
+    return 'none'
+  }
+  const mixed = (): Snapshot => ({
+    ...snapshot(),
+    transactions: [...snapshot().transactions, tx('pay', { amount: 3000_00, categoryId: null }), tx('own', { categoryId: null, transfer: 'own' })],
+  })
+
+  it('sets one category and subcategory on every transaction', () => {
+    const s = applyEdit(snapshot(), bulk(['t1', 't3']))
+    expect(s.transactions.map((t) => [t.id, t.categoryId, t.subcategoryId ?? null])).toEqual([
+      ['t1', 'restaurants', 'restaurants-0'],
+      ['t2', 'groceries', 'groceries-1'],
+      ['t3', 'restaurants', 'restaurants-0'],
+    ])
+  })
+
+  it('refuses transfers, mixed types, a category of the other type and a subcategory of another category', () => {
+    expect(reason(() => applyEdit(mixed(), bulk(['t1', 'own'])))).toBe('transfer')
+    expect(reason(() => applyEdit(mixed(), bulk(['t1', 'pay'])))).toBe('mixed_types')
+    expect(reason(() => applyEdit(mixed(), bulk(['t1', 't2'], 'salary', 'salary-0')))).toBe('category_type')
+    expect(reason(() => applyEdit(mixed(), bulk(['t1'], 'restaurants', 'groceries-0')))).toBe('subcategory_category')
+    expect(reason(() => applyEdit(mixed(), bulk(['t1', 'nope'])))).toBe('not_found')
+    expect(reason(() => validateEdit(bulk([])))).toBe('invalid')
+    expect(reason(() => validateEdit(bulk(['t1', 't1'])))).toBe('invalid')
+  })
+
+  it('undo puts back each transaction’s previous category', () => {
+    const before = snapshot()
+    const after = applyEdit(before, bulk(['t1', 't3']))
+    const previous = [
+      { id: 't1', categoryId: 'groceries', subcategoryId: 'groceries-1' },
+      { id: 't3', categoryId: 'groceries', subcategoryId: null },
+    ]
+    expect(applyEdit(after, validateEdit({ op: 'restoreCategories', items: previous })).transactions).toEqual(before.transactions.map((t) => ({ ...t, subcategoryId: t.subcategoryId ?? null })))
+  })
 })

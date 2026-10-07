@@ -1,6 +1,7 @@
 import type { Repository } from './repository'
 import type { Snapshot, SyncInfo, SyncJob } from './types'
 import { messages } from '../i18n/messages'
+import type { BulkResult } from './edits'
 
 /** Pluggy or the database isn't configured on the server yet (see docs/pluggy-setup.md, docs/neon-setup.md). */
 export class NotConfiguredError extends Error {}
@@ -35,8 +36,15 @@ async function request(fetchFn: Fetch, url: string, init: RequestInit = {}): Pro
  * An error code (the API's, or an EditError's) as a message for the UI. The
  * server's own text is technical and in English, so it is never shown.
  */
-export function errorMessage(code: string | undefined, status?: number): string {
+export function errorMessage(code: string | undefined, status?: number, reason?: string): string {
   const e = messages.errors
+  const bulk: Record<string, string> = {
+    transfer: e.bulkTransfer,
+    mixed_types: e.bulkMixedTypes,
+    category_type: e.bulkCategoryType,
+    subcategory_category: e.bulkSubcategory,
+  }
+  if (reason && bulk[reason]) return bulk[reason]
   const byCode: Record<string, string> = {
     database: e.database,
     schema_outdated: e.schemaOutdated,
@@ -49,8 +57,8 @@ export function errorMessage(code: string | undefined, status?: number): string 
 }
 
 async function failure(res: Response): Promise<Error> {
-  const body = (await res.json().catch(() => null)) as { error?: string } | null
-  return new Error(errorMessage(body?.error, res.status))
+  const body = (await res.json().catch(() => null)) as { error?: string; reason?: string } | null
+  return new Error(errorMessage(body?.error, res.status, body?.reason))
 }
 
 /**
@@ -75,6 +83,7 @@ export function createApiRepository(fetchFn: Fetch = (...a) => fetch(...a)): Rep
     async edit(e) {
       const res = await post('/api/edits', e)
       if (!res.ok) throw await failure(res)
+      return e.op === 'categorizeMany' ? ((await res.json()) as BulkResult) : null
     },
     async startSync(connectionIds) {
       const res = await post('/api/sync', connectionIds ? { connectionIds } : {}).catch(() => null)
