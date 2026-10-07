@@ -6,7 +6,7 @@
 import type { Snapshot, SyncInfo } from '../../src/data/types.js'
 import { toSnapshot } from '../pluggy/map.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
-import { readCategories } from './categories.js'
+import { readCategories, readIncomeFilter } from './categories.js'
 import type { Db } from './connection.js'
 
 /** When each configured connection last synced; overall = the oldest of them (null until all have). */
@@ -58,5 +58,5 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string): Pro
       ),
     },
   })
-  return { ...snapshot, sync }
+  return { ...snapshot, sync, incomeFilter: await readIncomeFilter(db) }
 }

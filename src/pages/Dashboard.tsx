@@ -3,7 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
 import { MONTHS_OF_HISTORY } from '../data/seed'
 import type { Transaction } from '../data/types'
-import { averageIncome, balances, expensesByCategory, inMonth, totals, visible } from '../lib/summary'
+import { balances, expensesByCategory, inMonth, totals, visible } from '../lib/summary'
+import { incomeAverage, NO_FILTER } from '../data/incomeAverage'
 import { catVar } from '../components/CategoryBadge'
 import { SyncBar } from '../components/SyncBar'
 import { balanceHistory, cashByCurrency, cashByInstitution } from '../lib/history'
@@ -22,11 +23,10 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 
 const TOP_CATEGORIES = 5
 /** Complete months in the average income. */
-const AVERAGE_MONTHS = 6
 const CURRENCY_COLORS: Record<string, string> = { BRL: 'var(--series-1)', USD: 'var(--series-3)', EUR: 'var(--series-4)' }
 
 export function Dashboard() {
-  const { accounts, transactions, categoriesById, institutionsById } = useData()
+  const { accounts, transactions, categories, subcategories, incomeFilter, categoriesById, institutionsById } = useData()
   const isDesktop = useIsDesktop()
   const [params, setParams] = useSearchParams()
   const { t, categoryName } = useI18n()
@@ -61,15 +61,12 @@ export function Dashboard() {
   )
   // Figures for the selected month (the current one by default).
   const thisMonth = flow.find((f) => f.month === month) ?? flow[flow.length - 1]
-  // Average income: complete months; the current one is compared with it.
-  // Average income: the last 6 complete months (7 with the current one), from the first month with data.
-  const incomeMonths = useMemo(() => {
-    const first = counted.reduce((min, tx) => (tx.date < min ? tx.date : min), '9999-12')
-    return lastMonths(latest, AVERAGE_MONTHS + 1)
-      .filter((m) => m >= monthKey(first))
-      .map((m) => ({ month: m, label: formatMonthShort(m), income: totals(inMonth(counted, m), categoriesById).income }))
-  }, [counted, categoriesById, latest])
-  const avgIncome = useMemo(() => averageIncome(incomeMonths), [incomeMonths])
+  // Average income: the last 6 complete months, the current one compared with it,
+  // counting the income categories chosen on the card (src/data/incomeAverage.ts, shared with the server).
+  const avgIncome = useMemo(
+    () => incomeAverage(transactions, categories, subcategories, incomeFilter ?? NO_FILTER, latest),
+    [transactions, categories, subcategories, incomeFilter, latest],
+  )
   const keptPct = thisMonth.income > 0 ? (thisMonth.net / thisMonth.income) * 100 : null
 
   // Spending trend: top categories over the period, the rest folded into "Other".
@@ -244,7 +241,7 @@ export function Dashboard() {
         {/* 3b. Average income (desktop: full width after the two monthly charts) */}
         {avgIncome && (
           <Card className="lg:order-5 lg:col-span-12">
-            <AverageIncomeCard average={avgIncome} perMonth={incomeMonths} />
+            <AverageIncomeCard average={avgIncome} />
           </Card>
         )}
 

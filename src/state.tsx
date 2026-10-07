@@ -4,7 +4,7 @@ import { errorMessage, SyncStartError } from './data/apiRepository'
 import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/syncProblems'
 import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
-import type { Account, Category, Institution, Snapshot, Subcategory, SyncInfo, SyncJob } from './data/types'
+import type { Account, Category, IncomeFilter, Institution, Snapshot, Subcategory, SyncInfo, SyncJob } from './data/types'
 import { useI18n } from './i18n/I18nProvider'
 import { messages } from './i18n/messages'
 import { Button, EmptyState } from './components/ui'
@@ -23,6 +23,8 @@ interface AppData extends Snapshot {
   categorizeMany(transactionIds: string[], categoryId: string, subcategoryId: string): Promise<BulkResult>
   /** Undo of categorizeMany. */
   restoreCategories(previous: PreviousCategory[]): Promise<void>
+  /** Saves the average income's filter (server first); rejects with a message for the UI. */
+  saveIncomeFilter(filter: IncomeFilter): Promise<void>
   /** Set (or clear, with null) a card's closing and due days; saved on this device. */
   setCardDays(accountId: string, days: CardDays | null): void
 }
@@ -159,6 +161,13 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [save],
   )
 
+  const saveIncomeFilter = useCallback(
+    async (filter: IncomeFilter) => {
+      await save({ op: 'setIncomeFilter', filter })
+    },
+    [save],
+  )
+
   const [cardDays, setCardDaysState] = useState(readCardDays)
   const setCardDays = useCallback((accountId: string, days: CardDays | null) => {
     saveCardDays(accountId, days)
@@ -282,9 +291,10 @@ export function DataProvider({ repository, children }: { repository: Repository;
       edit,
       categorizeMany,
       restoreCategories,
+      saveIncomeFilter,
       setCardDays,
     }
-  }, [snapshot, edit, categorizeMany, restoreCategories, cardDays, setCardDays])
+  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, cardDays, setCardDays])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

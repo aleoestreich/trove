@@ -110,6 +110,9 @@ between accounts, and card bill payments.
   subcategory at once (Transações → Selecionar, or the checkbox column on
   desktop), all or nothing, with Undo. Transfers can't be selected, and a
   selection must be all expenses or all income.
+- **Average income** (Overview) averages the last 6 complete months of
+  income in the categories chosen on its card (all by default; the choice is
+  saved in the database and shared between devices).
 - **Hidden transactions** are left out of every total, chart, average,
   category breakdown and installments total. Balances, net worth and card
   bills still include them, as they are the bank's figures.

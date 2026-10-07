@@ -11,7 +11,8 @@ import { dbErrorCode, inTransaction } from './connection.js'
 import { readSnapshot } from './read.js'
 import { save, syncFrom, type Fetched } from './sync.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
-import { edits, startSync, syncStatus } from './handlers.js'
+import { edits, incomeAverageRoute, incomeRoutes, incomeCategoriesRoute, saveIncomeFilterRoute, startSync, syncStatus } from './handlers.js'
+import { previewAverage } from '../../src/data/incomeAverage.js'
 import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 
 const url = process.env.TEST_DATABASE_URL
@@ -169,6 +170,74 @@ suite('database', () => {
       const result = await many(['t1', 't2'], 'restaurants', delivery)
       expect(await applyEditSql(pool, { op: 'restoreCategories', items: (result as BulkResult).previous }, ctx)).toEqual({ updated: 2 })
       expect((await pool.query(`SELECT id, category_id, subcategory_id, category_edited_at FROM transactions ORDER BY id`)).rows).toEqual(before.rows)
+    })
+  })
+
+  describe('average income filter', () => {
+    const config = () => ({ pluggy: { clientId: 'cid', clientSecret: 'secret', itemIds: ['item-1'], baseUrl: 'https://api.pluggy.ai' }, databaseUrl: url! })
+    const deps = { now: () => now }
+    const get = async (route: typeof incomeAverageRoute) => (await route(new Request('https://trove.test/api'), config(), deps)).json()
+    const put = (body: unknown) =>
+      saveIncomeFilterRoute(new Request('https://trove.test/api/settings/income-average-filter', { method: 'PUT', body: JSON.stringify(body) }), config(), deps)
+    const months = ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09']
+    const income = () =>
+      sync(
+        months.flatMap((m) => [
+          tx(`sal-${m}`, { type: 'CREDIT', amount: 1000, category: 'Salary', date: `${m}-05T12:00:00.000Z` }),
+          tx(`pix-${m}`, { type: 'CREDIT', amount: 100, date: `${m}-12T12:00:00.000Z` }),
+          tx(`out-${m}`, { amount: -50, category: 'Supermarkets', date: `${m}-15T12:00:00.000Z` }),
+        ]),
+      )
+    const none = { excludedCategoryIds: [], excludedSubcategoryIds: [], excludeUncategorized: false }
+
+    it('GET returns the card and the categories; PUT saves and answers with what the preview showed', async () => {
+      await income()
+      const card = await get(incomeAverageRoute)
+      expect(card).toMatchObject({ average: 1100_00, allAverage: 1100_00, filter: { ...none, label: 'Todas as receitas' } })
+      expect(card.months).toHaveLength(6)
+      const options = await get(incomeCategoriesRoute)
+      expect(options.categories.find((c: { id: string }) => c.id === 'salary')).toMatchObject({ name: 'Salário', average: 1000_00 })
+      expect(options.uncategorized.average).toBe(100_00)
+      const chosen = { ...none, excludeUncategorized: true }
+      const saved = await put(chosen)
+      expect(saved.status).toBe(200)
+      const body = await saved.json()
+      expect(body.average).toBe(previewAverage(options, chosen))
+      expect(body).toMatchObject({ average: 1000_00, allAverage: 1100_00, filter: { label: 'Salário, Freelance', included: 2, total: 3 } })
+      // Stored, and part of the app's data.
+      expect((await readSnapshot(pool, ['item-1'], '2026-04-01'))!.incomeFilter).toEqual(chosen)
+    })
+
+    it('one function serves the three routes, by the rewritten view or the original path', async () => {
+      await income()
+      const call = (method: string, path: string, body?: unknown) =>
+        incomeRoutes(new Request(`https://trove.test${path}`, { method, body: body === undefined ? undefined : JSON.stringify(body) }), config(), deps)
+      expect((await (await call('GET', '/api/income-average?view=card')).json()).average).toBe(1100_00)
+      expect((await (await call('GET', '/api/overview/income-average')).json()).average).toBe(1100_00)
+      expect((await (await call('GET', '/api/income-average?view=categories')).json()).uncategorized.average).toBe(100_00)
+      expect((await (await call('GET', '/api/overview/income-average/categories')).json()).uncategorized.average).toBe(100_00)
+      expect((await call('PUT', '/api/income-average?view=filter', { ...none, excludeUncategorized: true })).status).toBe(200)
+      expect((await call('PUT', '/api/settings/income-average-filter', none)).status).toBe(200)
+      expect((await call('PUT', '/api/overview/income-average', none)).status).toBe(405)
+      expect((await call('GET', '/api/settings/income-average-filter')).status).toBe(405)
+    })
+
+    it('refuses a filter with nothing selected', async () => {
+      await income()
+      const res = await put({ excludedCategoryIds: ['salary', 'freelance'], excludedSubcategoryIds: [], excludeUncategorized: true })
+      expect(res.status).toBe(400)
+      expect(await res.json()).toMatchObject({ reason: 'nothing_selected', message: 'Selecione pelo menos uma categoria' })
+      expect((await put({ ...none, excludedCategoryIds: ['groceries'] })).status).toBe(400)
+    })
+
+    it('deleting an excluded category or subcategory removes it from the setting', async () => {
+      await income()
+      const salarySub = await subOf('salary', (await pool.query(`SELECT name FROM subcategories WHERE category_id = 'salary' LIMIT 1`)).rows[0].name)
+      expect((await put({ excludedCategoryIds: ['freelance'], excludedSubcategoryIds: [salarySub], excludeUncategorized: false })).status).toBe(200)
+      await applyEditSql(pool, { op: 'deleteCategory', id: 'freelance' })
+      await applyEditSql(pool, { op: 'deleteSubcategory', id: salarySub })
+      const stored = (await pool.query(`SELECT value FROM app_settings WHERE key = 'income_avg_filter'`)).rows[0].value
+      expect(stored).toEqual({ income_avg_excluded_category_ids: [], income_avg_excluded_subcategory_ids: [], income_avg_exclude_uncategorized: false })
     })
   })
 

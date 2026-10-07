@@ -54,3 +54,8 @@ export function formatPercent(value: number, decimals = 0): string {
 export function formatCompactMoney(cents: Cents): string {
   return new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(cents / 100)
 }
+
+/** Money rounded to whole reais, for averages in lists: "R$ 13.783". */
+export function formatWholeMoney(cents: Cents): string {
+  return new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(cents / 100))
+}

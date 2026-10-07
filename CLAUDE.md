@@ -67,7 +67,11 @@ Run `npm test` and `npm run build` before pushing.
   `server/` and is typechecked with `tsconfig.server.json` (NodeNext). Vercel
   runs these files unbundled as Node.js ES modules, so relative imports must end
   in `.js` (e.g. `./config.js`); the typecheck enforces it. It must fail
-  closed: if a setting is missing, refuse the request. Who may sign in is
+  closed: if a setting is missing, refuse the request. Each file in `api/` is
+  one Vercel Function, and the Hobby plan allows 12 per deployment, the login
+  middleware included (11 in use): group new routes into an existing file
+  (with `vercel.json` rewrites when the public paths must stay) instead of
+  adding files. Who may sign in is
   managed only in Auth0 (its user list, sign-ups disabled). Never hardcode
   emails, user IDs or secrets in code, docs or config; secrets are Vercel
   environment variables.

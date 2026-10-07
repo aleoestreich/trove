@@ -51,6 +51,27 @@ export interface Messages {
       currentNone: (amount: string) => string
       avgLabel: (amount: string) => string
       chart: (average: string) => string
+      /** The category filter: the card's pill and its picker. */
+      filter: {
+        all: string
+        partial: string
+        count: (n: number, total: number) => string
+        aria: (names: string, n: number, total: number) => string
+        and: string
+        title: string
+        desc: string
+        listLabel: string
+        avgCol: string
+        uncategorizedNote: string
+        resultLabel: string
+        allLabel: string
+        markAll: string
+        apply: string
+        saving: string
+        noneHint: string
+        expand: (name: string) => string
+        collapse: (name: string) => string
+      }
     }
     whereMoney: string
     balancesNote: string
@@ -246,6 +267,8 @@ export interface Messages {
     bulkMixedTypes: string
     bulkCategoryType: string
     bulkSubcategory: string
+    nothingSelected: string
+    notIncome: string
     http: (status: number) => string
   }
   debug: {
@@ -378,6 +401,26 @@ export const messages: Messages = {
       currentNone: (amount) => `Este mês: ${amount}`,
       avgLabel: (amount) => `média ${amount}`,
       chart: (average) => `Renda por mês; média ${average}`,
+      filter: {
+        all: 'Todas as receitas',
+        partial: '(parcial)',
+        count: (n, total) => `${n} de ${total}`,
+        aria: (names, n, total) => `Categorias consideradas na renda média: ${names}, ${n} de ${total}. Alterar`,
+        and: 'e',
+        title: 'Categorias da renda média',
+        desc: 'Escolha quais receitas entram no cálculo. A escolha fica salva e vale também no desktop.',
+        listLabel: 'Receitas',
+        avgCol: 'Média/mês',
+        uncategorizedNote: 'Pix e depósitos',
+        resultLabel: 'Renda média com esta seleção',
+        allLabel: 'Com todas:',
+        markAll: 'Marcar todas',
+        apply: 'Aplicar',
+        saving: 'Salvando…',
+        noneHint: 'Selecione pelo menos uma categoria',
+        expand: (name) => `Mostrar subcategorias de ${name}`,
+        collapse: (name) => `Recolher subcategorias de ${name}`,
+      },
     },
     whereMoney: 'Onde está seu dinheiro',
     balancesNote: 'Saldos das contas, antes das faturas',
@@ -566,6 +609,8 @@ export const messages: Messages = {
     bulkMixedTypes: 'Selecione só despesas ou só receitas para categorizar.',
     bulkCategoryType: 'Essa categoria não é do mesmo tipo das transações.',
     bulkSubcategory: 'Essa subcategoria é de outra categoria.',
+    nothingSelected: 'Selecione pelo menos uma categoria',
+    notIncome: 'Só categorias de receita entram na renda média.',
     http: (status) => `A requisição falhou (HTTP ${status}).`,
   },
   debug: {

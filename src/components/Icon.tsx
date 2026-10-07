@@ -47,6 +47,9 @@ const paths = {
   tag: 'M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z M7.5 7.5h.01',
   checkBox: 'M6 12.5l4 4 8-9',
   minus: 'M7 12h10',
+  // Average income filter
+  filterLines: 'M4 6h16 M7 12h10 M10 18h4',
+  chevronUp: 'M6 15l6-6 6 6',
 } as const
 
 /** The pack's file names (ui/<name>.svg) in camelCase. A test checks this list against the files. */
