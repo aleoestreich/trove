@@ -137,8 +137,8 @@ between accounts, and card bill payments.
 - The insights read 14 months of transactions (a year is needed for yearly
   charges); every screen still shows the last 6.
 - **Account and card names:** any account or card can be renamed on Contas
-  (the pencil next to it). The name is shown everywhere in Trove, is saved
-  in the database apart from the bank's data, and a sync never changes it;
+  (the pencil next to it). The name is shown everywhere in Trove and saved
+  in the database (`accounts.nickname`), a column a sync never writes;
   "Usar o nome do banco" goes back to the bank's.
 - **Hidden transactions** are left out of every total, chart, average,
   category breakdown and installments total. Balances, net worth and card

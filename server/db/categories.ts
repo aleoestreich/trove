@@ -103,17 +103,6 @@ async function pruneStoredIncomeFilter(db: Db): Promise<void> {
 const PROJECTION_KEY = 'projection_settings'
 /** Hand-set answers about recurring charges, in app_settings under `recurring_overrides`, by recurring charge ID. */
 const RECURRING_KEY = 'recurring_overrides'
-/**
- * Names set in Trove for accounts and cards, in app_settings under
- * `account_names`, by account ID. Sync only writes the accounts table, so it
- * never changes them.
- */
-const ACCOUNT_NAMES_KEY = 'account_names'
-
-export async function readAccountNames(db: Db): Promise<Record<string, string>> {
-  const r = await db.query<{ value: Record<string, string> }>(`SELECT value FROM app_settings WHERE key = $1`, [ACCOUNT_NAMES_KEY])
-  return r.rows[0]?.value ?? {}
-}
 
 export async function readProjectionSettings(db: Db): Promise<ProjectionSettings> {
   const r = await db.query<{ value: Partial<ProjectionSettings> }>(`SELECT value FROM app_settings WHERE key = $1`, [PROJECTION_KEY])
@@ -260,15 +249,10 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
     case 'setProjectionSettings':
       await writeSetting(db, PROJECTION_KEY, e.settings)
       return null
-    case 'renameAccount': {
-      await one(`SELECT 1 FROM accounts WHERE id = $1`, [e.accountId], 'account')
-      // The row is locked so two renames at once both stay.
-      await db.query(`INSERT INTO app_settings (key, value) VALUES ($1, '{}'::jsonb) ON CONFLICT (key) DO NOTHING`, [ACCOUNT_NAMES_KEY])
-      const r = await db.query<{ value: Record<string, string> }>(`SELECT value FROM app_settings WHERE key = $1 FOR UPDATE`, [ACCOUNT_NAMES_KEY])
-      const { [e.accountId]: _old, ...others } = r.rows[0]?.value ?? {}
-      await writeSetting(db, ACCOUNT_NAMES_KEY, e.name ? { ...others, [e.accountId]: e.name } : others)
+    case 'renameAccount':
+      // Its own column: syncs only write the bank's columns, so they never change it.
+      await one(`UPDATE accounts SET nickname = $2 WHERE id = $1`, [e.accountId, e.name], 'account')
       return null
-    }
     case 'recurringAction': {
       // The row is locked so two answers given at once both stay.
       await db.query(`INSERT INTO app_settings (key, value) VALUES ($1, '{}'::jsonb) ON CONFLICT (key) DO NOTHING`, [RECURRING_KEY])

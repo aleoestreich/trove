@@ -52,6 +52,10 @@ this a card bill payment?" (see [Card bill payments](#card-bill-payments)).
 Then [`db/migrations/006_own_transfer_override.sql`](../db/migrations/006_own_transfer_override.sql),
 which lets that answer also be "a transfer between own accounts" (`'own'`).
 
+Then run [`db/migrations/007_account_nickname.sql`](../db/migrations/007_account_nickname.sql):
+it adds the accounts' `nickname`, the name set in Trove for an account or
+card (see [Account names](#account-names)).
+
 ## 3. Give Vercel the connection string
 
 1. In Neon, open **Connect**, choose the database and role, and turn
@@ -310,12 +314,11 @@ request; saving goes through the `PUT` and `POST` routes.
 
 ## Account names
 
-Names set in Trove for accounts and cards are the `account_names` row of
-`app_settings`: `{ "<account id>": "<name>" }`. They are saved through
-`POST /api/edits` (`{ op: "renameAccount", accountId, name }`, `name: null`
-goes back to the bank's) and applied on every read as each account's
-`nickname`. Sync only writes the `accounts` table (Pluggy's own name stays in
-`raw`), so it never changes them. No migration is needed.
+A name set in Trove for an account or card is the `nickname` column of
+`accounts` (migration 007). It is saved through `POST /api/edits`
+(`{ op: "renameAccount", accountId, name }`; `name: null` goes back to the
+bank's) and read with each account. Sync's upsert only writes the bank's
+columns (`name`, `raw`…), never `nickname`, so a sync never changes it.
 
 ## Reads
 

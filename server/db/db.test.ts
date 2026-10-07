@@ -437,8 +437,13 @@ suite('database', () => {
     await inTransaction(pool, (db) => save(db, { ...fetched([tx('t1'), tx('t2')]), accounts: [renamed] }, now))
     const s = (await readSnapshot(pool, ['item-1'], '2026-09-01'))!
     expect(s.accounts[0]).toMatchObject({ id: 'acc-1', nickname: 'Conta da casa' })
-    expect((await pool.query(`SELECT raw->>'name' AS name FROM accounts WHERE id = 'acc-1'`)).rows[0].name).toBe('Banco Exemplo S.A. (Conta Corrente Plus)')
+    // Stored on the account's row: the bank's name updated, Trove's kept.
+    expect((await pool.query(`SELECT name, nickname FROM accounts WHERE id = 'acc-1'`)).rows[0]).toEqual({
+      name: 'Banco Exemplo S.A. (Conta Corrente Plus)',
+      nickname: 'Conta da casa',
+    })
     await applyEditSql(pool, { op: 'renameAccount', accountId: 'acc-1', name: null })
+    expect((await pool.query(`SELECT nickname FROM accounts WHERE id = 'acc-1'`)).rows[0].nickname).toBeNull()
     expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.accounts[0].nickname).toBeUndefined()
     await expect(applyEditSql(pool, { op: 'renameAccount', accountId: 'nope', name: 'X' })).rejects.toThrow(EditError)
   })

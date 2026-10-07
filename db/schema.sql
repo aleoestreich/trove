@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   balance_due_date        date,
   card_brand              text,
   card_level              text,
+  nickname                text,                  -- set in Trove; syncs never change it
   raw                     jsonb NOT NULL,
   synced_at               timestamptz NOT NULL DEFAULT now()
 );
