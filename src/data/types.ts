@@ -49,6 +49,8 @@ export interface Account {
     rate: number
   }
   creditData?: CreditData
+  /** A name set in Trove; shown instead of the bank's. Sync never changes it. */
+  nickname?: string
 }
 
 /** What a transaction counts as: income, an expense, or money moving between connected accounts. */
@@ -143,6 +145,8 @@ export interface Snapshot {
   incomeFilter?: IncomeFilter
   /** What the month-end projection counts (the defaults when absent). */
   projectionSettings?: ProjectionSettings
+  /** Names set in Trove for accounts and cards, by account ID (applied to `accounts`). */
+  accountNames?: Record<string, string>
   /** Hand-set answers about detected recurring charges, by recurring charge ID. */
   recurringOverrides?: Record<string, RecurringOverride>
 }

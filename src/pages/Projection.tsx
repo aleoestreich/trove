@@ -131,6 +131,7 @@ function shortList(names: string[], andMore: (names: string, n: number) => strin
 function accountLabel(id: string, accounts: Account[], institutions: Institution[]): string {
   const account = accounts.find((a) => a.id === id)
   if (!account) return ''
+  if (account.nickname) return account.nickname
   const bank = bankName(id, accounts, institutions)
   const sameBank = accounts.filter((a) => a.type === 'BANK' && a.institutionId === account.institutionId).length > 1
   return sameBank ? `${bank} · ${account.name}` : bank

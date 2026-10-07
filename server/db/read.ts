@@ -6,7 +6,8 @@
 import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Snapshot, type SyncInfo, type TransferOverride } from '../../src/data/types.js'
 import { toSnapshot } from '../pluggy/map.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
-import { readCategories, readIncomeFilter, readProjectionSettings, readRecurringOverrides } from './categories.js'
+import { readAccountNames, readCategories, readIncomeFilter, readProjectionSettings, readRecurringOverrides } from './categories.js'
+import { withAccountNames } from '../../src/data/edits.js'
 import type { Db } from './connection.js'
 
 /** When each configured connection last synced; overall = the oldest of them (null until all have). */
@@ -58,13 +59,14 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string): Pro
       ),
     },
   })
-  return {
+  return withAccountNames({
     ...snapshot,
+    accountNames: await readAccountNames(db),
     sync,
     incomeFilter: await readIncomeFilter(db),
     projectionSettings: await readProjectionSettings(db),
     recurringOverrides: await readRecurringOverrides(db),
-  }
+  })
 }
 
 /**

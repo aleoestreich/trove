@@ -38,6 +38,8 @@ export type Edit =
   | { op: 'setProjectionSettings'; settings: ProjectionSettings }
   /** A hand-set answer about a detected recurring charge, given on `at` (ISO date). */
   | { op: 'recurringAction'; id: string; action: RecurringAction; at: string }
+  /** Names an account or card in Trove; null goes back to the bank's name. */
+  | { op: 'renameAccount'; accountId: string; name: string | null }
 
 /** A transaction's category before a bulk change. `editedAt`: when it was last set by hand (server only). */
 export interface PreviousCategory {
@@ -183,6 +185,11 @@ export function validateEdit(e: unknown): Edit {
       if (typeof x.at !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(x.at)) bad('at')
       return { op: 'recurringAction', id: id(x.id, 'recurring charge'), action: x.action as RecurringAction, at: x.at as string }
     }
+    case 'renameAccount': {
+      const n = typeof x.name === 'string' ? cleanName(x.name) : x.name === null ? null : bad('name')
+      if (n !== null && n.length > NAME_MAX) bad('name')
+      return { op: 'renameAccount', accountId: id(x.accountId, 'account'), name: n || null }
+    }
     default:
       return bad('op')
   }
@@ -285,6 +292,11 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
       return { ...s, incomeFilter: checkIncomeFilter(s.categories, s.subcategories, e.filter) }
     case 'setProjectionSettings':
       return { ...s, projectionSettings: e.settings }
+    case 'renameAccount': {
+      if (!s.accounts.some((a) => a.id === e.accountId)) fail('not_found', 'account')
+      const { [e.accountId]: _old, ...others } = s.accountNames ?? {}
+      return withAccountNames({ ...s, accountNames: e.name ? { ...others, [e.accountId]: e.name } : others })
+    }
     case 'recurringAction': {
       const overrides = s.recurringOverrides ?? {}
       return { ...s, recurringOverrides: { ...overrides, [e.id]: applyRecurringAction(overrides[e.id], e.action, e.at) } }
@@ -303,6 +315,18 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
         }),
       }
     }
+  }
+}
+
+/** The accounts with the names set in Trove (the bank's name when none is). */
+export function withAccountNames(s: Snapshot): Snapshot {
+  const names = s.accountNames ?? {}
+  return {
+    ...s,
+    accounts: s.accounts.map((a) => {
+      const { nickname: _old, ...bank } = a
+      return names[a.id] ? { ...bank, nickname: names[a.id] } : bank
+    }),
   }
 }
 

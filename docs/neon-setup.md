@@ -308,6 +308,15 @@ The calculations live in `src/data/projection.ts`, `src/data/unusual.ts` and
 The app computes the same from its snapshot, so the cards need no extra
 request; saving goes through the `PUT` and `POST` routes.
 
+## Account names
+
+Names set in Trove for accounts and cards are the `account_names` row of
+`app_settings`: `{ "<account id>": "<name>" }`. They are saved through
+`POST /api/edits` (`{ op: "renameAccount", accountId, name }`, `name: null`
+goes back to the bank's) and applied on every read as each account's
+`nickname`. Sync only writes the `accounts` table (Pluggy's own name stays in
+`raw`), so it never changes them. No migration is needed.
+
 ## Reads
 
 Every screen works from one snapshot (`GET /api/finance`): connections,

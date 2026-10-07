@@ -16,9 +16,16 @@ export function bankName(accountId: string, accounts: Account[], institutions: I
   return institutions.find((i) => i.id === account.institutionId)?.name ?? account.name
 }
 
-/** How a recurring charge is paid: "Cartão Nubank", "Pix Itaú". */
-export function paymentLabel(method: PaymentMethod, bank: string): string {
-  return t.recurring.account[method](bank).trim()
+/** The name set in Trove for an account, if any. */
+export function nicknameOf(accountId: string, accounts: Account[]): string | undefined {
+  return accounts.find((a) => a.id === accountId)?.nickname
+}
+
+/** How a recurring charge is paid: "Cartão Nubank", "Pix Itaú" (with the account's name in Trove when set: "Pix Conta da casa"). */
+export function paymentLabel(method: PaymentMethod, accountId: string, accounts: Account[], institutions: Institution[]): string {
+  const nickname = nicknameOf(accountId, accounts)
+  if (nickname) return method === 'card' ? nickname : t.recurring.account[method](nickname).trim()
+  return t.recurring.account[method](bankName(accountId, accounts, institutions)).trim()
 }
 
 /** A projected event's name and description ("Fatura Nubank", "Cartão de crédito"). */
@@ -27,7 +34,7 @@ export function describeEvent(e: ProjectionEvent, accounts: Account[], instituti
   switch (e.kind) {
     case 'bill':
       return {
-        name: p.event.bill(bankName(e.accountId, accounts, institutions)),
+        name: p.event.bill(nicknameOf(e.accountId, accounts) ?? bankName(e.accountId, accounts, institutions)),
         meta: e.installments > 0 ? p.event.billMetaInstallments(formatMoney(e.installments)) : p.event.billMeta,
       }
     case 'recurring':

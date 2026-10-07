@@ -281,7 +281,7 @@ export function Transactions() {
             </FilterChip>
             {!bill && (
             <FilterChip
-              label={account ? `${institutionsById.get(account.institutionId)!.name} · ${accountLabel(account, t)}` : t.transactions.account}
+              label={account ? (account.nickname ?? `${institutionsById.get(account.institutionId)!.name} · ${accountLabel(account, t)}`) : t.transactions.account}
               applied={!!account}
               value={filters.accountId ?? ''}
               onChange={(v) => set('a', v)}
@@ -289,7 +289,7 @@ export function Transactions() {
               <option value="">{t.transactions.allAccounts}</option>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {institutionsById.get(a.institutionId)!.name} · {accountLabel(a, t)}
+                  {a.nickname ?? `${institutionsById.get(a.institutionId)!.name} · ${accountLabel(a, t)}`}
                 </option>
               ))}
             </FilterChip>

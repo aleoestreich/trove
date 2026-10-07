@@ -169,3 +169,23 @@ describe('card bill payment (setTransferOverride)', () => {
     expect(s.transactions[2]).toMatchObject({ transfer: 'own', categoryId: null, subcategoryId: null, transferOverride: 'own' })
   })
 })
+
+describe('renaming an account', () => {
+  const account = { id: 'card-1', institutionId: 'bank', name: 'Cartão Exemplo Platinum', type: 'CREDIT' as const, subtype: 'CREDIT_CARD' as const, balance: 0 }
+  const withAccount = (): Snapshot => ({ ...snapshot(), accounts: [account] })
+
+  it('sets a name, keeps the bank’s, and goes back to it', () => {
+    const named = applyEdit(withAccount(), validateEdit({ op: 'renameAccount', accountId: 'card-1', name: '  Cartão   da casa ' }))
+    expect(named.accounts[0]).toMatchObject({ name: 'Cartão Exemplo Platinum', nickname: 'Cartão da casa' })
+    expect(named.accountNames).toEqual({ 'card-1': 'Cartão da casa' })
+    const back = applyEdit(named, validateEdit({ op: 'renameAccount', accountId: 'card-1', name: null }))
+    expect(back.accounts[0].nickname).toBeUndefined()
+    expect(back.accountNames).toEqual({})
+  })
+
+  it('refuses a missing account and a name over 40 characters; an empty name means the bank’s', () => {
+    expect(() => applyEdit(withAccount(), { op: 'renameAccount', accountId: 'other', name: 'X' })).toThrow(EditError)
+    expect(() => validateEdit({ op: 'renameAccount', accountId: 'card-1', name: 'x'.repeat(41) })).toThrow(EditError)
+    expect(validateEdit({ op: 'renameAccount', accountId: 'card-1', name: '   ' })).toEqual({ op: 'renameAccount', accountId: 'card-1', name: null })
+  })
+})

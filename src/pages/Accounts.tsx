@@ -17,6 +17,7 @@ import { sortForDisplay } from '../lib/accountOrder'
 import { isDeployed } from '../lib/useIsDesktop'
 import { ConnectMeuPluggy } from '../components/ConnectMeuPluggy'
 import { CardDaysEditor } from '../components/CardDaysEditor'
+import { RenameButton } from '../components/RenameAccount'
 import { SyncBar } from '../components/SyncBar'
 import { needsReconnect } from '../lib/syncProblems'
 
@@ -39,6 +40,11 @@ export function Accounts() {
     // Checking first, then savings, then cards.
     const own = sortForDisplay(accounts.filter((a) => a.institutionId === inst.id))
     const labels = accountTypeLabels(own, t)
+    // What the bank calls each one, without the names set in Trove.
+    const bankLabels = accountTypeLabels(
+      own.map(({ nickname: _n, ...a }) => a),
+      t,
+    )
     const total = balances(own)
     return (
       <section key={inst.id} className="overflow-hidden rounded-lg border border-line bg-surface">
@@ -58,20 +64,28 @@ export function Accounts() {
         {own.map((a) =>
           a.type === 'CREDIT' ? (
             <Fragment key={a.id}>
-              <CreditCardBlock account={a} label={labels.get(a.id)!} bill={currentBill(a, transactions, plans)} futureInstallments={futureInstallments.get(a.id) ?? 0} />
+              <div className="relative">
+                <CreditCardBlock account={a} label={labels.get(a.id)!} bill={currentBill(a, transactions, plans)} futureInstallments={futureInstallments.get(a.id) ?? 0} />
+                <RenameButton account={a} label={labels.get(a.id)!} bankLabel={bankLabels.get(a.id)!} className="absolute top-2 right-2 lg:right-3" />
+              </div>
               <CardDaysEditor account={a} />
             </Fragment>
           ) : a.foreign ? (
-            <ForeignBlock key={a.id} account={a} label={labels.get(a.id)!} />
+            <div key={a.id} className="relative">
+              <ForeignBlock account={a} label={labels.get(a.id)!} />
+              <RenameButton account={a} label={labels.get(a.id)!} bankLabel={bankLabels.get(a.id)!} className="absolute top-2 right-2 lg:top-1/2 lg:right-3 lg:-translate-y-1/2" />
+            </div>
           ) : (
-            <Link
-              key={a.id}
-              to={`/transactions?m=all&a=${a.id}`}
-              className="flex min-h-14 items-center justify-between gap-3 border-t border-line px-4 active:bg-track lg:min-h-[52px] lg:px-5 lg:hover:bg-page"
-            >
-              <AccountTypeLabel type={accountType(a)} label={labels.get(a.id)!} />
-              <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(a.balance)}</span>
-            </Link>
+            <div key={a.id} className="flex items-center border-t border-line pr-2 lg:pr-3">
+              <Link
+                to={`/transactions?m=all&a=${a.id}`}
+                className="flex min-h-14 min-w-0 flex-1 items-center justify-between gap-3 pl-4 active:bg-track lg:min-h-[52px] lg:pl-5 lg:hover:bg-page"
+              >
+                <AccountTypeLabel type={accountType(a)} label={labels.get(a.id)!} />
+                <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(a.balance)}</span>
+              </Link>
+              <RenameButton account={a} label={labels.get(a.id)!} bankLabel={bankLabels.get(a.id)!} />
+            </div>
           ),
         )}
       </section>
@@ -126,7 +140,7 @@ function ForeignBlock({ account, label }: { account: Account; label: string }) {
   return (
     <Link
       to={`/transactions?m=all&a=${account.id}`}
-      className="flex flex-col gap-1 border-t border-line p-4 active:bg-track lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:px-5 lg:hover:bg-page"
+      className="flex flex-col gap-1 border-t border-line p-4 pr-14 active:bg-track lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:px-5 lg:pr-16 lg:hover:bg-page"
     >
       <span className="flex flex-col gap-1 lg:gap-0.5">
         <span className="mb-0.5">
@@ -161,7 +175,7 @@ function CreditCardBlock({ account, label, bill, futureInstallments }: { account
       to={bill ? `/transactions?bill=${account.id}` : `/transactions?m=all&a=${account.id}`}
       className="flex flex-col gap-3 border-t border-line p-4 active:bg-track lg:px-5 lg:hover:bg-page"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 pr-10">
         <AccountTypeLabel type="card" label={label} />
         {near && (
           <Badge tone="critical" icon="alert">

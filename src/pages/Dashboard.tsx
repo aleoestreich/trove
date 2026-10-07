@@ -262,7 +262,7 @@ export function Dashboard() {
               <Link key={c.id} to={bill ? `/transactions?bill=${c.id}` : `/transactions?m=all&a=${c.id}`} className="flex min-h-[60px] items-center gap-3 border-b border-line active:bg-track">
                 <InstitutionBadge institution={institutionsById.get(c.institutionId)!} size={36} />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate text-[15px] font-medium text-ink lg:text-sm">{t.cardOf(institutionsById.get(c.institutionId)!.name)}</span>
+                  <span className="truncate text-[15px] font-medium text-ink lg:text-sm">{c.nickname ?? t.cardOf(institutionsById.get(c.institutionId)!.name)}</span>
                   {dueDate && <span className="text-[13px] text-muted">{t.overview.due(formatShortDate(dueDate))}</span>}
                 </span>
                 <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(bill ? bill.amount : c.balance)}</span>
