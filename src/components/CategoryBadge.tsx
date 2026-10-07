@@ -9,7 +9,7 @@ export const catTint = (color: string, pct = 16) => `color-mix(in srgb, ${catVar
 /** The colour mixed with ink, readable as text or an icon (72% for icons, 70% for text). */
 export const catInk = (color: string, pct = 72) => `color-mix(in srgb, ${catVar(color)} ${pct}%, var(--ink))`
 
-export type BadgeSize = 28 | 34 | 36 | 40 | 44
+export type BadgeSize = 24 | 26 | 28 | 34 | 36 | 40 | 44
 
 /**
  * A category's icon in a circle tinted with its colour. Without a category,
@@ -25,7 +25,7 @@ export function CategoryBadge({
   transfer?: boolean
   size?: BadgeSize
 }) {
-  const glyph = size <= 28 ? 'size-4' : size >= 44 ? 'size-[22px]' : 'size-5'
+  const glyph = size <= 24 ? 'size-[14px]' : size <= 28 ? 'size-4' : size >= 44 ? 'size-[22px]' : 'size-5'
   const box: CSSProperties = { width: size, height: size }
   if (transfer)
     return (

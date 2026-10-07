@@ -1,7 +1,9 @@
+import { useRef, type MouseEvent, type PointerEvent } from 'react'
 import type { Transaction } from '../data/types'
 import { useData } from '../state'
 import { Amount } from './ui'
 import { CategoryLabel, TransactionBadge } from './CategoryBadge'
+import { SelectBox } from './SelectBox'
 import { formatShortDate } from '../lib/dates'
 import { useI18n } from '../i18n/I18nProvider'
 
@@ -42,34 +44,85 @@ export function CategoryLine({ tx, compact = false }: { tx: Transaction; compact
   return <CategoryLabel category={category} subcategory={sub} name={categoryName(category)} />
 }
 
+/** How long a press must last to count as a long press. */
+const LONG_PRESS_MS = 500
+
 /**
  * Category badge; description, "Category › Subcategory", and "account · 3/10";
  * the amount. `showDate` adds the date to the last line (lists that aren't
  * grouped by day).
+ *
+ * Selection mode (`select`): the badge becomes a checkbox, the row a
+ * checkbox (role, aria-checked), tinted when selected; rows that can't be
+ * selected (transfers) are dimmed and aria-disabled. `onLongPress` enters
+ * selection mode from a normal row.
  */
 export function TransactionRow({
   tx,
   onSelect,
+  onLongPress,
+  select,
   showDate = false,
   className = '',
 }: {
   tx: Transaction
   onSelect?(tx: Transaction): void
+  onLongPress?(tx: Transaction): void
+  select?: { checked: boolean; disabled: boolean }
   showDate?: boolean
   className?: string
 }) {
   const { categoriesById } = useData()
   const { t } = useI18n()
   const accountLabel = useAccountLabel()
+  const press = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null)
+  const cancelPress = () => {
+    if (press.current) clearTimeout(press.current.timer)
+  }
+  const longPress = onLongPress && {
+    onPointerDown: (e: PointerEvent) => {
+      cancelPress()
+      const state = { x: e.clientX, y: e.clientY, fired: false, timer: 0 }
+      state.timer = window.setTimeout(() => {
+        state.fired = true
+        onLongPress(tx)
+      }, LONG_PRESS_MS)
+      press.current = state
+    },
+    onPointerMove: (e: PointerEvent) => {
+      const p = press.current
+      if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) cancelPress()
+    },
+    onPointerUp: cancelPress,
+    onPointerCancel: cancelPress,
+    onContextMenu: (e: MouseEvent) => e.preventDefault(),
+  }
 
   return (
     <button
       type="button"
-      onClick={() => onSelect?.(tx)}
-      className={`flex min-h-[72px] w-full items-center gap-3 py-2.5 text-left active:bg-track ${className}`}
+      role={select ? 'checkbox' : undefined}
+      aria-checked={select ? select.checked : undefined}
+      aria-disabled={select?.disabled || undefined}
+      onClick={() => {
+        // The click that ends a long press doesn't also open the details.
+        if (press.current?.fired) {
+          press.current = null
+          return
+        }
+        if (!select?.disabled) onSelect?.(tx)
+      }}
+      {...longPress}
+      className={`flex min-h-[72px] w-full items-center gap-3 py-2.5 text-left select-none ${select?.checked ? 'bg-accent-faint' : select ? '' : 'active:bg-track'} ${className}`}
     >
-      <TransactionBadge tx={tx} categoriesById={categoriesById} />
-      <span className="flex min-w-0 flex-1 flex-col">
+      {select ? (
+        <span className={`flex size-10 shrink-0 items-center justify-center ${select.disabled ? 'opacity-45' : ''}`}>
+          <SelectBox state={select.disabled ? 'disabled' : select.checked ? 'on' : 'off'} />
+        </span>
+      ) : (
+        <TransactionBadge tx={tx} categoriesById={categoriesById} />
+      )}
+      <span className={`flex min-w-0 flex-1 flex-col ${select?.disabled ? 'opacity-45' : ''}`}>
         <span className="truncate text-[15px] leading-5 font-medium text-ink">{tx.description}</span>
         <CategoryLine tx={tx} />
         <span className="truncate text-[13px] leading-[18px] text-muted">
@@ -86,7 +139,9 @@ export function TransactionRow({
           {tx.status === 'PENDING' && ` · ${t.pending}`}
         </span>
       </span>
-      <Amount cents={tx.amount} foreign={tx.foreign} transfer={!!tx.transfer} />
+      <span className={select?.disabled ? 'opacity-45' : undefined}>
+        <Amount cents={tx.amount} foreign={tx.foreign} transfer={!!tx.transfer} />
+      </span>
     </button>
   )
 }

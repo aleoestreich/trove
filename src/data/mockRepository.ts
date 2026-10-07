@@ -1,6 +1,6 @@
 import type { Repository } from './repository'
 import { DEMO_SUBCATEGORIES, buildSeed } from './seed'
-import { applyEdit, defaultCategories } from './edits'
+import { applyEdit, checkBulk, defaultCategories } from './edits'
 import { DEFAULT_CATEGORIES } from './categoryCatalog'
 import type { Category, Snapshot, Subcategory } from './types'
 
@@ -75,12 +75,15 @@ export function createMockRepository(today: Date = new Date()): Repository {
       return load()
     },
     async edit(e) {
-      const next = applyEdit(load(), e)
+      const current = load()
+      const previous = e.op === 'categorizeMany' ? checkBulk(current, e) : null
+      const next = applyEdit(current, e)
       const stored: DemoOwner['stored'] = {}
       for (const t of next.transactions) {
         if (!t.transfer) stored[t.id] = { categoryId: t.categoryId, subcategoryId: t.subcategoryId ?? null, hidden: !!t.hidden }
       }
       write({ categories: next.categories, subcategories: next.subcategories, stored })
+      return previous && { updated: previous.length, previous }
     },
     async startSync() {
       throw new Error('Demo data has nothing to sync.')

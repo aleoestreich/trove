@@ -7,7 +7,7 @@
 // rest stay uncategorized until one is chosen; transfers and card bill
 // payments become transfers, which have no category.
 
-import type { Transaction } from './types.js'
+import type { Category, CategoryKind, Transaction } from './types.js'
 
 /** Guess ID → default category ID (src/data/categoryCatalog.ts). */
 const TO_DEFAULT: Record<string, string> = {
@@ -30,4 +30,16 @@ export function fromGuess(guess: string, known?: Set<string>): Pick<Transaction,
   if (guess === 'card-payment') return { categoryId: null, transfer: 'card-payment' }
   const id = TO_DEFAULT[guess] ?? null
   return { categoryId: id && (!known || known.has(id)) ? id : null }
+}
+
+/**
+ * What a transaction counts as: a transfer between connected accounts, else
+ * its category's type, else (uncategorized) income when money came in and an
+ * expense when it went out.
+ */
+export function kindOf(t: Pick<Transaction, 'transfer' | 'categoryId' | 'amount'>, categoriesById: Map<string, Category>): CategoryKind {
+  if (t.transfer) return 'transfer'
+  const category = t.categoryId ? categoriesById.get(t.categoryId) : undefined
+  if (category) return category.type
+  return t.amount > 0 ? 'income' : 'expense'
 }

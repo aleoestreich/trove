@@ -61,6 +61,8 @@ function Shell() {
               </span>
             )}
           </div>
+          {/* Page actions (e.g. "Selecionar" on Transactions) are rendered here by the page. */}
+          <div id="header-actions" className="flex shrink-0 items-center" />
         </div>
       </header>
 

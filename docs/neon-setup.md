@@ -189,6 +189,28 @@ A category, subcategory or hidden flag set in the app stays as set:
   (`category_edited_at` set) keeps that category even when it would be paired
   as an own transfer or read as a card bill payment.
 
+### Bulk categorization
+
+**Transações → Selecionar** (phones) or the checkbox column (desktop) sets
+one category and subcategory on many transactions at once, through
+`POST /api/edits` with `{ op: 'categorizeMany', transactionIds, categoryId,
+subcategoryId }`:
+
+- The rules (`checkBulk` in `src/data/edits.ts`, the same in the app and on
+  the server): every ID is a live transaction of a configured connection;
+  none is a transfer or card bill payment; all are expenses or all income;
+  the category is of that type; the subcategory belongs to it. Otherwise
+  `400` with a `reason` (`transfer`, `mixed_types`, `category_type`,
+  `subcategory_category`) or `404`.
+- One database transaction, all or nothing. The rows are locked, checked
+  against the transactions as the app shows them (transfers are detected on
+  read), updated, and marked `category_edited_at`, so a sync never changes
+  them.
+- The answer is `{ updated, previous: [{ id, categoryId, subcategoryId,
+  editedAt }] }`. Undo sends `previous` back as
+  `{ op: 'restoreCategories', items }`, which restores each value and edited
+  mark in one transaction.
+
 ## Reads
 
 Every screen works from one snapshot (`GET /api/finance`): connections,

@@ -3,7 +3,8 @@
 //   GET  /api/finance  the app's data, read from the database
 //        200 Snapshot · 409 { error: 'never_synced', sync } · 503 not_configured
 //   POST /api/edits    one change to categories or transactions (src/data/edits.ts)
-//        204 · 400 invalid · 404 not_found · 409 name_taken
+//        204 · 400 invalid (with a `reason` for bulk rules) · 404 not_found · 409 name_taken
+//        categorizeMany: 200 { updated, previous }; restoreCategories: 200 { updated }
 //   POST /api/sync     { connectionIds? }: start a background sync (default: every connection)
 //        202 SyncJob (the running one if a sync is already in progress) · 403 not in PLUGGY_ITEM_IDS
 //   GET  /api/sync     the latest sync job, for progress: 200 { job: SyncJob | null }
@@ -62,11 +63,15 @@ export async function edits(request: Request, config: DbConfig): Promise<Respons
   } catch (e) {
     return json(400, { error: 'invalid', message: e instanceof EditError ? e.message : 'Invalid JSON.' })
   }
+  // Bulk edits only touch the configured connections' transactions.
+  const bulk = edit.op === 'categorizeMany' || edit.op === 'restoreCategories'
+  if (bulk && !config.pluggy) return notConfigured()
   try {
-    await applyEditSql(getPool(config.databaseUrl), edit)
-    return json(204, null)
+    const outcome = await applyEditSql(getPool(config.databaseUrl), edit, { itemIds: config.pluggy?.itemIds })
+    return outcome ? json(200, outcome) : json(204, null)
   } catch (e) {
-    if (e instanceof EditError) return json(e.code === 'not_found' ? 404 : e.code === 'name_taken' ? 409 : 400, { error: e.code, message: e.message })
+    if (e instanceof EditError)
+      return json(e.code === 'not_found' ? 404 : e.code === 'name_taken' ? 409 : 400, { error: e.code, reason: e.reason, message: e.message })
     return json(500, { error: dbErrorCode(e), message: dbErrorMessage(e) })
   }
 }

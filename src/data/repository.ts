@@ -1,4 +1,4 @@
-import type { Edit } from './edits'
+import type { BulkResult, Edit } from './edits'
 import type { Snapshot, SyncJob } from './types'
 
 /**
@@ -8,8 +8,11 @@ import type { Snapshot, SyncJob } from './types'
  */
 export interface Repository {
   load(): Promise<Snapshot>
-  /** Saves one change (see src/data/edits.ts); rejects if it can't. */
-  edit(edit: Edit): Promise<void>
+  /**
+   * Saves one change (see src/data/edits.ts); rejects if it can't.
+   * categorizeMany resolves with what it replaced (for undo); others with null.
+   */
+  edit(edit: Edit): Promise<BulkResult | null>
   /**
    * Starts a background sync of these connections (default: all), or returns
    * the one already running. The server keeps going with the app closed.

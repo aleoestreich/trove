@@ -1,4 +1,5 @@
-import type { Account, Category, CategoryKind, Cents, Transaction } from '../data/types'
+import type { Account, Category, Cents, Transaction } from '../data/types'
+import { kindOf } from '../data/categories'
 import { monthKey } from './dates'
 
 export interface Totals {
@@ -8,17 +9,8 @@ export interface Totals {
   net: Cents
 }
 
-/**
- * What a transaction counts as: a transfer between connected accounts, else
- * its category's type, else (uncategorized) income when money came in and an
- * expense when it went out.
- */
-export function kindOf(t: Pick<Transaction, 'transfer' | 'categoryId' | 'amount'>, categoriesById: Map<string, Category>): CategoryKind {
-  if (t.transfer) return 'transfer'
-  const category = t.categoryId ? categoriesById.get(t.categoryId) : undefined
-  if (category) return category.type
-  return t.amount > 0 ? 'income' : 'expense'
-}
+/** What a transaction counts as (shared with the server: src/data/categories.ts). */
+export { kindOf }
 
 /** Transactions that count: everything except hidden ones. */
 export const visible = (transactions: Transaction[]): Transaction[] => transactions.filter((t) => !t.hidden)

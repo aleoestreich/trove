@@ -4,14 +4,14 @@
 import { readFileSync } from 'node:fs'
 import pg from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { EditError } from '../../src/data/edits.js'
+import { EditError, type BulkResult } from '../../src/data/edits.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
 import { dbErrorCode, inTransaction } from './connection.js'
 import { readSnapshot } from './read.js'
 import { save, syncFrom, type Fetched } from './sync.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
-import { startSync, syncStatus } from './handlers.js'
+import { edits, startSync, syncStatus } from './handlers.js'
 import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 
 const url = process.env.TEST_DATABASE_URL
@@ -97,6 +97,79 @@ suite('database', () => {
     await sync([tx('p1', { status: 'PENDING', category: 'Supermarkets' })])
     await sync([tx('n1', { date: '2026-10-02T12:00:00.000Z', category: 'Restaurants' })])
     expect((await row('n1')).category_id).toBe('restaurants')
+  })
+
+  describe('bulk categorize', () => {
+    const ctx = { itemIds: ['item-1'] }
+    const many = (transactionIds: string[], categoryId: string, subcategoryId: string) =>
+      applyEditSql(pool, { op: 'categorizeMany', transactionIds, categoryId, subcategoryId }, ctx)
+    const reasonOf = (p: Promise<unknown>) => p.then(() => 'none', (e) => (e instanceof EditError ? e.reason ?? e.code : String(e)))
+    const state = async () =>
+      (await pool.query(`SELECT id, category_id, subcategory_id, category_edited_at IS NOT NULL AS edited FROM transactions ORDER BY id`)).rows
+
+    it('sets the category on all of them, marks them edited and returns the previous values', async () => {
+      await sync([tx('t1', { category: 'Supermarkets' }), tx('t2'), tx('t3', { category: 'Supermarkets' })])
+      const delivery = await subOf('restaurants', 'Delivery')
+      const result = await many(['t1', 't2'], 'restaurants', delivery)
+      expect(result).toEqual({
+        updated: 2,
+        previous: [
+          { id: 't1', categoryId: 'groceries', subcategoryId: null, editedAt: null },
+          { id: 't2', categoryId: null, subcategoryId: null, editedAt: null },
+        ],
+      })
+      expect(await state()).toEqual([
+        { id: 't1', category_id: 'restaurants', subcategory_id: delivery, edited: true },
+        { id: 't2', category_id: 'restaurants', subcategory_id: delivery, edited: true },
+        { id: 't3', category_id: 'groceries', subcategory_id: null, edited: false },
+      ])
+      // A later sync keeps them.
+      await sync([tx('t1', { category: 'Supermarkets', amount: -151 }), tx('t2'), tx('t3', { category: 'Supermarkets' })])
+      expect((await row('t1')).category_id).toBe('restaurants')
+    })
+
+    it('is all or nothing: one transfer, an unknown ID or another connection’s transaction changes nothing', async () => {
+      await sync([tx('t1', { category: 'Supermarkets' }), tx('t2'), tx('bill', { category: 'Credit card payment' })])
+      const before = await state()
+      const delivery = await subOf('restaurants', 'Delivery')
+      expect(await reasonOf(many(['t1', 'bill'], 'restaurants', delivery))).toBe('transfer')
+      expect(await reasonOf(many(['t1', 'nope'], 'restaurants', delivery))).toBe('not_found')
+      expect(await reasonOf(applyEditSql(pool, { op: 'categorizeMany', transactionIds: ['t1'], categoryId: 'restaurants', subcategoryId: delivery }, { itemIds: ['item-2'] }))).toBe('not_found')
+      expect(await state()).toEqual(before)
+    })
+
+    it('refuses mixed types, a category of the other type and a subcategory of another category', async () => {
+      await sync([tx('t1', { category: 'Supermarkets' }), tx('pay', { type: 'CREDIT', amount: 3000 })])
+      const delivery = await subOf('restaurants', 'Delivery')
+      const salarySub = (await pool.query(`SELECT id FROM subcategories WHERE category_id = 'salary' LIMIT 1`)).rows[0].id
+      expect(await reasonOf(many(['t1', 'pay'], 'restaurants', delivery))).toBe('mixed_types')
+      expect(await reasonOf(many(['t1'], 'salary', salarySub))).toBe('category_type')
+      expect(await reasonOf(many(['t1'], 'groceries', delivery))).toBe('subcategory_category')
+    })
+
+    it('POST /api/edits answers 200 with the previous values, or 400 with the reason', async () => {
+      await sync([tx('t1', { category: 'Supermarkets' }), tx('bill', { category: 'Credit card payment' })])
+      const delivery = await subOf('restaurants', 'Delivery')
+      const config = { pluggy: { clientId: 'cid', clientSecret: 'secret', itemIds: ['item-1'], baseUrl: 'https://api.pluggy.ai' }, databaseUrl: url! }
+      const post = (body: unknown) => edits(new Request('https://trove.test/api/edits', { method: 'POST', body: JSON.stringify(body) }), config)
+      const refused = await post({ op: 'categorizeMany', transactionIds: ['t1', 'bill'], categoryId: 'restaurants', subcategoryId: delivery })
+      expect([refused.status, (await refused.json()).reason]).toEqual([400, 'transfer'])
+      const ok = await post({ op: 'categorizeMany', transactionIds: ['t1'], categoryId: 'restaurants', subcategoryId: delivery })
+      expect([ok.status, (await ok.json()).updated]).toEqual([200, 1])
+      const noPluggy = await edits(new Request('https://trove.test/api/edits', { method: 'POST', body: JSON.stringify({ op: 'categorizeMany', transactionIds: ['t1'], categoryId: 'restaurants', subcategoryId: delivery }) }), { pluggy: null, databaseUrl: url! })
+      expect(noPluggy.status).toBe(503)
+    })
+
+    it('undo restores the previous categories and edited marks', async () => {
+      await sync([tx('t1', { category: 'Supermarkets' }), tx('t2')])
+      const bakery = await subOf('groceries', 'Padaria')
+      await applyEditSql(pool, { op: 'categorize', transactionId: 't2', categoryId: 'groceries', subcategoryId: bakery })
+      const before = await pool.query(`SELECT id, category_id, subcategory_id, category_edited_at FROM transactions ORDER BY id`)
+      const delivery = await subOf('restaurants', 'Delivery')
+      const result = await many(['t1', 't2'], 'restaurants', delivery)
+      expect(await applyEditSql(pool, { op: 'restoreCategories', items: (result as BulkResult).previous }, ctx)).toEqual({ updated: 2 })
+      expect((await pool.query(`SELECT id, category_id, subcategory_id, category_edited_at FROM transactions ORDER BY id`)).rows).toEqual(before.rows)
+    })
   })
 
   it('is idempotent: the same data synced again changes nothing and duplicates nothing', async () => {

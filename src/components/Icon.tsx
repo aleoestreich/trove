@@ -42,6 +42,11 @@ const paths = {
   taxes: 'M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21Z M10 8h4 M10 12h4',
   other: 'M6 12h.01 M12 12h.01 M18 12h.01',
   transfer: 'M4 8h14 M14 4l4 4-4 4 M20 16H6 M10 12l-4 4 4 4',
+  // Bulk selection
+  listCheck: 'M4 5h4v4H4Z M4 15h4v4H4Z M5 7l1 1 1.5-2 M11 7h9 M11 17h9',
+  tag: 'M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z M7.5 7.5h.01',
+  checkBox: 'M6 12.5l4 4 8-9',
+  minus: 'M7 12h10',
 } as const
 
 /** The pack's file names (ui/<name>.svg) in camelCase. A test checks this list against the files. */

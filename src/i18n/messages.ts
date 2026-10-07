@@ -205,6 +205,34 @@ export interface Messages {
     due: string
     rate: (currency: string, rate: string) => string
   }
+  /** Bulk categorization on the Transactions screen. */
+  bulk: {
+    select: string
+    exitSelect: string
+    selected: (n: number) => string
+    selectAll: string
+    selectAllN: (n: number) => string
+    selectAllAria: string
+    clearSelection: string
+    selectDay: (day: string) => string
+    totalSelected: string
+    categorizeN: (n: number) => string
+    transfersNote: string
+    mixedNote: string
+    total: string
+    current: string
+    resultLabel: (n: number) => string
+    pickCategory: string
+    pickSubcategory: string
+    cancel: string
+    apply: (n: number) => string
+    saving: string
+    updated: (n: number) => string
+    undo: string
+    undone: string
+    undoFailed: string
+    panelNote: string
+  }
   /** Server errors, by the code the API returns (never its text, which is English and technical). */
   errors: {
     database: string
@@ -214,6 +242,10 @@ export interface Messages {
     notFound: string
     nameTaken: string
     network: string
+    bulkTransfer: string
+    bulkMixedTypes: string
+    bulkCategoryType: string
+    bulkSubcategory: string
     http: (status: number) => string
   }
   debug: {
@@ -495,6 +527,33 @@ export const messages: Messages = {
     rate: (currency, rate) => `Cotação 1 ${currency} = R$ ${rate}`,
   },
 
+  bulk: {
+    select: 'Selecionar',
+    exitSelect: 'Sair da seleção',
+    selected: (n) => (n === 1 ? '1 selecionada' : `${n} selecionadas`),
+    selectAll: 'Selecionar tudo',
+    selectAllN: (n) => (n === 1 ? 'Selecionar a 1' : `Selecionar as ${n}`),
+    selectAllAria: 'Selecionar todas as transações visíveis',
+    clearSelection: 'Limpar seleção',
+    selectDay: (day) => `Selecionar todas de ${day}`,
+    totalSelected: 'Total selecionado',
+    categorizeN: (n) => (n === 1 ? 'Categorizar 1 transação' : `Categorizar ${n} transações`),
+    transfersNote: 'Transferências entre suas contas não têm categoria e não podem ser selecionadas.',
+    mixedNote: 'Selecione só despesas ou só receitas para categorizar.',
+    total: 'Total',
+    current: 'Hoje estão em',
+    resultLabel: (n) => (n === 1 ? 'A 1 vai para' : `As ${n} vão para`),
+    pickCategory: 'Escolha a categoria',
+    pickSubcategory: 'Escolha a subcategoria',
+    cancel: 'Cancelar',
+    apply: (n) => `Aplicar a ${n}`,
+    saving: 'Salvando…',
+    updated: (n) => (n === 1 ? '1 transação atualizada' : `${n} transações atualizadas`),
+    undo: 'Desfazer',
+    undone: 'Alteração desfeita',
+    undoFailed: 'Não foi possível desfazer. Tente de novo.',
+    panelNote: 'Shift + clique seleciona um intervalo. Transferências entre suas contas não podem ser selecionadas.',
+  },
   errors: {
     database: 'O banco de dados não respondeu. Tente de novo em instantes.',
     schemaOutdated: 'As tabelas do banco de dados estão desatualizadas: rode os arquivos pendentes de db/migrations (docs/neon-setup.md).',
@@ -503,6 +562,10 @@ export const messages: Messages = {
     notFound: 'Isso não existe mais. Os dados foram recarregados.',
     nameTaken: 'Já existe uma com esse nome.',
     network: 'Não foi possível acessar o servidor do Trove. Verifique a conexão.',
+    bulkTransfer: 'Transferências entre suas contas e pagamentos de fatura não têm categoria.',
+    bulkMixedTypes: 'Selecione só despesas ou só receitas para categorizar.',
+    bulkCategoryType: 'Essa categoria não é do mesmo tipo das transações.',
+    bulkSubcategory: 'Essa subcategoria é de outra categoria.',
     http: (status) => `A requisição falhou (HTTP ${status}).`,
   },
   debug: {

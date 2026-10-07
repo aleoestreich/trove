@@ -251,3 +251,21 @@ body {
     animation: none;
   }
 }
+
+/* Rows a bulk change just updated: an accent tint that fades out. */
+@keyframes flash-accent {
+  from {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+.flash-accent {
+  animation: flash-accent 1.5s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .flash-accent {
+    animation-duration: 0.01s;
+  }
+}
