@@ -352,7 +352,7 @@ export function toSnapshot(input: PluggyData): Snapshot {
       if (detect && !tx.transfer && looksLikeBillPayment(t, accountType.get(t.accountId))) Object.assign(tx, { categoryId: null, transfer: 'card-payment' })
       if (stored?.edited || override === 'none') delete tx.transfer
       if (stored && !tx.transfer) Object.assign(tx, { categoryId: stored.categoryId, subcategoryId: stored.subcategoryId })
-      if (override === 'card-payment') Object.assign(tx, { categoryId: null, subcategoryId: null, transfer: 'card-payment' })
+      if (override && override !== 'none') Object.assign(tx, { categoryId: null, subcategoryId: null, transfer: override })
       if (override) tx.transferOverride = override
       if (detect && !tx.transfer) {
         const type = accountType.get(t.accountId)

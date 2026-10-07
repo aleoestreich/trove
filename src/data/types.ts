@@ -76,8 +76,8 @@ export interface Subcategory {
   sortOrder: number
 }
 
-/** A hand-set answer to "is this a card bill payment?". */
-export type TransferOverride = 'card-payment' | 'none'
+/** A hand-set answer to "is this a transfer (own accounts, or a card bill payment)?". */
+export type TransferOverride = 'own' | 'card-payment' | 'none'
 
 export interface Transaction {
   id: string
@@ -100,8 +100,9 @@ export interface Transaction {
    */
   transfer?: 'own' | 'card-payment'
   /**
-   * Set by hand in the transaction's details: "card-payment" marks it as a
-   * card bill payment; "none" says it isn't one (overrides detection).
+   * Set by hand in the transaction's details: "own" marks it as a transfer
+   * between own accounts, "card-payment" as a card bill payment; "none" says
+   * it is neither (overrides detection).
    */
   transferOverride?: TransferOverride
   /** Hidden: left out of every total, chart, average and the list. */

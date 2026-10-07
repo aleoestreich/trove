@@ -55,9 +55,9 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
     incomeFilter: owner.incomeFilter,
     transactions: seed.transactions.map((t) => {
       const s = owner.stored[t.id]
-      // A hand-set card-payment answer wins over the seed's own transfers.
-      if (s?.transferOverride === 'card-payment')
-        return { ...t, transfer: 'card-payment' as const, categoryId: null, subcategoryId: null, hidden: s.hidden || undefined, transferOverride: s.transferOverride }
+      // A hand-set answer wins over the seed's own transfers.
+      if (s?.transferOverride === 'own' || s?.transferOverride === 'card-payment')
+        return { ...t, transfer: s.transferOverride, categoryId: null, subcategoryId: null, hidden: s.hidden || undefined, transferOverride: s.transferOverride }
       if (s?.transferOverride === 'none') {
         const { transfer: _seedTransfer, ...rest } = t
         return { ...rest, categoryId: s.categoryId, subcategoryId: s.subcategoryId, hidden: s.hidden || undefined, transferOverride: s.transferOverride }

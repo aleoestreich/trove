@@ -161,6 +161,11 @@ describe('card bill payment (setTransferOverride)', () => {
     const undone = applyEdit(marked, { op: 'setTransferOverride', transactionId: 't1', value: 'none' })
     expect(undone.transactions[0].transfer).toBeUndefined()
     expect(undone.transactions[0].transferOverride).toBe('none')
-    expect(() => validateEdit({ op: 'setTransferOverride', transactionId: 't1', value: 'own' })).toThrow(EditError)
+    expect(() => validateEdit({ op: 'setTransferOverride', transactionId: 't1', value: 'other' })).toThrow(EditError)
+  })
+
+  it('marks a transaction as a transfer between own accounts: no category, neither income nor expense', () => {
+    const s = applyEdit(snapshot(), validateEdit({ op: 'setTransferOverride', transactionId: 't3', value: 'own' }))
+    expect(s.transactions[2]).toMatchObject({ transfer: 'own', categoryId: null, subcategoryId: null, transferOverride: 'own' })
   })
 })

@@ -119,7 +119,17 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
           </button>
         </>
       ) : current.transfer ? (
-        <p className="mt-3 text-[13px] leading-[18px] text-muted">{t.transactions.transferNote}</p>
+        <>
+          <p className="mt-3 text-[13px] leading-[18px] text-muted">{t.transactions.transferNote}</p>
+          <button
+            type="button"
+            onClick={() => edit({ op: 'setTransferOverride', transactionId: current.id, value: 'none' })}
+            className="mt-2 inline-flex h-12 items-center gap-2 self-start rounded-md px-3 -ml-3 text-sm font-medium text-accent hover:bg-accent-faint active:bg-track"
+          >
+            <Icon name="close" className="size-[18px]" strokeWidth={2} />
+            {t.transactions.notOwnTransfer}
+          </button>
+        </>
       ) : (
         <>
           <h3 id={`${variant}-category`} className="label-caps pt-4 pb-2">
@@ -156,18 +166,29 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
         </>
       )}
 
+      {/* Neither income nor an expense: mark it as a transfer (own accounts, or a card bill payment). */}
       {!current.transfer && (
-        <button
-          type="button"
-          onClick={() => edit({ op: 'setTransferOverride', transactionId: current.id, value: 'card-payment' })}
-          className="mt-4 flex min-h-16 w-full items-center gap-3 rounded-md border border-line px-3.5 py-2.5 text-left hover:bg-track active:bg-track"
-        >
-          <Icon name="card" className="size-[22px] shrink-0 text-ink-2" strokeWidth={1.8} />
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[15px] leading-5 font-medium text-ink">{t.transactions.markCardPayment}</span>
-            <span className="text-xs leading-[17px] text-muted">{t.transactions.markCardPaymentNote}</span>
-          </span>
-        </button>
+        <div className="mt-4 divide-y divide-line overflow-hidden rounded-md border border-line">
+          {(
+            [
+              ['own', 'transfer', t.transactions.markOwnTransfer, t.transactions.markOwnTransferNote],
+              ['card-payment', 'card', t.transactions.markCardPayment, t.transactions.markCardPaymentNote],
+            ] as const
+          ).map(([value, icon, label, note]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => edit({ op: 'setTransferOverride', transactionId: current.id, value })}
+              className="flex min-h-16 w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-track active:bg-track"
+            >
+              <Icon name={icon} className="size-[22px] shrink-0 text-ink-2" strokeWidth={1.8} />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-[15px] leading-5 font-medium text-ink">{label}</span>
+                <span className="text-xs leading-[17px] text-muted">{note}</span>
+              </span>
+            </button>
+          ))}
+        </div>
       )}
 
       <HideSwitch hidden={!!current.hidden} onChange={(hidden) => edit({ op: 'hide', transactionId: current.id, hidden })} />
