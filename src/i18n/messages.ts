@@ -212,6 +212,19 @@ export interface Messages {
     alreadyPaid: (amount: string) => string
     closed: string
     /** Per-card closing and due days set by hand. */
+    /** Renaming an account or card (kept across syncs). */
+    rename: {
+      action: (name: string) => string
+      titleAccount: string
+      titleCard: string
+      label: string
+      bankName: (name: string) => string
+      note: string
+      save: string
+      cancel: string
+      useBank: string
+      tooLong: (max: number) => string
+    }
     cardDays: {
       missing: string
       set: string
@@ -693,6 +706,18 @@ export const messages: Messages = {
     types: { checking: 'Conta corrente', savings: 'Poupança', usd: 'Saldo em dólar', card: 'Cartão de crédito' },
     alreadyPaid: (amount) => `${amount} já pago`,
     closed: 'Fechou em',
+    rename: {
+      action: (name) => `Renomear ${name}`,
+      titleAccount: 'Renomear conta',
+      titleCard: 'Renomear cartão',
+      label: 'Nome no Trove',
+      bankName: (name) => `Nome no banco: ${name}`,
+      note: 'Só muda no Trove. A sincronização mantém este nome.',
+      save: 'Salvar',
+      cancel: 'Cancelar',
+      useBank: 'Usar o nome do banco',
+      tooLong: (max) => `Use até ${max} caracteres.`,
+    },
     cardDays: {
       missing: 'O banco não informa a data de fechamento deste cartão, então não dá para calcular a fatura atual. Informe os dias pelo app do banco.',
       set: 'Definir dias de fechamento e vencimento',

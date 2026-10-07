@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { RecurringAction, RecurringAlert, RecurringItem } from '../../data/recurring'
 import { formatDay, formatMonthName, formatMonthShort } from '../../lib/dates'
 import { formatMoney, formatPercent } from '../../lib/money'
-import { bankName, paymentLabel } from '../../lib/insightText'
+import { paymentLabel } from '../../lib/insightText'
 import { useData } from '../../state'
 import { useI18n } from '../../i18n/I18nProvider'
 import { CategoryBadge } from '../CategoryBadge'
@@ -11,7 +11,7 @@ import { Sheet } from './parts'
 /** How a recurring charge is paid, with its bank: "Cartão Nubank". */
 export function usePaymentLabel() {
   const { accounts, institutions } = useData()
-  return (item: RecurringItem) => paymentLabel(item.paymentMethod, bankName(item.accountId, accounts, institutions))
+  return (item: RecurringItem) => paymentLabel(item.paymentMethod, item.accountId, accounts, institutions)
 }
 
 const money = (cents: number, currency = 'BRL') => formatMoney(cents, currency)

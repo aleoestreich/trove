@@ -429,6 +429,25 @@ suite('database', () => {
     expect(s.sync).toMatchObject({ lastSyncedAt: now.toISOString(), connections: [{ id: 'item-1', name: 'Banco Exemplo', status: 'UPDATED' }] })
   })
 
+  it('a name set in Trove survives every sync, and can go back to the bank’s', async () => {
+    await sync([tx('t1')])
+    await applyEditSql(pool, { op: 'renameAccount', accountId: 'acc-1', name: 'Conta da casa' })
+    // The bank renames the account and the next sync stores it: Trove's name stays.
+    const renamed = { ...checking, name: 'Banco Exemplo S.A. (Conta Corrente Plus)' }
+    await inTransaction(pool, (db) => save(db, { ...fetched([tx('t1'), tx('t2')]), accounts: [renamed] }, now))
+    const s = (await readSnapshot(pool, ['item-1'], '2026-09-01'))!
+    expect(s.accounts[0]).toMatchObject({ id: 'acc-1', nickname: 'Conta da casa' })
+    // Stored on the account's row: the bank's name updated, Trove's kept.
+    expect((await pool.query(`SELECT name, nickname FROM accounts WHERE id = 'acc-1'`)).rows[0]).toEqual({
+      name: 'Banco Exemplo S.A. (Conta Corrente Plus)',
+      nickname: 'Conta da casa',
+    })
+    await applyEditSql(pool, { op: 'renameAccount', accountId: 'acc-1', name: null })
+    expect((await pool.query(`SELECT nickname FROM accounts WHERE id = 'acc-1'`)).rows[0].nickname).toBeNull()
+    expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.accounts[0].nickname).toBeUndefined()
+    await expect(applyEditSql(pool, { op: 'renameAccount', accountId: 'nope', name: 'X' })).rejects.toThrow(EditError)
+  })
+
   describe('insight routes', () => {
     const config = () => ({ pluggy: { clientId: 'cid', clientSecret: 'secret', itemIds: ['item-1'], baseUrl: 'https://api.pluggy.ai' }, databaseUrl: url! })
     const deps = { now: () => now }

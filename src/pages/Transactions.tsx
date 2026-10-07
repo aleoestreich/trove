@@ -18,7 +18,7 @@ import { BulkPanel, BulkSheet, UndoToast, type Applied } from '../components/Bul
 import { SelectBox } from '../components/SelectBox'
 import { groupState, rangeIds, selectable, selectAllIds, summarize, toggleGroup, type CheckState } from '../lib/selection'
 import { useI18n } from '../i18n/I18nProvider'
-import { accountLabel } from '../lib/accountLabel'
+import { accountLabel, shownName } from '../lib/accountLabel'
 import { useIsDesktop } from '../lib/useIsDesktop'
 
 export interface TransactionFilters {
@@ -281,7 +281,7 @@ export function Transactions() {
             </FilterChip>
             {!bill && (
             <FilterChip
-              label={account ? `${institutionsById.get(account.institutionId)!.name} · ${accountLabel(account, t)}` : t.transactions.account}
+              label={account ? shownName(account, `${institutionsById.get(account.institutionId)!.name} · ${accountLabel(account, t)}`) : t.transactions.account}
               applied={!!account}
               value={filters.accountId ?? ''}
               onChange={(v) => set('a', v)}
@@ -289,7 +289,7 @@ export function Transactions() {
               <option value="">{t.transactions.allAccounts}</option>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {institutionsById.get(a.institutionId)!.name} · {accountLabel(a, t)}
+                  {shownName(a, `${institutionsById.get(a.institutionId)!.name} · ${accountLabel(a, t)}`)}
                 </option>
               ))}
             </FilterChip>

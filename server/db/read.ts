@@ -7,6 +7,7 @@ import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Snapshot, type SyncInfo, ty
 import { toSnapshot } from '../pluggy/map.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
 import { readCategories, readIncomeFilter, readProjectionSettings, readRecurringOverrides } from './categories.js'
+import { withAccountNames } from '../../src/data/edits.js'
 import type { Db } from './connection.js'
 
 /** When each configured connection last synced; overall = the oldest of them (null until all have). */
@@ -31,7 +32,10 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string): Pro
   if (sync.connections.every((c) => !c.lastSyncedAt)) return null
 
   const items = await db.query<{ raw: PluggyItem }>(`SELECT raw FROM bank_connections WHERE id = ANY($1::text[])`, [itemIds])
-  const accounts = await db.query<{ raw: PluggyAccount }>(`SELECT raw FROM accounts WHERE connection_id = ANY($1::text[])`, [itemIds])
+  const accounts = await db.query<{ id: string; raw: PluggyAccount; nickname: string | null }>(
+    `SELECT id, raw, nickname FROM accounts WHERE connection_id = ANY($1::text[])`,
+    [itemIds],
+  )
   const txs = await db.query<{ raw: PluggyTransaction; category_id: string | null; subcategory_id: string | null; is_hidden: boolean; edited: boolean; transfer_override: TransferOverride | null }>(
     `SELECT t.raw, t.category_id, t.subcategory_id, t.is_hidden, t.category_edited_at IS NOT NULL AS edited, t.transfer_override
      FROM transactions t JOIN accounts a ON a.id = t.account_id
@@ -58,13 +62,14 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string): Pro
       ),
     },
   })
-  return {
+  return withAccountNames({
     ...snapshot,
+    accountNames: Object.fromEntries(accounts.rows.filter((r) => r.nickname).map((r) => [r.id, r.nickname!])),
     sync,
     incomeFilter: await readIncomeFilter(db),
     projectionSettings: await readProjectionSettings(db),
     recurringOverrides: await readRecurringOverrides(db),
-  }
+  })
 }
 
 /**

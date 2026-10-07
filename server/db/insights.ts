@@ -22,7 +22,7 @@ import { computeInsights } from '../../src/data/insights.js'
 import type { Projection } from '../../src/data/projection.js'
 import type { RecurringItem } from '../../src/data/recurring.js'
 import type { Snapshot } from '../../src/data/types.js'
-import { bankName, describeEvent, paymentLabel } from '../../src/lib/insightText.js'
+import { describeEvent, paymentLabel } from '../../src/lib/insightText.js'
 import { brazilDate } from '../pluggy/map.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
 import { dbErrorCode, dbErrorMessage, getPool } from './connection.js'
@@ -96,7 +96,7 @@ export function recurringPayload(s: Snapshot, today: string) {
     nextDate: i.nextDate,
     amount: i.amount,
     ...(i.foreign?.currency === 'USD' ? { usdAmount: i.foreign.amount } : {}),
-    account: paymentLabel(i.paymentMethod, bankName(i.accountId, s.accounts, s.institutions)),
+    account: paymentLabel(i.paymentMethod, i.accountId, s.accounts, s.institutions),
     paymentMethod: i.paymentMethod,
     status: i.status,
     priceHistory: i.priceHistory,

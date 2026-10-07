@@ -249,6 +249,10 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
     case 'setProjectionSettings':
       await writeSetting(db, PROJECTION_KEY, e.settings)
       return null
+    case 'renameAccount':
+      // Its own column: syncs only write the bank's columns, so they never change it.
+      await one(`UPDATE accounts SET nickname = $2 WHERE id = $1`, [e.accountId, e.name], 'account')
+      return null
     case 'recurringAction': {
       // The row is locked so two answers given at once both stay.
       await db.query(`INSERT INTO app_settings (key, value) VALUES ($1, '{}'::jsonb) ON CONFLICT (key) DO NOTHING`, [RECURRING_KEY])

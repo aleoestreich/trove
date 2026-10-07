@@ -1,6 +1,6 @@
 import type { Repository } from './repository'
 import { DEMO_SUBCATEGORIES, buildSeed } from './seed'
-import { applyEdit, checkBulk, defaultCategories } from './edits'
+import { applyEdit, checkBulk, defaultCategories, withAccountNames } from './edits'
 import { DEFAULT_CATEGORIES } from './categoryCatalog'
 import type { Category, IncomeFilter, ProjectionSettings, RecurringOverride, Snapshot, Subcategory, TransferOverride } from './types'
 
@@ -16,6 +16,8 @@ interface DemoOwner {
   /** The projection's settings and the answers about recurring charges (app_settings too). */
   projectionSettings?: ProjectionSettings
   recurringOverrides?: Record<string, RecurringOverride>
+  /** Names set in Trove for accounts and cards (app_settings too). */
+  accountNames?: Record<string, string>
 }
 
 function read(): DemoOwner | null {
@@ -51,8 +53,9 @@ function initialOwner(seed: Snapshot): DemoOwner {
 /** The seed with the stored categories; guesses only point at categories that still exist. */
 function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
   const known = new Set(owner.categories.map((c) => c.id))
-  return {
+  return withAccountNames({
     ...seed,
+    accountNames: owner.accountNames,
     categories: owner.categories,
     subcategories: owner.subcategories,
     incomeFilter: owner.incomeFilter,
@@ -71,7 +74,7 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
       if (s) return { ...t, categoryId: s.categoryId, subcategoryId: s.subcategoryId, hidden: s.hidden || undefined }
       return t.categoryId && !known.has(t.categoryId) ? { ...t, categoryId: null } : t
     }),
-  }
+  })
 }
 
 /** Demo data. Categories and edits are kept in this browser's localStorage. */
@@ -105,6 +108,7 @@ export function createMockRepository(today: Date = new Date()): Repository {
         incomeFilter: next.incomeFilter,
         projectionSettings: next.projectionSettings,
         recurringOverrides: next.recurringOverrides,
+        accountNames: next.accountNames,
       })
       return previous && { updated: previous.length, previous }
     },

@@ -1,5 +1,6 @@
 import type { Account } from '../data/types'
 import type { Messages } from '../i18n/messages'
+import { shownName } from './accountLabel'
 
 export type AccountType = 'checking' | 'savings' | 'usd' | 'card'
 
@@ -15,6 +16,7 @@ export function accountType(account: Account): AccountType {
  * Labels for a bank's accounts on Accounts: the kind of account ("Checking",
  * "Credit card"…), or "EUR balance" for other foreign balances. When a bank has
  * two of the same, each also shows its own name ("Credit card · Platinum").
+ * A name set in Trove replaces the label.
  */
 export function accountTypeLabels(accounts: Account[], t: Messages): Map<string, string> {
   const base = (a: Account) => {
@@ -27,7 +29,7 @@ export function accountTypeLabels(accounts: Account[], t: Messages): Map<string,
     accounts.map((a) => {
       const label = base(a)
       const name = a.name.trim()
-      return [a.id, (counts.get(label) ?? 0) > 1 && name && name !== label ? `${label} · ${name}` : label]
+      return [a.id, shownName(a, (counts.get(label) ?? 0) > 1 && name && name !== label ? `${label} · ${name}` : label)]
     }),
   )
 }
