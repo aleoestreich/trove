@@ -1,5 +1,6 @@
 import type { BulkResult, Edit } from './edits'
-import type { Snapshot, SyncJob } from './types'
+import type { Snapshot, SyncJob, Transaction } from './types'
+import type { TransactionQuery } from './transactionFilter'
 
 /**
  * Everything the UI reads or writes goes through this interface.
@@ -20,4 +21,9 @@ export interface Repository {
   startSync(connectionIds?: string[]): Promise<SyncJob>
   /** The latest sync job, for progress (null if there was none). */
   syncStatus(): Promise<SyncJob | null>
+  /**
+   * Stored transactions of a month, or of every stored month ("all"), with
+   * Transações' filters: for months older than `load()` returns.
+   */
+  transactions(query: TransactionQuery): Promise<Transaction[]>
 }

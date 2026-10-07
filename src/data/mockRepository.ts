@@ -1,6 +1,7 @@
 import type { Repository } from './repository'
 import { DEMO_SUBCATEGORIES, buildSeed } from './seed'
 import { applyEdit, checkBulk, defaultCategories, withAccountNames } from './edits'
+import { filterTransactions } from './transactionFilter'
 import { DEFAULT_CATEGORIES } from './categoryCatalog'
 import type { Category, IncomeFilter, ProjectionSettings, RecurringOverride, Snapshot, Subcategory, TransferOverride } from './types'
 
@@ -117,6 +118,12 @@ export function createMockRepository(today: Date = new Date()): Repository {
     },
     async syncStatus() {
       return null
+    },
+    async transactions(q) {
+      // The demo has every month in memory already.
+      const s = load()
+      const inMonth = q.month === 'all' ? s.transactions : s.transactions.filter((t) => t.date.startsWith(q.month))
+      return filterTransactions(inMonth, new Map(s.categories.map((c) => [c.id, c])), { ...q, month: undefined })
     },
   }
 }

@@ -60,3 +60,23 @@ describe('transactions page order', () => {
     expect(newestFirst(list).map((t) => t.id)).toEqual(['b', 'c', 'd', 'a'])
   })
 })
+
+describe('transactions page months', () => {
+  it('lists every stored month from the oldest to now', async () => {
+    const { monthsBetween } = await import('../pages/Transactions')
+    expect(monthsBetween('2025-01', '2026-10')).toHaveLength(22)
+    expect(monthsBetween('2025-01', '2026-10')[0]).toBe('2025-01')
+    expect(monthsBetween(undefined, '2026-10')).toEqual(['2026-10'])
+  })
+})
+
+describe('transaction queries', () => {
+  it('round-trip through the URL and refuse invalid ones', async () => {
+    const { parseTransactionQuery, transactionQueryParams } = await import('../data/transactionFilter')
+    const q = { month: 'all', accountId: 'acc-1', categoryId: 'none', kind: 'expense' as const, query: 'loja' }
+    expect(parseTransactionQuery(transactionQueryParams(q))).toEqual(q)
+    expect(parseTransactionQuery(new URLSearchParams('month=2025-13'))).toBeNull()
+    expect(parseTransactionQuery(new URLSearchParams('month=2025-03&type=other'))).toBeNull()
+    expect(parseTransactionQuery(new URLSearchParams('month=2025-03'))).toEqual({ month: '2025-03' })
+  })
+})

@@ -8,7 +8,8 @@ import { EditError, type BulkResult } from '../../src/data/edits.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
 import { dbErrorCode, inTransaction } from './connection.js'
-import { readSnapshot } from './read.js'
+import { readSnapshot, readStart } from './read.js'
+import { financeRoutes } from './handlers.js'
 import { HISTORY_START, save, syncFrom, type Fetched } from './sync.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
 import { edits, incomeAverageRoute, incomeRoutes, incomeCategoriesRoute, saveIncomeFilterRoute, startSync, syncStatus } from './handlers.js'
@@ -448,6 +449,27 @@ suite('database', () => {
     await expect(applyEditSql(pool, { op: 'renameAccount', accountId: 'nope', name: 'X' })).rejects.toThrow(EditError)
   })
 
+  it('GET /api/transactions fetches older months and every stored month, with the filters', async () => {
+    await sync([
+      tx('old-1', { date: '2025-02-10T12:00:00.000Z', description: 'LOJA ANTIGA' }),
+      tx('old-2', { date: '2025-02-20T12:00:00.000Z', description: 'MERCADO EXEMPLO', amount: -80 }),
+      tx('old-3', { date: '2025-03-05T12:00:00.000Z', type: 'CREDIT', amount: 500, description: 'PIX RECEBIDO EXEMPLO' }),
+      tx('new-1', { date: '2026-10-01T12:00:00.000Z' }),
+    ])
+    const config = { pluggy: { clientId: 'cid', clientSecret: 'secret', itemIds: ['item-1'], baseUrl: 'https://api.pluggy.ai' }, databaseUrl: url! }
+    const get = async (query: string) => {
+      const res = await financeRoutes(new Request(`https://trove.test/api/finance?view=transactions&${query}`), config)
+      return { status: res.status, ids: res.ok ? ((await res.json()).transactions as { id: string }[]).map((t) => t.id).sort() : [] }
+    }
+    expect(await get('month=2025-02')).toEqual({ status: 200, ids: ['old-1', 'old-2'] })
+    expect(await get('month=all')).toEqual({ status: 200, ids: ['new-1', 'old-1', 'old-2', 'old-3'] })
+    expect(await get('month=all&type=income')).toEqual({ status: 200, ids: ['old-3'] })
+    expect(await get('month=all&q=mercado')).toEqual({ status: 200, ids: ['old-2'] })
+    expect((await get('month=fev')).status).toBe(400)
+    // The app's data lists every stored month, for the month filter.
+    expect((await readSnapshot(pool, ['item-1'], '2026-10-01'))!.storedMonths).toEqual(['2025-02', '2025-03', '2026-10'])
+  })
+
   describe('insight routes', () => {
     const config = () => ({ pluggy: { clientId: 'cid', clientSecret: 'secret', itemIds: ['item-1'], baseUrl: 'https://api.pluggy.ai' }, databaseUrl: url! })
     const deps = { now: () => now }
@@ -516,6 +538,12 @@ suite('database', () => {
       const res = await insightRoutes(new Request('https://trove.test/api/recurring'), { pluggy: null, databaseUrl: null }, deps)
       expect(res.status).toBe(503)
     })
+  })
+})
+
+describe('read window', () => {
+  it('loads the 14 months the insights need; older ones are fetched on demand', () => {
+    expect(readStart(new Date(2026, 9, 7))).toBe('2025-09-01')
   })
 })
 

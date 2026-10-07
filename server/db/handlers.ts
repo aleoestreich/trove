@@ -2,6 +2,9 @@
 //
 //   GET  /api/finance  the app's data, read from the database
 //        200 Snapshot · 409 { error: 'never_synced', sync } · 503 not_configured
+//   GET  /api/transactions?month=YYYY-MM|all&type=&account=&category=&q=  stored transactions with
+//        Transações' filters, for months older than /api/finance loads: 200 { transactions } · 400 invalid
+//        (one function with /api/finance, api/finance.ts, through a vercel.json rewrite)
 //   POST /api/edits    one change to categories or transactions (src/data/edits.ts)
 //        204 · 400 invalid (with a `reason` for bulk rules) · 404 not_found · 409 name_taken
 //        categorizeMany: 200 { updated, previous }; restoreCategories: 200 { updated }
@@ -28,7 +31,8 @@ import { brazilDate } from '../pluggy/map.js'
 import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 import { applyEditSql, ensureSeeded } from './categories.js'
 import { dbErrorCode, dbErrorMessage, getPool } from './connection.js'
-import { analysisStart, readSnapshot, readSyncInfo } from './read.js'
+import { readStart, readSnapshot, readSyncInfo, readTransactions } from './read.js'
+import { parseTransactionQuery } from '../../src/data/transactionFilter.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
 import { waitUntil } from '@vercel/functions'
 
@@ -56,13 +60,39 @@ export async function financeFromDb(_request: Request, config: DbConfig, deps: P
   const pool = getPool(config.databaseUrl)
   try {
     await ensureSeeded(pool)
-    const snapshot = await readSnapshot(pool, config.pluggy.itemIds, analysisStart(deps.now?.() ?? new Date()))
+    const snapshot = await readSnapshot(pool, config.pluggy.itemIds, readStart(deps.now?.() ?? new Date()))
     if (!snapshot) return json(409, { error: 'never_synced', sync: await readSyncInfo(pool, config.pluggy.itemIds) })
     return json(200, snapshot)
   } catch (e) {
     if (e instanceof Error && e.message.startsWith('Missing exchange rate')) return json(500, { error: 'missing_rate', message: e.message })
     return json(500, { error: dbErrorCode(e), message: dbErrorMessage(e) })
   }
+}
+
+/**
+ * GET /api/transactions?month=YYYY-MM|all&type=&account=&category=&q=: the
+ * stored transactions of a month, or of every stored month, with Transações'
+ * filters applied (Pluggy isn't reached: only Sync does that).
+ */
+export async function transactionsRoute(request: Request, config: DbConfig): Promise<Response> {
+  if (!config.pluggy || !config.databaseUrl) return notConfigured()
+  const q = parseTransactionQuery(new URL(request.url).searchParams)
+  if (!q) return json(400, { error: 'invalid' })
+  try {
+    const transactions = await readTransactions(getPool(config.databaseUrl), config.pluggy.itemIds, q)
+    return transactions ? json(200, { transactions }) : json(409, { error: 'never_synced' })
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith('Missing exchange rate')) return json(500, { error: 'missing_rate', message: e.message })
+    return json(500, { error: dbErrorCode(e), message: dbErrorMessage(e) })
+  }
+}
+
+/** GET /api/finance and GET /api/transactions are one function (vercel.json rewrites the second here with ?view=transactions). */
+export function financeRoutes(request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}): Promise<Response> {
+  const url = new URL(request.url)
+  return url.searchParams.get('view') === 'transactions' || url.pathname.endsWith('/transactions')
+    ? transactionsRoute(request, config)
+    : financeFromDb(request, config, deps)
 }
 
 export async function edits(request: Request, config: DbConfig): Promise<Response> {
@@ -158,7 +188,7 @@ async function snapshotFor(config: DbConfig, deps: Partial<HandlerDeps>): Promis
   if (!config.pluggy || !config.databaseUrl) return notConfigured()
   const pool = getPool(config.databaseUrl)
   await ensureSeeded(pool)
-  const snapshot = await readSnapshot(pool, config.pluggy.itemIds, analysisStart(deps.now?.() ?? new Date()))
+  const snapshot = await readSnapshot(pool, config.pluggy.itemIds, readStart(deps.now?.() ?? new Date()))
   return snapshot ?? json(409, { error: 'never_synced' })
 }
 
