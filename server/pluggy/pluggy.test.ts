@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PluggyClient, PluggyError, readPluggyConfig, readPluggyCredentials, type PluggyConfig } from './client.js'
 import { connectToken } from './connectToken.js'
 import { pluggyWebhook, readWebhookConfig, WEBHOOK_SECRET_HEADER } from './webhook.js'
 import { bankOf, brazilDate, categoryFor, itemBankName, toSnapshot, type PluggyData } from './map.js'
 import { clearRateCache, ratesToBRL } from './rates.js'
-import { clearFinanceCache, finance, historyStart } from './finance.js'
+import { historyStart } from '../db/read.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
 import { defaultCategories } from '../../src/data/edits.js'
 import { incomeAverage, NO_FILTER } from '../../src/data/incomeAverage.js'
@@ -437,82 +437,9 @@ describe('mapping to Trove', () => {
   })
 })
 
-describe('GET /api/finance', () => {
-  beforeEach(() => {
-    clearFinanceCache()
-    clearRateCache()
-  })
-  afterEach(() => vi.restoreAllMocks())
-
-  /** Fake Pluggy + exchange-rate service. */
-  function fakeUpstream(opts: { failAccounts?: boolean; extraAccounts?: PluggyAccount[] } = {}) {
-    return vi.fn(async (input: string | URL | Request) => {
-      const url = new URL(String(input))
-      if (url.hostname === 'economia.awesomeapi.com.br') return Response.json({ USDBRL: { bid: '5.5' } })
-      if (url.pathname === '/auth') return Response.json({ apiKey: 'KEY' })
-      if (url.pathname === '/items/item-1') return Response.json(item)
-      if (url.pathname === '/accounts') {
-        const results = [checking, usd, ...(opts.extraAccounts ?? [])]
-        return opts.failAccounts ? new Response('down', { status: 500 }) : Response.json({ results, page: 1, total: results.length, totalPages: 1 })
-      }
-      if (url.pathname === '/v2/transactions') {
-        const acc = url.searchParams.get('accountId')!
-        if (opts.extraAccounts?.some((a) => a.id === acc)) return Response.json({ results: [], next: null })
-        return Response.json({ results: [tx({ id: `t-${acc}`, accountId: acc, category: 'Groceries', description: 'Pão de Açúcar' })], next: null })
-      }
-      return new Response('not found', { status: 404 })
-    })
-  }
-  const req = (q = '') => new Request(`https://trove.vercel.app/api/finance${q}`)
-  const now = () => new Date(2026, 8, 29)
-
-  it('does not ask for exchange rates of hidden, empty balances (e.g. a Wise EUR account at zero)', async () => {
-    const eur: PluggyAccount = { id: 'acc-eur', itemId: 'item-1', type: 'BANK', subtype: 'CHECKING_ACCOUNT', name: 'EUR', balance: 0, currencyCode: 'EUR' }
-    const fetchFn = fakeUpstream({ extraAccounts: [eur] })
-    const res = await finance(req(), config, { fetch: fetchFn as typeof fetch, now })
-    expect(res.status).toBe(200)
-    const rateUrls = fetchFn.mock.calls.map(([u]) => String(u)).filter((u) => u.includes('awesomeapi'))
-    expect(rateUrls).toEqual(['https://economia.awesomeapi.com.br/json/last/USD-BRL'])
-    expect((await res.json()).accounts.map((a: { id: string }) => a.id)).not.toContain('acc-eur')
-  })
-
-  it('returns 503 when Pluggy is not configured (the app then shows demo data)', async () => {
-    const res = await finance(req(), null)
-    expect(res.status).toBe(503)
-    expect(await res.json()).toEqual({ error: 'not_configured' })
-  })
-
-  it('returns the snapshot, fetching history from the start of the 6-month window', async () => {
-    const fetchFn = fakeUpstream()
-    const res = await finance(req(), config, { fetch: fetchFn as typeof fetch, now })
-    expect(res.status).toBe(200)
-    expect(res.headers.get('Cache-Control')).toContain('private')
-    const s = await res.json()
-    expect(s.source).toBe('pluggy')
-    expect(s.accounts).toHaveLength(2)
-    expect(s.transactions).toHaveLength(2)
-    expect(historyStart(now())).toBe('2026-04-01')
-    expect(fetchFn.mock.calls.some(([u]) => String(u).includes('dateFrom=2026-04-01'))).toBe(true)
-  })
-
-  it('summary: shows structure and category mapping, but no amounts or descriptions', async () => {
-    const res = await finance(req('?summary'), config, { fetch: fakeUpstream() as typeof fetch, now })
-    const text = await res.text()
-    const body = JSON.parse(text)
-    expect(body.items[0]).toMatchObject({ connector: 'Nubank', status: 'UPDATED' })
-    expect(body.accounts.map((a: { currencyCode: string }) => a.currencyCode)).toEqual(['BRL', 'USD'])
-    expect(body.categories[0]).toMatchObject({ pluggyCategory: 'Groceries', mappedTo: 'groceries', count: 2 })
-    expect(text).not.toContain('Pão de Açúcar')
-    expect(text).not.toMatch(/"(amount|balance)"/)
-  })
-
-  it('returns 502 with a readable message when Pluggy fails, without the secret', async () => {
-    const res = await finance(req(), config, { fetch: fakeUpstream({ failAccounts: true }) as typeof fetch, now })
-    expect(res.status).toBe(502)
-    const body = await res.json()
-    expect(body.error).toBe('upstream')
-    expect(body.message).toContain('/accounts')
-    expect(JSON.stringify(body)).not.toContain('super-secret')
+describe('history window', () => {
+  it('starts on the first day of the oldest month shown', () => {
+    expect(historyStart(new Date(2026, 8, 29))).toBe('2026-04-01')
   })
 })
 
@@ -607,7 +534,6 @@ describe('POST /api/webhooks/pluggy', () => {
   const log = (message: string, details: Record<string, string | undefined>) => void logs.push({ message, details })
   beforeEach(() => {
     logs.length = 0
-    clearFinanceCache()
   })
 
   it('reads its secret from PLUGGY_WEBHOOK_SECRET (fails closed without it)', () => {
@@ -623,30 +549,11 @@ describe('POST /api/webhooks/pluggy', () => {
     expect(logs).toEqual([])
   })
 
-  it('acknowledges item/updated with 2XX and clears the cache so the next load is fresh', async () => {
-    let pluggyCalls = 0
-    const upstream = (async (input: string | URL | Request) => {
-      const url = new URL(String(input))
-      if (url.hostname === 'api.pluggy.ai') pluggyCalls++
-      if (url.pathname === '/auth') return Response.json({ apiKey: 'K' })
-      if (url.pathname.startsWith('/items/')) return Response.json(item)
-      if (url.pathname === '/accounts') return Response.json({ results: [checking], page: 1, total: 1, totalPages: 1 })
-      return Response.json({ results: [], next: null })
-    }) as typeof fetch
-    const load = () => finance(new Request('https://t/api/finance'), config, { fetch: upstream })
-
-    await load()
-    const afterFirst = pluggyCalls
-    await load()
-    expect(pluggyCalls).toBe(afterFirst) // served from the cache
-
+  it('acknowledges item/updated with 2XX and only logs it, without calling Pluggy', async () => {
     const res = await pluggyWebhook(hook({ event: 'item/updated', eventId: 'e1', itemId: 'item-1' }), cfg, log)
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ received: true })
-    expect(logs[0].message).toMatch(/cache cleared/)
-
-    await load()
-    expect(pluggyCalls).toBeGreaterThan(afterFirst) // fetched again after the webhook
+    expect(logs[0].message).toMatch(/Sync fetches it/)
   })
 
   it('logs item/created with its ID, and item/error with its code only', async () => {

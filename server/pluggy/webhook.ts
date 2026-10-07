@@ -8,12 +8,10 @@
 // closed: no secret configured -> 503; wrong or missing header -> 401.
 //
 // Pluggy requires a 2XX within 5 seconds. Trove's data only changes on Sync
-// (server/db/sync.ts), so the work here is small: drop the
-// live-read cache used by /api/finance?summary, and log what happened (event
-// type and IDs only; never amounts or messages).
+// (server/db/sync.ts), so the webhook only logs what happened (event type and
+// IDs only; never amounts or messages); it never calls Pluggy.
 
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { clearFinanceCache } from './finance.js'
 
 export const WEBHOOK_PATH = '/api/webhooks/pluggy'
 export const WEBHOOK_SECRET_HEADER = 'X-Trove-Webhook-Secret'
@@ -81,8 +79,7 @@ export async function pluggyWebhook(request: Request, config: WebhookConfig | nu
     case 'transactions/created':
     case 'transactions/updated':
     case 'transactions/deleted':
-      clearFinanceCache()
-      log('data changed; cache cleared', ids)
+      log('data changed in Pluggy; Sync fetches it', ids)
       break
     case 'item/error':
       // Only the code: the message may contain details from the bank.

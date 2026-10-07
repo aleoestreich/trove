@@ -4,7 +4,8 @@ Trove gets bank data from Pluggy, the Open Finance service behind Meu Pluggy:
 - on **Sync**, the server (behind the Auth0 login) fetches each connection,
   its accounts and their transactions from Pluggy and saves them in Trove's
   database ([docs/neon-setup.md](neon-setup.md));
-- every screen reads that database; nothing calls Pluggy on load.
+- every screen and every route reads that database; only Sync calls Pluggy
+  (plus the Connect token when linking Meu Pluggy, which returns no data).
 
 Until the settings below and the database are in place, the deployed site
 shows demo data (with the "Demo data" label).
@@ -97,15 +98,7 @@ Nothing else is stored. The logs are in Vercel → **Logs**.
    and log in: demo data shows with "Sync to load your banks". **Sync now**
    syncs each connection in turn; then the real accounts appear and the "Demo
    data" label goes away.
-2. `https://YOUR_SITE/api/finance?summary` (while logged in) returns a live
-   report from Pluggy for tuning the mapping:
-   - connections and their status;
-   - each account's name and the bank its card is named after;
-   - account types and currencies;
-   - how Pluggy's categories map to Trove's.
-
-   It contains **no amounts or transaction descriptions**.
-3. Worth checking by eye:
+2. Worth checking by eye:
    - **Wise:** the USD balance shows as US$ with its R$ value next to it.
    - **Cards:** open bill, limit and available limit match the bank's app.
    - **Installments tab:** purchases show the right "3/10".
@@ -151,28 +144,12 @@ When the sync can't start at all, the reason comes from the HTTP status of
 `POST /api/sync`: no answer (network), `503` (a setting is missing), `403` (a
 connection not in `PLUGGY_ITEM_IDS`), or `5xx` (server or database).
 
-## Debug screen
-
-**Accounts → Pluggy debug** (or `/#/debug`) on the deployed site shows exactly
-what Pluggy sends. For each item in `PLUGGY_ITEM_IDS`, each button calls one
-of:
-
-- `GET /items/{id}`;
-- `GET /accounts?itemId=`;
-- `GET /v2/transactions?accountId=` (one page; **Next page** follows the cursor);
-- `GET /bills?accountId=` (credit cards).
-
-It shows Pluggy's status and the full raw JSON, values included. Nothing is
-stored or logged; the route is behind the login and only accepts the
-configured items and their accounts.
-
 ## Implementation
 
 - `api/finance.ts` → `server/db/handlers.ts`: `GET /api/finance` reads the
   database (`server/db/read.ts`). It fails closed with `503 not_configured`
   when Pluggy or the database isn't configured, and returns `409
   never_synced` before the first sync; the app then shows demo data.
-  `?summary` is the live diagnostic report (`server/pluggy/finance.ts`).
 - `api/sync.ts` → `server/db/syncJobs.ts` and `server/db/sync.ts`:
   `POST /api/sync` starts a background sync (optionally of some
   `connectionIds`, which must be in `PLUGGY_ITEM_IDS`; `403` otherwise) and
@@ -182,10 +159,8 @@ configured items and their accounts.
   sends the API key as `X-API-KEY`, and uses `GET /items/{id}`,
   `GET /accounts?itemId=` and `GET /v2/transactions?accountId=&dateFrom=`
   with the cursor.
-- `api/debug/pluggy.ts` → `server/pluggy/debug.ts`: the debug screen's
-  read-only passthrough (`PluggyClient.raw`), limited to the four calls above.
-- `server/pluggy/map.ts`: Pluggy → Trove model, for live data and for the
-  stored `raw` rows alike:
+- `server/pluggy/map.ts`: Pluggy → Trove model, applied to the stored `raw`
+  rows on every read:
   - signs from `DEBIT`/`CREDIT`;
   - BRL conversion, keeping the original currency;
   - installments from `creditCardMetadata`;
@@ -205,8 +180,7 @@ configured items and their accounts.
     "USD balance" / "Saldo em USD", and so on;
   - accounts with nothing to show and no transactions in the window are left
     out: bank accounts at zero, and credit cards with no bill and none of the
-    limit in use (no future installments). The summary marks them
-    `hiddenAsEmpty`.
+    limit in use (no future installments).
 - `api/connect-token.ts` → `server/pluggy/connectToken.ts`: `POST` (behind
   the login). It looks up the MeuPluggy connector (`GET /connectors?name=`),
   refuses with `409` if it's missing, then creates a Connect token
