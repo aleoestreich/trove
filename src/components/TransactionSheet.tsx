@@ -71,17 +71,18 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
 
   return (
     <>
-      <div className="flex items-center gap-3 pt-1 pb-3 lg:pt-0">
+      {/* The full description wraps (banks' long ones included), so it can be read while editing. */}
+      <div className="flex items-start gap-3 pt-1 pb-3 lg:pt-0">
         <TransactionBadge tx={current} categoriesById={categoriesById} size={44} />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 className="truncate text-lg leading-6 font-medium text-ink">{current.description}</h2>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
+          <h2 className="text-lg leading-6 font-medium [overflow-wrap:anywhere] text-ink">{current.description}</h2>
           <span className="text-[13px] leading-[18px] text-muted">{accountLabel(current.accountId)}</span>
         </div>
         <button
           ref={closeRef}
           type="button"
           onClick={onClose}
-          className="-mr-2 flex size-12 shrink-0 items-center justify-center rounded-full text-ink-2 hover:bg-track active:bg-track"
+          className="-mt-1 -mr-2 flex size-12 shrink-0 items-center justify-center rounded-full text-ink-2 hover:bg-track active:bg-track"
           aria-label={t.close}
         >
           <Icon name="close" className="size-[22px]" strokeWidth={2} />
@@ -141,7 +142,7 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
             <div
               role="radiogroup"
               aria-labelledby={`${variant}-category`}
-              className={`-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:-mx-5 lg:px-5 ${panel ? 'lg:flex-wrap lg:overflow-visible' : ''}`}
+              className={`-mx-4 flex shrink-0 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:-mx-5 lg:px-5 ${panel ? 'lg:flex-wrap lg:overflow-visible' : ''}`}
             >
               {options.map((c) => (
                 <CategoryChip key={c.id} category={c} name={categoryName(c)} on={c.id === category?.id} onClick={() => setCategory(c)} />
