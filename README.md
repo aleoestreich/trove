@@ -33,10 +33,12 @@ blocks the connection, allow Node.js on private networks.
 
 English and Brazilian Portuguese (PT-BR), switched in the header and saved on
 the device. On first launch the device language is used. UI text, money
-(`R$ 1.234,56` / `R$1,234.56`) and dates follow the language. Category names
-are stored as entered (the defaults are seeded in the language active on first
-run). Transaction descriptions and account names are shown as the banks send
-them. Strings live in `src/i18n/messages.ts`.
+(`R$ 1.234,56` / `R$1,234.56`) and dates follow the language. The default
+categories and subcategories are seeded once, in the language active on first
+run, and shown in the active language while they keep a default name
+(`src/data/categoryNames.ts`). Renamed defaults and categories created in the
+app show the name as entered. Transaction descriptions and account names are
+shown as the banks send them. Strings live in `src/i18n/messages.ts`.
 
 ## Data
 

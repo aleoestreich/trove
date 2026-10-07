@@ -4,6 +4,7 @@ import { SyncStartError } from './data/apiRepository'
 import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/syncProblems'
 import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, type Edit } from './data/edits'
+import { localizeCategories } from './data/categoryNames'
 import type { Account, Category, Institution, Snapshot, Subcategory, SyncInfo, SyncJob } from './data/types'
 import { useI18n } from './i18n/I18nProvider'
 import { Button, EmptyState } from './components/ui'
@@ -69,6 +70,7 @@ const byOrder = <T extends { sortOrder: number; name: string }>(a: T, b: T) => a
  * inside `<DataGate>`, which shows the loading and error states.
  */
 export function DataProvider({ repository, children }: { repository: Repository; children: ReactNode }) {
+  const { locale } = useI18n()
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -213,8 +215,10 @@ export function DataProvider({ repository, children }: { repository: Repository;
     if (!snapshot) return null
     // Closing and due days set by hand replace the bank's dates for those cards.
     const accounts = applyCardDays(snapshot.accounts, cardDays)
-    const categories = [...snapshot.categories].sort(byOrder)
-    const subcategories = [...snapshot.subcategories].sort(byOrder)
+    // Default names follow the active language (unless renamed).
+    const named = localizeCategories(snapshot.categories, snapshot.subcategories, locale === 'pt-BR' ? 'pt' : 'en')
+    const categories = named.categories.sort(byOrder)
+    const subcategories = named.subcategories.sort(byOrder)
     return {
       ...snapshot,
       accounts,
@@ -227,7 +231,7 @@ export function DataProvider({ repository, children }: { repository: Repository;
       edit,
       setCardDays,
     }
-  }, [snapshot, edit, cardDays, setCardDays])
+  }, [snapshot, edit, cardDays, setCardDays, locale])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),
