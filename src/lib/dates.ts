@@ -1,5 +1,5 @@
 /** Dates are handled as ISO strings (yyyy-mm-dd) in local time; no time zones. */
-import { LOCALE } from '../i18n/locale'
+import { LOCALE } from '../i18n/locale.js'
 
 export function toISO(d: Date): string {
   const y = d.getFullYear()
@@ -19,6 +19,33 @@ export function dayOfMonth(ref: Date, offset: number, day: number): string {
 export function addMonths(iso: string, months: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   return dayOfMonth(new Date(y, m - 1, 1), months, d)
+}
+
+/** The date `days` days later (or earlier, when negative). */
+export function addDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return toISO(new Date(y, m - 1, d + days))
+}
+
+/** Whole days from `a` to `b` (ISO dates; negative when `b` is earlier). */
+export function daysFrom(a: string, b: string): number {
+  const utc = (iso: string) => {
+    const [y, m, d] = iso.split('-').map(Number)
+    return Date.UTC(y, m - 1, d)
+  }
+  return Math.round((utc(b) - utc(a)) / 86_400_000)
+}
+
+/** Days in the month of an ISO date or month key. */
+export function daysInMonth(iso: string): number {
+  const [y, m] = iso.split('-').map(Number)
+  return new Date(y, m, 0).getDate()
+}
+
+/** An ISO date as a local Date (midnight). */
+export function fromISO(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d ?? 1)
 }
 
 /** "2026-09" for a given ISO date. */

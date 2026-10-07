@@ -4,12 +4,30 @@ import { errorMessage, SyncStartError } from './data/apiRepository'
 import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/syncProblems'
 import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
-import type { Account, Category, IncomeFilter, Institution, Snapshot, Subcategory, SyncInfo, SyncJob } from './data/types'
+import { MONTHS_OF_HISTORY, type Account, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type Transaction } from './data/types'
+import { computeInsights, type Insights } from './data/insights'
+import type { RecurringAction } from './data/recurring'
+import { lastMonths, monthKey, toISO } from './lib/dates'
 import { useI18n } from './i18n/I18nProvider'
 import { messages } from './i18n/messages'
 import { Button, EmptyState } from './components/ui'
 
 interface AppData extends Snapshot {
+  /**
+   * The months the screens show (MONTHS_OF_HISTORY, plus the one before for
+   * the 6-complete-month averages). The snapshot loads more for the insights.
+   */
+  transactions: Transaction[]
+  /** Everything loaded (MONTHS_OF_ANALYSIS months), for the insights. */
+  allTransactions: Transaction[]
+  /** Today (ISO date), as the insights see it. */
+  today: string
+  /** Month-end projection, unusual categories and recurring charges (src/data/insights.ts). */
+  insights: Insights
+  /** Saves what the projection counts (applied at once). */
+  saveProjectionSettings(settings: ProjectionSettings): void
+  /** A hand-set answer about a recurring charge (applied at once). */
+  answerRecurring(id: string, action: RecurringAction): void
   accountsById: Map<string, Account>
   categoriesById: Map<string, Category>
   subcategoriesById: Map<string, Subcategory>
@@ -273,14 +291,25 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [snapshot?.sync, syncing, sync],
   )
 
+  const saveProjectionSettings = useCallback((settings: ProjectionSettings) => edit({ op: 'setProjectionSettings', settings }), [edit])
+  const answerRecurring = useCallback((id: string, action: RecurringAction) => edit({ op: 'recurringAction', id, action, at: toISO(new Date()) }), [edit])
+
   const value = useMemo<AppData | null>(() => {
     if (!snapshot) return null
     // Closing and due days set by hand replace the bank's dates for those cards.
     const accounts = applyCardDays(snapshot.accounts, cardDays)
     const categories = [...snapshot.categories].sort(byOrder)
     const subcategories = [...snapshot.subcategories].sort(byOrder)
+    const today = toISO(new Date())
+    const from = `${lastMonths(monthKey(today), MONTHS_OF_HISTORY + 1)[0]}-01`
     return {
       ...snapshot,
+      transactions: snapshot.transactions.filter((t) => t.date >= from),
+      allTransactions: snapshot.transactions,
+      today,
+      insights: computeInsights({ ...snapshot, accounts, categories }, today),
+      saveProjectionSettings,
+      answerRecurring,
       accounts,
       categories,
       subcategories,
@@ -294,7 +323,7 @@ export function DataProvider({ repository, children }: { repository: Repository;
       saveIncomeFilter,
       setCardDays,
     }
-  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, cardDays, setCardDays])
+  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, cardDays, setCardDays, saveProjectionSettings, answerRecurring])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

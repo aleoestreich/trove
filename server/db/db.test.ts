@@ -13,6 +13,7 @@ import { HISTORY_START, save, syncFrom, type Fetched } from './sync.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
 import { edits, incomeAverageRoute, incomeRoutes, incomeCategoriesRoute, saveIncomeFilterRoute, startSync, syncStatus } from './handlers.js'
 import { previewAverage } from '../../src/data/incomeAverage.js'
+import { insightRoutes } from './insights.js'
 import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 
 const url = process.env.TEST_DATABASE_URL
@@ -426,6 +427,76 @@ suite('database', () => {
       ['t2', null, true],
     ])
     expect(s.sync).toMatchObject({ lastSyncedAt: now.toISOString(), connections: [{ id: 'item-1', name: 'Banco Exemplo', status: 'UPDATED' }] })
+  })
+
+  describe('insight routes', () => {
+    const config = () => ({ pluggy: { clientId: 'cid', clientSecret: 'secret', itemIds: ['item-1'], baseUrl: 'https://api.pluggy.ai' }, databaseUrl: url! })
+    const deps = { now: () => now }
+    const call = (method: string, path: string, body?: unknown) =>
+      insightRoutes(new Request(`https://trove.test${path}`, { method, body: body === undefined ? undefined : JSON.stringify(body) }), config(), deps)
+    const months = ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09']
+    const history = (extra: PluggyTransaction[] = []) =>
+      sync([
+        ...months.flatMap((m) => [
+          tx(`sal-${m}`, { type: 'CREDIT', amount: 1000, category: 'Salary', date: `${m}-05T12:00:00.000Z` }),
+          tx(`rent-${m}`, { amount: -300, description: 'Pix enviado ALUGUEL EXEMPLO', date: `${m}-10T12:00:00.000Z` }),
+          tx(`str-${m}`, { amount: -39.9, description: 'STREAMING EXEMPLO', date: `${m}-20T12:00:00.000Z` }),
+        ]),
+        ...extra,
+      ])
+
+    it('GET /api/insights/projection projects the month end from the database', async () => {
+      await history()
+      const res = await call('GET', '/api/insights/projection')
+      expect(res.status).toBe(200)
+      const p = await res.json()
+      expect(p).toMatchObject({ available: true, asOf: '2026-10-06', endDate: '2026-10-31', settings: { accountIds: null, includeDaily: true, includeFreelance: false } })
+      expect(p.breakdown).toMatchObject({ saldoHoje: 1500_00, receitasPrevistas: 1000_00, faturas: 0, recorrentes: 339_90 })
+      expect(p.end).toBe(1500_00 + 1000_00 - 339_90 - p.breakdown.diaADia)
+      expect(p.events).toContainEqual({ date: '2026-10-10', name: 'Pix enviado ALUGUEL EXEMPLO', meta: 'Recorrente · Pix', amount: -300_00 })
+      expect(p.events).toContainEqual({ date: '2026-10-07', name: 'Salário', meta: 'Estimado · média de 6 meses', amount: 1000_00 })
+    })
+
+    it('PUT /api/insights/projection/settings saves them and recalculates', async () => {
+      await history()
+      const res = await call('PUT', '/api/insights/projection/settings', { accountIds: ['acc-1'], includeDaily: false, includeFreelance: true })
+      expect(res.status).toBe(200)
+      expect((await res.json()).breakdown.diaADia).toBe(0)
+      expect((await readSnapshot(pool, ['item-1'], '2026-04-01'))!.projectionSettings).toEqual({ accountIds: ['acc-1'], includeDaily: false, includeFreelance: true })
+      expect((await call('PUT', '/api/insights/projection/settings', { accountIds: [], includeDaily: false, includeFreelance: true })).status).toBe(400)
+      expect((await call('POST', '/api/insights/projection/settings', {})).status).toBe(405)
+    })
+
+    it('GET /api/recurring and the actions, which survive the next sync', async () => {
+      await history()
+      const list = await (await call('GET', '/api/recurring')).json()
+      expect(list.active.map((i: { id: string }) => i.id).sort()).toEqual(['pix-enviado-aluguel-exemplo', 'streaming-exemplo'])
+      expect(list.monthTotal).toBe(339_90)
+      expect(list.active.find((i: { id: string }) => i.id === 'streaming-exemplo')).toMatchObject({ paymentMethod: 'debit', account: 'Débito Banco Exemplo', cadence: 'monthly', day: 20 })
+      const done = await call('POST', '/api/recurring/streaming-exemplo/action', { action: 'not_recurring' })
+      expect(done.status).toBe(200)
+      expect((await done.json()).active.map((i: { id: string }) => i.id)).toEqual(['pix-enviado-aluguel-exemplo'])
+      // The next sync brings another charge: still not recurring.
+      await history([tx('str-2026-10', { amount: -39.9, description: 'STREAMING EXEMPLO', date: '2026-10-05T12:00:00.000Z' })])
+      expect((await (await call('GET', '/api/recurring')).json()).monthTotal).toBe(300_00)
+      expect((await readSnapshot(pool, ['item-1'], '2026-04-01'))!.recurringOverrides).toEqual({ 'streaming-exemplo': { status: 'not_recurring', statusAt: '2026-10-06' } })
+      expect((await call('POST', '/api/recurring/streaming-exemplo/action', { action: 'delete' })).status).toBe(400)
+      expect((await call('POST', '/api/insights?view=recurring-action&id=has%20space', { action: 'confirm' })).status).toBe(400)
+    })
+
+    it('GET /api/insights/unusual-categories, and the income routes still answer here', async () => {
+      await history()
+      const u = await (await call('GET', '/api/insights/unusual-categories')).json()
+      expect(u).toMatchObject({ mode: 'month', month: '2026-09', compareFrom: '2026-04', compareTo: '2026-08' })
+      expect((await (await call('GET', '/api/insights?view=card')).json()).average).toBe(1000_00)
+      expect((await (await call('GET', '/api/overview/income-average')).json()).average).toBe(1000_00)
+      expect((await call('DELETE', '/api/recurring')).status).toBe(405)
+    })
+
+    it('fails closed without the database settings', async () => {
+      const res = await insightRoutes(new Request('https://trove.test/api/recurring'), { pluggy: null, databaseUrl: null }, deps)
+      expect(res.status).toBe(503)
+    })
   })
 })
 

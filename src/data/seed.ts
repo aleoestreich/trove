@@ -151,9 +151,15 @@ export function buildSeed(today: Date = new Date()): Snapshot {
     transfer('wise-brl', 'itau-checking', day(21), 5_000_00, 'Wise - envio para Itaú')
 
     // Credit card purchases.
-    add({ accountId: 'nubank-card', date: day(7), description: 'Netflix.com', amount: -44_90, categoryId: 'subscriptions' })
+    // Netflix went up last month; the gym stopped 3 months ago; an AI subscription in dollars started 2 months ago.
+    add({ accountId: 'nubank-card', date: day(7), description: 'Netflix.com', amount: offset >= -1 ? -44_90 : -39_90, categoryId: 'subscriptions' })
     add({ accountId: 'nubank-card', date: day(12), description: 'Spotify', amount: -21_90, categoryId: 'subscriptions' })
-    add({ accountId: 'itau-card', date: day(5), description: 'Smart Fit', amount: -129_90, categoryId: 'health' })
+    if (offset <= -3) add({ accountId: 'itau-card', date: day(5), description: 'Smart Fit', amount: -129_90, categoryId: 'health' })
+    if (offset >= -2) add({ accountId: 'nubank-card', date: day(12), description: 'ChatGPT Plus', categoryId: 'subscriptions', ...usd(-20_00) })
+    // More dining out lately: restaurants above their average.
+    if (offset >= -1) {
+      add({ accountId: 'itau-card', date: day(offset === 0 ? 2 : 16), description: 'Outback Steakhouse', amount: -between(150, 210), categoryId: 'food' })
+    }
     add({ accountId: 'inter-card', date: day(18), description: 'Google One', amount: -9_99, categoryId: 'subscriptions' })
     for (const card of cards) {
       const merchants = cardMerchants[card.id]
@@ -294,6 +300,8 @@ export const DEMO_SUBCATEGORIES: Record<string, string> = {
   'Padaria Bella Vista': 'Bakery',
   iFood: 'Delivery',
   'Coco Bambu': 'Dining out',
+  'Outback Steakhouse': 'Dining out',
+  'ChatGPT Plus': 'Software',
   'Uber *Trip': 'Ride apps',
   '99 Tecnologia': 'Ride apps',
   'Shell Select': 'Fuel',

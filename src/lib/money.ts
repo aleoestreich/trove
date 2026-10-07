@@ -1,5 +1,5 @@
-import type { Cents, CurrencyCode } from '../data/types'
-import { LOCALE } from '../i18n/locale'
+import type { Cents, CurrencyCode } from '../data/types.js'
+import { LOCALE } from '../i18n/locale.js'
 
 const formatters = new Map<string, Intl.NumberFormat>()
 

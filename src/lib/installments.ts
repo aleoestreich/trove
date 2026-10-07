@@ -1,5 +1,5 @@
-import type { Cents, Transaction } from '../data/types'
-import { addMonths, monthKey, toISO } from './dates'
+import type { Cents, Transaction } from '../data/types.js'
+import { addMonths, monthKey, toISO } from './dates.js'
 
 export interface UpcomingInstallment {
   number: number

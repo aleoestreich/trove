@@ -141,6 +141,33 @@ export interface Snapshot {
   sync?: SyncInfo
   /** Which income counts in the average income (none excluded when absent). */
   incomeFilter?: IncomeFilter
+  /** What the month-end projection counts (the defaults when absent). */
+  projectionSettings?: ProjectionSettings
+  /** Hand-set answers about detected recurring charges, by recurring charge ID. */
+  recurringOverrides?: Record<string, RecurringOverride>
+}
+
+/** What the month-end projection counts. */
+export interface ProjectionSettings {
+  /** The accounts whose balance is projected; null: every checking account in BRL. */
+  accountIds: string[] | null
+  /** Subtract the usual day-to-day spending (debit, Pix, boleto) until the end of the month. */
+  includeDaily: boolean
+  /** Count the expected freelance income next to the salary. */
+  includeFreelance: boolean
+}
+
+/**
+ * A hand-set answer about a recurring charge. `status`: confirmed (no longer
+ * "new"), not recurring (left out), cancelled (stopped) or still active
+ * (never shown as stopped). `increaseDismissedAt`: price increases from that
+ * date or before are no longer flagged.
+ */
+export interface RecurringOverride {
+  status?: 'confirmed' | 'not_recurring' | 'cancelled' | 'still_active'
+  /** Day the status was set (ISO date). */
+  statusAt?: string
+  increaseDismissedAt?: string
 }
 
 /**
@@ -196,3 +223,10 @@ export interface SyncResult {
 
 /** Months of history the app shows (charts, month filters) and the server fetches. */
 export const MONTHS_OF_HISTORY = 6
+
+/**
+ * Months the app loads for the insights (the current one included): recurring
+ * charges need a year to find yearly ones, and the unusual categories compare
+ * a month with the 6 before it. Screens still show MONTHS_OF_HISTORY.
+ */
+export const MONTHS_OF_ANALYSIS = 14

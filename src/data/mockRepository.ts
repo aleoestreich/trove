@@ -2,7 +2,7 @@ import type { Repository } from './repository'
 import { DEMO_SUBCATEGORIES, buildSeed } from './seed'
 import { applyEdit, checkBulk, defaultCategories } from './edits'
 import { DEFAULT_CATEGORIES } from './categoryCatalog'
-import type { Category, IncomeFilter, Snapshot, Subcategory, TransferOverride } from './types'
+import type { Category, IncomeFilter, ProjectionSettings, RecurringOverride, Snapshot, Subcategory, TransferOverride } from './types'
 
 const KEY = 'trove.demoOwner'
 
@@ -13,6 +13,9 @@ interface DemoOwner {
   stored: Record<string, { categoryId: string | null; subcategoryId: string | null; hidden: boolean; transferOverride?: TransferOverride }>
   /** The average income's filter (the database keeps it in app_settings). */
   incomeFilter?: IncomeFilter
+  /** The projection's settings and the answers about recurring charges (app_settings too). */
+  projectionSettings?: ProjectionSettings
+  recurringOverrides?: Record<string, RecurringOverride>
 }
 
 function read(): DemoOwner | null {
@@ -53,6 +56,8 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
     categories: owner.categories,
     subcategories: owner.subcategories,
     incomeFilter: owner.incomeFilter,
+    projectionSettings: owner.projectionSettings,
+    recurringOverrides: owner.recurringOverrides,
     transactions: seed.transactions.map((t) => {
       const s = owner.stored[t.id]
       // A hand-set answer wins over the seed's own transfers.
@@ -93,7 +98,14 @@ export function createMockRepository(today: Date = new Date()): Repository {
         if (!t.transfer || t.transferOverride)
           stored[t.id] = { categoryId: t.categoryId, subcategoryId: t.subcategoryId ?? null, hidden: !!t.hidden, transferOverride: t.transferOverride }
       }
-      write({ categories: next.categories, subcategories: next.subcategories, stored, incomeFilter: next.incomeFilter })
+      write({
+        categories: next.categories,
+        subcategories: next.subcategories,
+        stored,
+        incomeFilter: next.incomeFilter,
+        projectionSettings: next.projectionSettings,
+        recurringOverrides: next.recurringOverrides,
+      })
       return previous && { updated: previous.length, previous }
     },
     async startSync() {
