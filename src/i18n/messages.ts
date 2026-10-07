@@ -79,6 +79,8 @@ export interface Messages {
     byBank: string
     incomeVsExpenses: string
     lastMonths: (months: number) => string
+    /** The period of the multi-month charts. */
+    range: { label: string; months: (n: number) => string; year: string }
     kept: string
     keptShort: string
     comingUp: string
@@ -578,7 +580,8 @@ export const messages: Messages = {
     byCurrency: 'Por moeda',
     byBank: 'Por banco',
     incomeVsExpenses: 'Receitas vs. despesas',
-    lastMonths: (months) => `Últimos ${months} meses`,
+    lastMonths: (months) => (months === 12 ? 'Últimos 12 meses' : `Últimos ${months} meses`),
+    range: { label: 'Período dos gráficos', months: (n) => `${n} meses`, year: '1 ano' },
     kept: 'da receita do mês foi guardado',
     keptShort: 'Guardado no mês',
     comingUp: 'Próximos pagamentos',

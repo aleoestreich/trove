@@ -1,4 +1,5 @@
-// Hardcoded demo data: 4 institutions, ~6 months of transactions.
+// Hardcoded demo data: 4 institutions, 12 months of transactions (the
+// Overview's charts can show a year; screens list the last 6).
 //
 // Dates are generated relative to "today" so the current month always has
 // data. Amounts come from a seeded random generator, so the data is the same
@@ -16,7 +17,10 @@ export { MONTHS_OF_HISTORY }
 
 /** USD -> BRL rate today, and for each earlier month (index 0 = current month). */
 export const USD_BRL_TODAY = 5.45
-const USD_BRL_BY_MONTH = [5.45, 5.49, 5.47, 5.51, 5.58, 5.62]
+const USD_BRL_BY_MONTH = [5.45, 5.49, 5.47, 5.51, 5.58, 5.62, 5.55, 5.48, 5.41, 5.36, 5.39, 5.33]
+
+/** Months of demo transactions, the current one included. */
+const SEED_MONTHS = USD_BRL_BY_MONTH.length
 
 
 export const institutions: Institution[] = [
@@ -113,7 +117,7 @@ export function buildSeed(today: Date = new Date()): Snapshot {
     add({ accountId: to, date, description, amount, categoryId: 'transfer' })
   }
 
-  for (let offset = -(MONTHS_OF_HISTORY - 1); offset <= 0; offset++) {
+  for (let offset = -(SEED_MONTHS - 1); offset <= 0; offset++) {
     const day = (d: number) => dayOfMonth(today, offset, d)
     const usdRate = USD_BRL_BY_MONTH[-offset]
 

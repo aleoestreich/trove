@@ -230,3 +230,39 @@ export function PageHeader({ title, subtitle, children }: { title: string; subti
     </div>
   )
 }
+
+/** The periods the Overview's multi-month charts can show, in months. */
+export const RANGES = [3, 6, 12] as const
+export type Range = (typeof RANGES)[number]
+
+/** A period from the address (?r=3|6|12); 6 months when missing or unknown. */
+export function parseRange(value: string | null): Range {
+  const n = Number(value)
+  return (RANGES as readonly number[]).includes(n) ? (n as Range) : 6
+}
+
+/** "3 meses · 6 meses · 1 ano": a segmented control for the charts' period (44px targets). */
+export function RangeSwitcher({ value, onChange }: { value: Range; onChange(r: Range): void }) {
+  const { t } = useI18n()
+  const r = t.overview.range
+  return (
+    <div role="group" aria-label={r.label} className="flex rounded-md border border-line bg-surface p-1 lg:w-auto">
+      {RANGES.map((n) => {
+        const on = n === value
+        return (
+          <button
+            key={n}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(n)}
+            className={`h-10 flex-1 rounded-[10px] px-4 text-sm font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:outline-accent lg:flex-none ${
+              on ? 'bg-accent-soft text-accent' : 'text-ink-2 hover:bg-track'
+            }`}
+          >
+            {n === 12 ? r.year : r.months(n)}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
