@@ -6,7 +6,7 @@
 import { kindOf } from './categories.js'
 import { CATEGORY_COLORS, CATEGORY_ICONS, DEFAULT_CATEGORIES } from './categoryCatalog.js'
 import { hasSelection, normalizeIncomeFilter, pruneIncomeFilter } from './incomeAverage.js'
-import type { Category, CategoryType, IncomeFilter, Snapshot, Subcategory } from './types.js'
+import type { Category, CategoryType, IncomeFilter, Snapshot, Subcategory, TransferOverride } from './types.js'
 
 export type Edit =
   /** Sets a transaction's category and subcategory (null: uncategorized / none). */
@@ -29,6 +29,8 @@ export type Edit =
   | { op: 'categorizeMany'; transactionIds: string[]; categoryId: string; subcategoryId: string }
   /** Puts back what categorizeMany replaced (its BulkResult's `previous`). */
   | { op: 'restoreCategories'; items: PreviousCategory[] }
+  /** Marks a transaction as a card bill payment ('card-payment'), or says it isn't one ('none'). */
+  | { op: 'setTransferOverride'; transactionId: string; value: TransferOverride }
   /** Which income categories count in the average income (stored as exclusions). */
   | { op: 'setIncomeFilter'; filter: IncomeFilter }
 
@@ -139,6 +141,9 @@ export function validateEdit(e: unknown): Edit {
       if (new Set(out.map((i) => i.id)).size !== out.length) bad('items')
       return { op: 'restoreCategories', items: out }
     }
+    case 'setTransferOverride':
+      if (x.value !== 'card-payment' && x.value !== 'none') bad('value')
+      return { op: 'setTransferOverride', transactionId: id(x.transactionId, 'transaction'), value: x.value as TransferOverride }
     case 'setIncomeFilter': {
       const f = (x.filter ?? {}) as Record<string, unknown>
       const ids = (v: unknown, what: string) => {
@@ -255,6 +260,20 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
     }
     case 'setIncomeFilter':
       return { ...s, incomeFilter: checkIncomeFilter(s.categories, s.subcategories, e.filter) }
+    case 'setTransferOverride': {
+      tx(e.transactionId)
+      // A card bill payment has no category; "not one" leaves it uncategorized until one is chosen.
+      return {
+        ...s,
+        transactions: mapTx((t) => {
+          if (t.id !== e.transactionId) return t
+          const { transfer: _old, ...rest } = t
+          return e.value === 'card-payment'
+            ? { ...rest, transfer: 'card-payment', categoryId: null, subcategoryId: null, transferOverride: e.value }
+            : { ...rest, transferOverride: e.value }
+        }),
+      }
+    }
   }
 }
 

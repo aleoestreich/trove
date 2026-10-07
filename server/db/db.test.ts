@@ -241,6 +241,20 @@ suite('database', () => {
     })
   })
 
+  it('a hand-set card bill payment clears the category, survives syncs and moves to a replacing transaction', async () => {
+    await sync([tx('t1', { category: 'Supermarkets' }), tx('p1', { status: 'PENDING', description: 'PIX ENVIADO' })])
+    await applyEditSql(pool, { op: 'setTransferOverride', transactionId: 't1', value: 'card-payment' })
+    await applyEditSql(pool, { op: 'setTransferOverride', transactionId: 'p1', value: 'card-payment' })
+    expect((await pool.query(`SELECT category_id, transfer_override FROM transactions WHERE id = 't1'`)).rows[0]).toEqual({ category_id: null, transfer_override: 'card-payment' })
+    // The pending one posts under a new ID; the answer moves with it.
+    await sync([tx('t1', { category: 'Supermarkets', amount: -151 }), tx('n1', { description: 'PIX ENVIADO', date: '2026-10-02T12:00:00.000Z' })])
+    const s = (await readSnapshot(pool, ['item-1'], '2026-09-01'))!
+    expect(s.transactions.find((t) => t.id === 't1')).toMatchObject({ transfer: 'card-payment', categoryId: null, transferOverride: 'card-payment' })
+    expect(s.transactions.find((t) => t.id === 'n1')).toMatchObject({ transfer: 'card-payment' })
+    await applyEditSql(pool, { op: 'setTransferOverride', transactionId: 't1', value: 'none' })
+    expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.transactions.find((t) => t.id === 't1')!.transfer).toBeUndefined()
+  })
+
   it('is idempotent: the same data synced again changes nothing and duplicates nothing', async () => {
     const data = [tx('t1', { category: 'Supermarkets' }), tx('t2')]
     const bills = [{ accountId: 'acc-1', bill: { id: 'b1', dueDate: '2026-10-10T03:00:00.000Z', totalAmount: 150 } }]

@@ -429,6 +429,62 @@ describe('mapping to Trove', () => {
     expect(incomeAverage(s.transactions, categories, subcategories, NO_FILTER, '2026-10')!.average).toBe(8_250_00)
   })
 
+  describe('card bill payments', () => {
+    const kinds = (s: ReturnType<typeof toSnapshot>) => Object.fromEntries(s.transactions.map((t) => [t.id, t.transfer ?? t.categoryId]))
+    const withStored = (txs: PluggyTransaction[], stored: [string, Record<string, unknown>][]) =>
+      toSnapshot({
+        ...data(txs),
+        owner: {
+          categories: [],
+          subcategories: [],
+          stored: new Map(stored.map(([id, v]) => [id, { categoryId: null, subcategoryId: null, hidden: false, ...v }])),
+        },
+      })
+
+    it('are found by their wording: leaving a bank account, or arriving on a card (not refunds)', () => {
+      const s = toSnapshot(
+        data([
+          tx({ id: 'pay-out', description: 'PAGAMENTO FATURA CARTAO EXEMPLO', amount: 500 }),
+          tx({ id: 'pgto', description: 'PGTO FATURA', amount: 300, date: '2026-08-01T12:00:00Z' }),
+          tx({ id: 'pix-in', type: 'CREDIT', description: 'Pagamento recebido', amount: 120 }),
+          tx({ id: 'card-in', accountId: 'acc-card', type: 'CREDIT', description: 'Pagamento recebido', amount: 777, date: '2026-08-20T12:00:00Z' }),
+          tx({ id: 'refund', accountId: 'acc-card', type: 'CREDIT', description: 'Estorno LOJA EXEMPLO', amount: 40 }),
+        ]),
+      )
+      expect(kinds(s)).toEqual({ 'pay-out': 'card-payment', pgto: 'card-payment', 'pix-in': null, 'card-in': 'card-payment', refund: null })
+    })
+
+    it('are paired by amount: a bank debit and a card credit up to 5 days apart', () => {
+      const s = toSnapshot(
+        data([
+          tx({ id: 'out', description: 'PIX ENVIADO BANCO EXEMPLO', amount: 850.1, date: '2026-09-08T12:00:00Z' }),
+          tx({ id: 'in', accountId: 'acc-card', type: 'CREDIT', description: 'Crédito', amount: 850.1, date: '2026-09-10T12:00:00Z' }),
+          tx({ id: 'far-out', description: 'PIX ENVIADO', amount: 99, date: '2026-09-01T12:00:00Z' }),
+          tx({ id: 'far-in', accountId: 'acc-card', type: 'CREDIT', description: 'Crédito', amount: 99, date: '2026-09-20T12:00:00Z' }),
+          tx({ id: 'buy', accountId: 'acc-card', description: 'LOJA EXEMPLO', amount: 850.1, date: '2026-09-05T12:00:00Z' }),
+        ]),
+      )
+      expect(kinds(s)).toMatchObject({ out: 'card-payment', in: 'card-payment', 'far-out': null, 'far-in': null, buy: null })
+      // The purchase counts once; the payment and the card credit don't.
+      expect(totals(s.transactions).expenses).toBe(850_10 + 99_00)
+    })
+
+    it('a hand-set answer wins over detection, and an edited category over detection', () => {
+      const txs = [
+        tx({ id: 'worded', description: 'PAGAMENTO FATURA', amount: 500 }),
+        tx({ id: 'plain', description: 'PIX ENVIADO', amount: 1200 }),
+        tx({ id: 'edited', description: 'PAG FATURA', amount: 60 }),
+      ]
+      const s = withStored(txs, [
+        ['worded', { transferOverride: 'none' }],
+        ['plain', { transferOverride: 'card-payment', categoryId: 'shopping' }],
+        ['edited', { edited: true, categoryId: 'shopping' }],
+      ])
+      expect(kinds(s)).toEqual({ worded: null, plain: 'card-payment', edited: 'shopping' })
+      expect(s.transactions.find((t) => t.id === 'plain')!.transferOverride).toBe('card-payment')
+    })
+  })
+
   it('ignores accounts and transactions from connections that were not requested', () => {
     const other: PluggyAccount = { ...checking, id: 'x', itemId: 'someone-else' }
     const s = toSnapshot(data([tx({ accountId: 'x' })], [checking, other]))

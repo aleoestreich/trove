@@ -46,6 +46,10 @@ Then run [`db/migrations/004_category_edits.sql`](../db/migrations/004_category_
 it adds the transactions' `category_edited_at`, which marks a category set by
 an edit (see [Edits are never overwritten](#edits-are-never-overwritten)).
 
+Then run [`db/migrations/005_transfer_override.sql`](../db/migrations/005_transfer_override.sql):
+it adds the transactions' `transfer_override`, the hand-set answer to "is
+this a card bill payment?" (see [Card bill payments](#card-bill-payments)).
+
 ## 3. Give Vercel the connection string
 
 1. In Neon, open **Connect**, choose the database and role, and turn
@@ -99,7 +103,7 @@ use today can be read later without fetching it again.
 | `accounts` | `id` (Pluggy account ID) → `bank_connections` | Type, name, currency, balance; for cards: limit, available, minimum payment, close and due dates, brand |
 | `account_balances` | (`account_id`, `as_of`) | One balance per account per day. Pluggy only gives the current balance, so this builds the history |
 | `card_bills` | `id` (Pluggy bill ID) → `accounts` | A card's monthly statements: due date, total, minimum payment, finance charges. The card itself is a row in `accounts` |
-| `transactions` | `id` (Pluggy transaction ID) → `accounts` | Date, description, type, amount (and in the account's currency), status, operation type, Pluggy's category, installment *n* of *N*, purchase date and total, merchant, payment method, `card_bill_id`, `provider_id`; edits: `category_id`, `subcategory_id`, `is_hidden`, `category_edited_at` |
+| `transactions` | `id` (Pluggy transaction ID) → `accounts` | Date, description, type, amount (and in the account's currency), status, operation type, Pluggy's category, installment *n* of *N*, purchase date and total, merchant, payment method, `card_bill_id`, `provider_id`; edits: `category_id`, `subcategory_id`, `is_hidden`, `category_edited_at`, `transfer_override` |
 | `categories` | `id` | Name, type (expense or income), colour key, icon key, order. The 10 defaults are seeded on first run, with their Portuguese names |
 | `subcategories` | `id` → `categories`; unique name per category | Subcategories, deleted with their category |
 | `card_settings` | `account_id` → `accounts` | Closing and due days per card (not used yet: still kept per device) |
@@ -185,6 +189,28 @@ A category, subcategory or hidden flag set in the app stays as set:
 - **Transfer detection on read:** a transaction whose category was edited
   (`category_edited_at` set) keeps that category even when it would be paired
   as an own transfer or read as a card bill payment.
+
+### Card bill payments
+
+Paying a card's bill moves money that was already spent: each purchase
+counts as an expense when it's made on the card, so the payment from a bank
+account must not count again (nor the payment arriving on the card as
+income). A card bill payment is a transfer: no category, neither income nor
+an expense, still in the account balance and the card bill. It's recognised
+on read (`server/pluggy/map.ts`), in this order:
+
+1. **Set by hand** in the transaction's details: "Marcar como pagamento de
+   fatura" (`transfer_override = 'card-payment'`, which also clears the
+   category) or "Não é pagamento de fatura" (`'none'`, which turns detection
+   off for it). Syncs never change it, and it moves to a transaction that
+   replaces a pending one.
+2. An **edited category** wins over the rules below.
+3. **Pluggy's category** ("Credit card payment").
+4. **Wording**: a debit from a bank account like "PAGAMENTO FATURA", "PAG
+   FATURA", "PGTO CARTAO", "FATURA DO CARTÃO"; a credit on a card like
+   "Pagamento recebido" (refunds, "Estorno"…, excluded).
+5. **Pairing**: a bank debit and a card credit of the same amount up to 5
+   days apart, nearest first.
 
 ### Bulk categorization
 

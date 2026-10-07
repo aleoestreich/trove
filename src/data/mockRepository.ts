@@ -2,7 +2,7 @@ import type { Repository } from './repository'
 import { DEMO_SUBCATEGORIES, buildSeed } from './seed'
 import { applyEdit, checkBulk, defaultCategories } from './edits'
 import { DEFAULT_CATEGORIES } from './categoryCatalog'
-import type { Category, IncomeFilter, Snapshot, Subcategory } from './types'
+import type { Category, IncomeFilter, Snapshot, Subcategory, TransferOverride } from './types'
 
 const KEY = 'trove.demoOwner'
 
@@ -10,7 +10,7 @@ const KEY = 'trove.demoOwner'
 interface DemoOwner {
   categories: Category[]
   subcategories: Subcategory[]
-  stored: Record<string, { categoryId: string | null; subcategoryId: string | null; hidden: boolean }>
+  stored: Record<string, { categoryId: string | null; subcategoryId: string | null; hidden: boolean; transferOverride?: TransferOverride }>
   /** The average income's filter (the database keeps it in app_settings). */
   incomeFilter?: IncomeFilter
 }
@@ -54,8 +54,15 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
     subcategories: owner.subcategories,
     incomeFilter: owner.incomeFilter,
     transactions: seed.transactions.map((t) => {
-      if (t.transfer) return t
       const s = owner.stored[t.id]
+      // A hand-set card-payment answer wins over the seed's own transfers.
+      if (s?.transferOverride === 'card-payment')
+        return { ...t, transfer: 'card-payment' as const, categoryId: null, subcategoryId: null, hidden: s.hidden || undefined, transferOverride: s.transferOverride }
+      if (s?.transferOverride === 'none') {
+        const { transfer: _seedTransfer, ...rest } = t
+        return { ...rest, categoryId: s.categoryId, subcategoryId: s.subcategoryId, hidden: s.hidden || undefined, transferOverride: s.transferOverride }
+      }
+      if (t.transfer) return t
       if (s) return { ...t, categoryId: s.categoryId, subcategoryId: s.subcategoryId, hidden: s.hidden || undefined }
       return t.categoryId && !known.has(t.categoryId) ? { ...t, categoryId: null } : t
     }),
@@ -83,7 +90,8 @@ export function createMockRepository(today: Date = new Date()): Repository {
       const next = applyEdit(current, e)
       const stored: DemoOwner['stored'] = {}
       for (const t of next.transactions) {
-        if (!t.transfer) stored[t.id] = { categoryId: t.categoryId, subcategoryId: t.subcategoryId ?? null, hidden: !!t.hidden }
+        if (!t.transfer || t.transferOverride)
+          stored[t.id] = { categoryId: t.categoryId, subcategoryId: t.subcategoryId ?? null, hidden: !!t.hidden, transferOverride: t.transferOverride }
       }
       write({ categories: next.categories, subcategories: next.subcategories, stored, incomeFilter: next.incomeFilter })
       return previous && { updated: previous.length, previous }

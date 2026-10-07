@@ -165,7 +165,8 @@ connection not in `PLUGGY_ITEM_IDS`), or `5xx` (server or database).
   - BRL conversion, keeping the original currency;
   - installments from `creditCardMetadata`;
   - category guesses (mapped to the default categories) and stored categories;
-  - transfer detection (own transfers and card bill payments, no category);
+  - transfer detection (own transfers and card bill payments, no category;
+    see [Card bill payments](neon-setup.md#card-bill-payments));
   - **one card per item**, so a bank's checking account and credit card
     stay together. Meu Pluggy items all have the connector "MeuPluggy", with
     the real bank only in the account names ("Nu Pagamentos S.A. - …

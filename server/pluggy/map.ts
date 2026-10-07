@@ -13,9 +13,15 @@
 //   isn't counted as income or expense: Pluggy's "same person transfer" and
 //   "credit card payment" categories, plus generic transfers that have a
 //   matching opposite transaction (same amount, same day) in another account.
+// - Card bill payments are also found by their wording ("PAGAMENTO FATURA"…
+//   leaving a bank account; "Pagamento recebido" arriving on a card) and by
+//   pairing a bank debit with a card credit of the same amount up to 5 days
+//   apart. Otherwise each card purchase would count twice: once when made,
+//   again when the bill is paid. A hand-set answer (transferOverride) wins
+//   over all of this, and an edited category wins over detection.
 
 import { fromGuess } from '../../src/data/categories.js'
-import type { Account, Category, Cents, Institution, Snapshot, Subcategory, Transaction } from '../../src/data/types.js'
+import type { Account, Category, Cents, Institution, Snapshot, Subcategory, Transaction, TransferOverride } from '../../src/data/types.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from './types.js'
 
 export interface PluggyData {
@@ -36,7 +42,7 @@ export interface OwnerData {
    * Per transaction, as stored: its category (the guess at first sync, or a
    * later edit, then `edited`) and whether it's hidden.
    */
-  stored: Map<string, { categoryId: string | null; subcategoryId: string | null; hidden: boolean; edited?: boolean }>
+  stored: Map<string, { categoryId: string | null; subcategoryId: string | null; hidden: boolean; edited?: boolean; transferOverride?: TransferOverride | null }>
 }
 
 const cents = (n: number): Cents => Math.round(n * 100)
@@ -185,6 +191,43 @@ const CATEGORY_RULES: [RegExp, string][] = [
   [/utilit|electric|water|internet|telecom|phone|mobile|energia|[aá]gua|telefon/i, 'utilities'],
 ]
 
+/** Paying a card bill, as banks word it on the paying side (money out of a bank account). */
+const BILL_PAYMENT_OUT =
+  /pagamento\s+(d[aeo]\s+)?(fatura|cart[aã]o)|pag(to|t)?\.?\s*(d[aeo]\s+)?fatura|pgto\.?\s*(d[aeo]\s+)?(fatura|cart)|fatura\s+(d[oe]\s+)?cart[aã]o|credit card (bill )?payment|card bill payment/i
+/** The payment arriving on the card (money in), as opposed to a refund. */
+const BILL_PAYMENT_IN = /pagamento|payment|pgto/i
+const REFUND = /estorno|reembolso|cancel|devolu[cç][aã]o|refund|chargeback/i
+/** How far apart a bank debit and the card credit it paid can be. */
+const BILL_PAYMENT_DAYS = 5
+
+/** Whether a transaction's own wording says it's a card bill payment. */
+export function looksLikeBillPayment(t: Pick<PluggyTransaction, 'description' | 'type'>, accountType: PluggyAccount['type'] | undefined): boolean {
+  const text = `${t.description ?? ''} ${(t as { descriptionRaw?: string | null }).descriptionRaw ?? ''}`
+  if (accountType === 'BANK') return t.type === 'DEBIT' && BILL_PAYMENT_OUT.test(text)
+  if (accountType === 'CREDIT') return t.type === 'CREDIT' && BILL_PAYMENT_IN.test(text) && !REFUND.test(text)
+  return false
+}
+
+const dayDiff = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000
+
+/**
+ * Pairs a bank debit with a card credit of the same amount, up to 5 days
+ * apart (nearest first), and marks both as a card bill payment.
+ */
+function pairCardPayments(txs: Transaction[], bankDebits: Set<string>, cardCredits: Set<string>) {
+  const credits = txs.filter((t) => cardCredits.has(t.id))
+  const used = new Set<string>()
+  for (const debit of txs) {
+    if (!bankDebits.has(debit.id)) continue
+    const match = credits
+      .filter((c) => !used.has(c.id) && c.amount === -debit.amount && dayDiff(c.date, debit.date) <= BILL_PAYMENT_DAYS)
+      .sort((a, b) => dayDiff(a.date, debit.date) - dayDiff(b.date, debit.date))[0]
+    if (!match) continue
+    used.add(match.id)
+    for (const x of [debit, match]) Object.assign(x, { categoryId: null, subcategoryId: null, transfer: 'card-payment' })
+  }
+}
+
 /** Generic transfers (Pix/TED to someone): an expense or income unless paired with another own account. */
 const GENERIC_TRANSFER = /transfer|pix|ted\b|doc\b|transfer[eê]ncia/i
 
@@ -275,6 +318,10 @@ export function toSnapshot(input: PluggyData): Snapshot {
     })
 
   const genericTransfers = new Set<string>()
+  const accountType = new Map(data.accounts.map((a) => [a.id, a.type]))
+  // Candidates for pairing a bill payment: bank debits and card credits that aren't transfers yet.
+  const bankDebits = new Set<string>()
+  const cardCredits = new Set<string>()
   // Guesses only point at categories that exist (a default one may have been deleted).
   const known = data.owner ? new Set(data.owner.categories.map((c) => c.id)) : undefined
   const transactions: Transaction[] = data.transactions
@@ -298,10 +345,20 @@ export function toSnapshot(input: PluggyData): Snapshot {
         status: t.status === 'PENDING' ? 'PENDING' : 'POSTED',
       }
       // What's stored wins over the guess (it's the guess from the first sync, or a later edit).
-      // An edited category wins over transfer detection too.
+      // An edited category wins over transfer detection too; a hand-set answer wins over both.
       const stored = data.owner?.stored.get(t.id)
-      if (stored?.edited) delete tx.transfer
+      const override = stored?.transferOverride ?? undefined
+      const detect = !override && !stored?.edited
+      if (detect && !tx.transfer && looksLikeBillPayment(t, accountType.get(t.accountId))) Object.assign(tx, { categoryId: null, transfer: 'card-payment' })
+      if (stored?.edited || override === 'none') delete tx.transfer
       if (stored && !tx.transfer) Object.assign(tx, { categoryId: stored.categoryId, subcategoryId: stored.subcategoryId })
+      if (override === 'card-payment') Object.assign(tx, { categoryId: null, subcategoryId: null, transfer: 'card-payment' })
+      if (override) tx.transferOverride = override
+      if (detect && !tx.transfer) {
+        const type = accountType.get(t.accountId)
+        if (type === 'BANK' && t.type === 'DEBIT') bankDebits.add(tx.id)
+        if (type === 'CREDIT' && t.type === 'CREDIT' && !REFUND.test(t.description ?? '')) cardCredits.add(tx.id)
+      }
       if (stored?.hidden) tx.hidden = true
       if (txCur !== 'BRL') tx.foreign = { currency: txCur, amount: sign * cents(Math.abs(t.amount)) }
       else if (accCur !== 'BRL') tx.foreign = { currency: accCur, amount: sign * cents(inAccountCurrency) }
@@ -317,13 +374,17 @@ export function toSnapshot(input: PluggyData): Snapshot {
           purchaseDate: m.purchaseDate ? brazilDate(m.purchaseDate) : tx.date,
         }
       }
-      if (!stored?.edited && guess.startsWith('other-') && GENERIC_TRANSFER.test(t.category ?? '')) genericTransfers.add(tx.id)
+      if (detect && guess.startsWith('other-') && GENERIC_TRANSFER.test(t.category ?? '')) genericTransfers.add(tx.id)
       return tx
     })
 
   // Sort chronologically so pairing is stable, then newest first for the app.
   transactions.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
   pairOwnTransfers(transactions, genericTransfers)
+  // Own-transfer pairing may have taken some candidates.
+  const byId = new Map(transactions.map((t) => [t.id, t]))
+  const stillFree = (ids: Set<string>) => new Set([...ids].filter((id) => !byId.get(id)!.transfer))
+  pairCardPayments(transactions, stillFree(bankDebits), stillFree(cardCredits))
   transactions.reverse()
 
   return {
