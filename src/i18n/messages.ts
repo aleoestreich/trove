@@ -142,6 +142,9 @@ export interface Messages {
     add: string
     hide: string
     hideNote: string
+    markOwnTransfer: string
+    markOwnTransferNote: string
+    notOwnTransfer: string
     markCardPayment: string
     markCardPaymentNote: string
     notCardPayment: string
@@ -478,6 +481,9 @@ export const messages: Messages = {
     add: 'Adicionar',
     hide: 'Ocultar esta transação',
     hideNote: 'Fica fora dos totais e gráficos. Encontre de novo em Transações › Ocultas.',
+    markOwnTransfer: 'Marcar como transferência entre suas contas',
+    markOwnTransferNote: 'Não conta como receita nem despesa: o dinheiro só mudou de conta.',
+    notOwnTransfer: 'Não é transferência entre suas contas',
     markCardPayment: 'Marcar como pagamento de fatura',
     markCardPaymentNote: 'Não conta como despesa: as compras do cartão já contam.',
     notCardPayment: 'Não é pagamento de fatura',

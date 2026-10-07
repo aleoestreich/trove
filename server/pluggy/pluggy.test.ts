@@ -483,6 +483,12 @@ describe('mapping to Trove', () => {
       expect(kinds(s)).toEqual({ worded: null, plain: 'card-payment', edited: 'shopping' })
       expect(s.transactions.find((t) => t.id === 'plain')!.transferOverride).toBe('card-payment')
     })
+
+    it('a transaction marked as an own transfer is neither income nor an expense', () => {
+      const s = withStored([tx({ id: 'wire', type: 'CREDIT', description: 'TED RECEBIDA', amount: 2000, category: 'Salary' })], [['wire', { transferOverride: 'own', categoryId: 'salary' }]])
+      expect(kinds(s)).toEqual({ wire: 'own' })
+      expect(totals(s.transactions)).toEqual({ income: 0, expenses: 0, net: 0 })
+    })
   })
 
   it('ignores accounts and transactions from connections that were not requested', () => {

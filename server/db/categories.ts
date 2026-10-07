@@ -199,12 +199,12 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
     case 'restoreCategories':
       return restoreCategories(db, e, connections(itemIds))
     case 'setTransferOverride':
-      // A card bill payment has no category: it loses its category and edited mark ("not one" then leaves it uncategorized).
+      // A transfer has no category: it loses its category and edited mark ("neither" then leaves it uncategorized).
       await one(
         `UPDATE transactions SET transfer_override = $2,
-           category_id = CASE WHEN $2 = 'card-payment' THEN NULL ELSE category_id END,
-           subcategory_id = CASE WHEN $2 = 'card-payment' THEN NULL ELSE subcategory_id END,
-           category_edited_at = CASE WHEN $2 = 'card-payment' THEN NULL ELSE category_edited_at END
+           category_id = CASE WHEN $2 <> 'none' THEN NULL ELSE category_id END,
+           subcategory_id = CASE WHEN $2 <> 'none' THEN NULL ELSE subcategory_id END,
+           category_edited_at = CASE WHEN $2 <> 'none' THEN NULL ELSE category_edited_at END
          WHERE id = $1`,
         [e.transactionId, e.value],
         'transaction',

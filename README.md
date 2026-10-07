@@ -106,7 +106,8 @@ between accounts, and card bill payments.
   once, when it happens, not again when the bill is paid. Bill payments are
   recognised by Pluggy's category, their wording, or by pairing the bank
   debit with the card credit; any transaction can also be marked (or
-  unmarked) as one in its details.
+  unmarked) as one in its details, or as a transfer between own accounts
+  (e.g. money moved in from an account that isn't connected).
 - A transaction counts as income or an expense by its category's type;
   uncategorized ones count by sign.
 - **Bulk categorization:** many transactions can get one category and

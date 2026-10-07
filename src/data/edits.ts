@@ -29,7 +29,7 @@ export type Edit =
   | { op: 'categorizeMany'; transactionIds: string[]; categoryId: string; subcategoryId: string }
   /** Puts back what categorizeMany replaced (its BulkResult's `previous`). */
   | { op: 'restoreCategories'; items: PreviousCategory[] }
-  /** Marks a transaction as a card bill payment ('card-payment'), or says it isn't one ('none'). */
+  /** Marks a transaction as an own transfer ('own') or a card bill payment ('card-payment'), or says it is neither ('none'). */
   | { op: 'setTransferOverride'; transactionId: string; value: TransferOverride }
   /** Which income categories count in the average income (stored as exclusions). */
   | { op: 'setIncomeFilter'; filter: IncomeFilter }
@@ -142,7 +142,7 @@ export function validateEdit(e: unknown): Edit {
       return { op: 'restoreCategories', items: out }
     }
     case 'setTransferOverride':
-      if (x.value !== 'card-payment' && x.value !== 'none') bad('value')
+      if (x.value !== 'own' && x.value !== 'card-payment' && x.value !== 'none') bad('value')
       return { op: 'setTransferOverride', transactionId: id(x.transactionId, 'transaction'), value: x.value as TransferOverride }
     case 'setIncomeFilter': {
       const f = (x.filter ?? {}) as Record<string, unknown>
@@ -262,15 +262,15 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
       return { ...s, incomeFilter: checkIncomeFilter(s.categories, s.subcategories, e.filter) }
     case 'setTransferOverride': {
       tx(e.transactionId)
-      // A card bill payment has no category; "not one" leaves it uncategorized until one is chosen.
+      // A transfer has no category; "neither" leaves it uncategorized until one is chosen.
       return {
         ...s,
         transactions: mapTx((t) => {
           if (t.id !== e.transactionId) return t
           const { transfer: _old, ...rest } = t
-          return e.value === 'card-payment'
-            ? { ...rest, transfer: 'card-payment', categoryId: null, subcategoryId: null, transferOverride: e.value }
-            : { ...rest, transferOverride: e.value }
+          return e.value === 'none'
+            ? { ...rest, transferOverride: e.value }
+            : { ...rest, transfer: e.value, categoryId: null, subcategoryId: null, transferOverride: e.value }
         }),
       }
     }

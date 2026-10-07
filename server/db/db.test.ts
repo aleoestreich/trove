@@ -253,6 +253,15 @@ suite('database', () => {
     expect(s.transactions.find((t) => t.id === 'n1')).toMatchObject({ transfer: 'card-payment' })
     await applyEditSql(pool, { op: 'setTransferOverride', transactionId: 't1', value: 'none' })
     expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.transactions.find((t) => t.id === 't1')!.transfer).toBeUndefined()
+    // Or a transfer between own accounts.
+    await applyEditSql(pool, { op: 'categorize', transactionId: 't1', categoryId: 'groceries', subcategoryId: null })
+    await applyEditSql(pool, { op: 'setTransferOverride', transactionId: 't1', value: 'own' })
+    expect((await pool.query(`SELECT category_id, category_edited_at, transfer_override FROM transactions WHERE id = 't1'`)).rows[0]).toEqual({
+      category_id: null,
+      category_edited_at: null,
+      transfer_override: 'own',
+    })
+    expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.transactions.find((t) => t.id === 't1')).toMatchObject({ transfer: 'own', categoryId: null })
   })
 
   it('is idempotent: the same data synced again changes nothing and duplicates nothing', async () => {

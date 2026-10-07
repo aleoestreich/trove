@@ -49,6 +49,8 @@ an edit (see [Edits are never overwritten](#edits-are-never-overwritten)).
 Then run [`db/migrations/005_transfer_override.sql`](../db/migrations/005_transfer_override.sql):
 it adds the transactions' `transfer_override`, the hand-set answer to "is
 this a card bill payment?" (see [Card bill payments](#card-bill-payments)).
+Then [`db/migrations/006_own_transfer_override.sql`](../db/migrations/006_own_transfer_override.sql),
+which lets that answer also be "a transfer between own accounts" (`'own'`).
 
 ## 3. Give Vercel the connection string
 
@@ -203,7 +205,10 @@ on read (`server/pluggy/map.ts`), in this order:
    fatura" (`transfer_override = 'card-payment'`, which also clears the
    category) or "Não é pagamento de fatura" (`'none'`, which turns detection
    off for it). Syncs never change it, and it moves to a transaction that
-   replaces a pending one.
+   replaces a pending one. The same answer marks a **transfer between own
+   accounts** ("Marcar como transferência entre suas contas", `'own'`) for
+   one that isn't detected, such as a wire from an account that isn't
+   connected; "Não é transferência entre suas contas" (`'none'`) undoes it.
 2. An **edited category** wins over the rules below.
 3. **Pluggy's category** ("Credit card payment").
 4. **Wording**: a debit from a bank account like "PAGAMENTO FATURA", "PAG
