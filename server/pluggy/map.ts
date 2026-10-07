@@ -32,8 +32,11 @@ export interface PluggyData {
 export interface OwnerData {
   categories: Category[]
   subcategories: Subcategory[]
-  /** Per transaction, as stored: its category (the guess at first sync, or a later edit) and whether it's hidden. */
-  stored: Map<string, { categoryId: string | null; subcategoryId: string | null; hidden: boolean }>
+  /**
+   * Per transaction, as stored: its category (the guess at first sync, or a
+   * later edit, then `edited`) and whether it's hidden.
+   */
+  stored: Map<string, { categoryId: string | null; subcategoryId: string | null; hidden: boolean; edited?: boolean }>
 }
 
 const cents = (n: number): Cents => Math.round(n * 100)
@@ -295,7 +298,9 @@ export function toSnapshot(input: PluggyData): Snapshot {
         status: t.status === 'PENDING' ? 'PENDING' : 'POSTED',
       }
       // What's stored wins over the guess (it's the guess from the first sync, or a later edit).
+      // An edited category wins over transfer detection too.
       const stored = data.owner?.stored.get(t.id)
+      if (stored?.edited) delete tx.transfer
       if (stored && !tx.transfer) Object.assign(tx, { categoryId: stored.categoryId, subcategoryId: stored.subcategoryId })
       if (stored?.hidden) tx.hidden = true
       if (txCur !== 'BRL') tx.foreign = { currency: txCur, amount: sign * cents(Math.abs(t.amount)) }
@@ -312,7 +317,7 @@ export function toSnapshot(input: PluggyData): Snapshot {
           purchaseDate: m.purchaseDate ? brazilDate(m.purchaseDate) : tx.date,
         }
       }
-      if (guess.startsWith('other-') && GENERIC_TRANSFER.test(t.category ?? '')) genericTransfers.add(tx.id)
+      if (!stored?.edited && guess.startsWith('other-') && GENERIC_TRANSFER.test(t.category ?? '')) genericTransfers.add(tx.id)
       return tx
     })
 

@@ -32,8 +32,8 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string): Pro
 
   const items = await db.query<{ raw: PluggyItem }>(`SELECT raw FROM bank_connections WHERE id = ANY($1::text[])`, [itemIds])
   const accounts = await db.query<{ raw: PluggyAccount }>(`SELECT raw FROM accounts WHERE connection_id = ANY($1::text[])`, [itemIds])
-  const txs = await db.query<{ raw: PluggyTransaction; category_id: string | null; subcategory_id: string | null; is_hidden: boolean }>(
-    `SELECT t.raw, t.category_id, t.subcategory_id, t.is_hidden
+  const txs = await db.query<{ raw: PluggyTransaction; category_id: string | null; subcategory_id: string | null; is_hidden: boolean; edited: boolean }>(
+    `SELECT t.raw, t.category_id, t.subcategory_id, t.is_hidden, t.category_edited_at IS NOT NULL AS edited
      FROM transactions t JOIN accounts a ON a.id = t.account_id
      WHERE a.connection_id = ANY($1::text[]) AND t.removed_at IS NULL AND t.booked_on >= $2::date
      ORDER BY t.booked_on DESC, t.date DESC`,
@@ -54,7 +54,7 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string): Pro
       categories,
       subcategories,
       stored: new Map(
-        txs.rows.map((r) => [r.raw.id, { categoryId: r.category_id, subcategoryId: r.subcategory_id, hidden: r.is_hidden }]),
+        txs.rows.map((r) => [r.raw.id, { categoryId: r.category_id, subcategoryId: r.subcategory_id, hidden: r.is_hidden, edited: r.edited }]),
       ),
     },
   })

@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   category_id            text REFERENCES categories(id) ON DELETE SET NULL,
   subcategory_id         text REFERENCES subcategories(id) ON DELETE SET NULL,
   is_hidden              boolean NOT NULL DEFAULT false,  -- left out of every total and chart
+  category_edited_at     timestamptz,            -- set by an edit: the category is never re-guessed or paired as a transfer
   raw                    jsonb NOT NULL,
   pluggy_updated_at      timestamptz,
   first_seen_at          timestamptz NOT NULL DEFAULT now(),
