@@ -103,7 +103,10 @@ between accounts, and card bill payments.
   `R$ 9.810,00`.
 - **Transfers between connected accounts and card bill payments are neither
   income nor expenses**, and have no category. A card purchase is counted
-  once, when it happens, not again when the bill is paid.
+  once, when it happens, not again when the bill is paid. Bill payments are
+  recognised by Pluggy's category, their wording, or by pairing the bank
+  debit with the card credit; any transaction can also be marked (or
+  unmarked) as one in its details.
 - A transaction counts as income or an expense by its category's type;
   uncategorized ones count by sign.
 - **Bulk categorization:** many transactions can get one category and

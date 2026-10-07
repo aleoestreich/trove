@@ -129,6 +129,8 @@ CREATE TABLE IF NOT EXISTS transactions (
   subcategory_id         text REFERENCES subcategories(id) ON DELETE SET NULL,
   is_hidden              boolean NOT NULL DEFAULT false,  -- left out of every total and chart
   category_edited_at     timestamptz,            -- set by an edit: the category is never re-guessed or paired as a transfer
+  transfer_override      text CONSTRAINT transactions_transfer_override_check CHECK (transfer_override IN ('card-payment', 'none')),
+                                                 -- set by hand: a card bill payment, or not one (wins over detection)
   raw                    jsonb NOT NULL,
   pluggy_updated_at      timestamptz,
   first_seen_at          timestamptz NOT NULL DEFAULT now(),

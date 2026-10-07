@@ -142,6 +142,10 @@ export interface Messages {
     add: string
     hide: string
     hideNote: string
+    markCardPayment: string
+    markCardPaymentNote: string
+    notCardPayment: string
+    cardPaymentNote: string
     noCategoriesOfType: (kind: string) => string
   }
   installments: {
@@ -474,6 +478,10 @@ export const messages: Messages = {
     add: 'Adicionar',
     hide: 'Ocultar esta transação',
     hideNote: 'Fica fora dos totais e gráficos. Encontre de novo em Transações › Ocultas.',
+    markCardPayment: 'Marcar como pagamento de fatura',
+    markCardPaymentNote: 'Não conta como despesa: as compras do cartão já contam.',
+    notCardPayment: 'Não é pagamento de fatura',
+    cardPaymentNote: 'Pagamentos de fatura não contam como despesa: as compras do cartão já contam. Continua no saldo da conta e na fatura.',
     noCategoriesOfType: (kind) => `Nenhuma categoria de ${kind} ainda. Crie uma em Categorias.`,
   },
 

@@ -153,3 +153,14 @@ describe('bulk categorize', () => {
     expect(applyEdit(after, validateEdit({ op: 'restoreCategories', items: previous })).transactions).toEqual(before.transactions.map((t) => ({ ...t, subcategoryId: t.subcategoryId ?? null })))
   })
 })
+
+describe('card bill payment (setTransferOverride)', () => {
+  it('marks a transaction as a card bill payment, without a category, and back', () => {
+    const marked = applyEdit(snapshot(), validateEdit({ op: 'setTransferOverride', transactionId: 't1', value: 'card-payment' }))
+    expect(marked.transactions[0]).toMatchObject({ transfer: 'card-payment', categoryId: null, subcategoryId: null, transferOverride: 'card-payment' })
+    const undone = applyEdit(marked, { op: 'setTransferOverride', transactionId: 't1', value: 'none' })
+    expect(undone.transactions[0].transfer).toBeUndefined()
+    expect(undone.transactions[0].transferOverride).toBe('none')
+    expect(() => validateEdit({ op: 'setTransferOverride', transactionId: 't1', value: 'own' })).toThrow(EditError)
+  })
+})

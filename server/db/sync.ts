@@ -10,7 +10,8 @@
 //   edits.
 // - Transactions in the fetched window that Pluggy no longer returns (e.g. a
 //   pending purchase that posted under a new ID) are marked removed, not
-//   deleted; their edits move to the transaction that replaced them.
+//   deleted; their edits (category, hidden, card-payment answer) move to the
+//   transaction that replaced them.
 // - Each run is logged in sync_runs with counts only; errors keep status
 //   codes, never amounts, descriptions or credentials.
 
@@ -338,8 +339,8 @@ async function carryEdits(db: Db, newIds: Set<string>, removedAt: Date) {
   if (newIds.size === 0) return
   const old = await db.query<Candidate>(
     `SELECT id, account_id, provider_id, type, amount_cents::text AS amount, booked_on::text AS day, status,
-       category_id, subcategory_id, is_hidden, category_edited_at
-     FROM transactions WHERE removed_at = $1 AND (category_edited_at IS NOT NULL OR is_hidden)`,
+       category_id, subcategory_id, is_hidden, category_edited_at, transfer_override
+     FROM transactions WHERE removed_at = $1 AND (category_edited_at IS NOT NULL OR is_hidden OR transfer_override IS NOT NULL)`,
     [removedAt],
   )
   if (old.rows.length === 0) return
@@ -371,6 +372,7 @@ async function carryEdits(db: Db, newIds: Set<string>, removedAt: Date) {
         from.is_hidden,
       ])
     else await db.query(`UPDATE transactions SET is_hidden = $2 WHERE id = $1`, [to.id, from.is_hidden])
+    if (from.transfer_override) await db.query(`UPDATE transactions SET transfer_override = $2 WHERE id = $1`, [to.id, from.transfer_override])
   }
 }
 
@@ -386,4 +388,5 @@ interface Candidate {
   subcategory_id?: string | null
   is_hidden?: boolean
   category_edited_at?: Date | null
+  transfer_override?: string | null
 }

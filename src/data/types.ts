@@ -76,6 +76,9 @@ export interface Subcategory {
   sortOrder: number
 }
 
+/** A hand-set answer to "is this a card bill payment?". */
+export type TransferOverride = 'card-payment' | 'none'
+
 export interface Transaction {
   id: string
   accountId: string
@@ -96,6 +99,11 @@ export interface Transaction {
    * income or an expense, and never categorized.
    */
   transfer?: 'own' | 'card-payment'
+  /**
+   * Set by hand in the transaction's details: "card-payment" marks it as a
+   * card bill payment; "none" says it isn't one (overrides detection).
+   */
+  transferOverride?: TransferOverride
   /** Hidden: left out of every total, chart, average and the list. */
   hidden?: boolean
   status: 'POSTED' | 'PENDING'
