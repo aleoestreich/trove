@@ -9,7 +9,7 @@ import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/typ
 import { applyEditSql, ensureSeeded } from './categories.js'
 import { dbErrorCode, inTransaction } from './connection.js'
 import { readSnapshot } from './read.js'
-import { save, syncFrom, type Fetched } from './sync.js'
+import { HISTORY_START, save, syncFrom, type Fetched } from './sync.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
 import { edits, incomeAverageRoute, incomeRoutes, incomeCategoriesRoute, saveIncomeFilterRoute, startSync, syncStatus } from './handlers.js'
 import { previewAverage } from '../../src/data/incomeAverage.js'
@@ -264,6 +264,21 @@ suite('database', () => {
     expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.transactions.find((t) => t.id === 't1')).toMatchObject({ transfer: 'own', categoryId: null })
   })
 
+  it('records how far back a connection was fetched, and never removes stored transactions older than what Pluggy returned', async () => {
+    const fetchedFrom = async () => (await pool.query(`SELECT value #>> '{}' AS day FROM app_settings WHERE key = 'fetched_from:item-1'`)).rows[0]?.day
+    await sync([tx('old', { date: '2025-03-10T12:00:00.000Z' }), tx('t1')])
+    expect(fetchedFrom).toBeDefined()
+    expect(await fetchedFrom()).toBe('2026-09-01')
+    // A full fetch from January 2025 where the bank only returns recent months: 'old' stays.
+    const full = { ...fetched([tx('t1')]), from: '2025-01-01' }
+    expect(await inTransaction(pool, (db) => save(db, full, now))).toMatchObject({ removed: 0 })
+    expect((await row('old')).removed_at).toBeNull()
+    expect(await fetchedFrom()).toBe('2025-01-01')
+    // A later, shorter sync doesn't move it forward.
+    await sync([tx('t1')])
+    expect(await fetchedFrom()).toBe('2025-01-01')
+  })
+
   it('is idempotent: the same data synced again changes nothing and duplicates nothing', async () => {
     const data = [tx('t1', { category: 'Supermarkets' }), tx('t2')]
     const bills = [{ accountId: 'acc-1', bill: { id: 'b1', dueDate: '2026-10-10T03:00:00.000Z', totalAmount: 150 } }]
@@ -415,9 +430,13 @@ suite('database', () => {
 })
 
 describe('sync window', () => {
-  it('goes back a year on the first sync and overlaps later ones by 35 days', () => {
-    expect(syncFrom(null, new Date(2026, 9, 6))).toBe('2025-10-01')
-    expect(syncFrom(new Date('2026-10-01T00:00:00Z'), now)).toBe('2026-08-27')
+  it('fetches back to January 2025 until a connection has been, then overlaps the last sync by 35 days', () => {
+    expect(HISTORY_START).toBe('2025-01-01')
+    expect(syncFrom(null, null)).toBe('2025-01-01')
+    // Synced before, but only back to October 2025: one full fetch.
+    expect(syncFrom(new Date('2026-10-01T00:00:00Z'), '2025-10-01')).toBe('2025-01-01')
+    expect(syncFrom(new Date('2026-10-01T00:00:00Z'), null)).toBe('2025-01-01')
+    expect(syncFrom(new Date('2026-10-01T00:00:00Z'), '2025-01-01')).toBe('2026-08-27')
   })
 })
 

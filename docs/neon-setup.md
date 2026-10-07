@@ -158,10 +158,16 @@ database transaction:
 - new transactions get Trove's category guess, and existing ones keep their
   stored category, subcategory and `is_hidden`: a sync never overwrites
   edits (see [Edits are never overwritten](#edits-are-never-overwritten));
-- the first sync goes back 12 months; later ones re-read from 35 days before
+- a connection is fetched back to **1 January 2025** (`HISTORY_START` in
+  `server/db/sync.ts`) until that has been done once: its first sync, or the
+  next sync of a connection fetched with a shorter window before. Pluggy
+  returns what each bank provides from there (often about a year). How far
+  back each connection has been fetched is kept in `app_settings`
+  (`fetched_from:<item ID>`). After that, syncs re-read from 35 days before
   the previous sync;
 - transactions in that window that Pluggy no longer returns are marked
-  removed;
+  removed (on a full fetch, only from the earliest day Pluggy returned, so a
+  bank with a shorter history never removes older stored transactions);
 - the day's balances and exchange rates are saved, so loading the app calls
   neither Pluggy nor a rate service;
 - each run is logged in `sync_runs` (counts and status codes only).
