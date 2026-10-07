@@ -6,6 +6,7 @@ import { CategoryLabel, TransactionBadge } from './CategoryBadge'
 import { SelectBox } from './SelectBox'
 import { formatShortDate } from '../lib/dates'
 import { useI18n } from '../i18n/I18nProvider'
+import { shownName } from '../lib/accountLabel'
 
 /** Account label for a row: the name set in Trove, else "Cartão Nubank", "Itaú", "Wise USD". */
 export function useAccountLabel() {
@@ -13,10 +14,9 @@ export function useAccountLabel() {
   const { t } = useI18n()
   return (accountId: string) => {
     const account = accountsById.get(accountId)!
-    if (account.nickname) return account.nickname
     const institution = institutionsById.get(account.institutionId)!
-    if (account.type === 'CREDIT') return t.cardOf(institution.name)
-    return `${institution.name}${account.foreign ? ` ${account.foreign.currency}` : ''}`
+    if (account.type === 'CREDIT') return shownName(account, t.cardOf(institution.name))
+    return shownName(account, `${institution.name}${account.foreign ? ` ${account.foreign.currency}` : ''}`)
   }
 }
 

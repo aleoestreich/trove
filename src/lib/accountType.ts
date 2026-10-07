@@ -1,5 +1,6 @@
 import type { Account } from '../data/types'
 import type { Messages } from '../i18n/messages'
+import { shownName } from './accountLabel'
 
 export type AccountType = 'checking' | 'savings' | 'usd' | 'card'
 
@@ -26,10 +27,9 @@ export function accountTypeLabels(accounts: Account[], t: Messages): Map<string,
   for (const a of accounts) counts.set(base(a), (counts.get(base(a)) ?? 0) + 1)
   return new Map(
     accounts.map((a) => {
-      if (a.nickname) return [a.id, a.nickname]
       const label = base(a)
       const name = a.name.trim()
-      return [a.id, (counts.get(label) ?? 0) > 1 && name && name !== label ? `${label} · ${name}` : label]
+      return [a.id, shownName(a, (counts.get(label) ?? 0) > 1 && name && name !== label ? `${label} · ${name}` : label)]
     }),
   )
 }

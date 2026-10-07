@@ -6,6 +6,7 @@ import type { ProjectionEvent } from '../data/projection.js'
 import type { PaymentMethod } from '../data/recurring.js'
 import type { Account, Institution } from '../data/types.js'
 import { formatMoney } from './money.js'
+import { shownName } from './accountLabel.js'
 
 const t = messages.insights
 
@@ -16,16 +17,17 @@ export function bankName(accountId: string, accounts: Account[], institutions: I
   return institutions.find((i) => i.id === account.institutionId)?.name ?? account.name
 }
 
-/** The name set in Trove for an account, if any. */
-export function nicknameOf(accountId: string, accounts: Account[]): string | undefined {
-  return accounts.find((a) => a.id === accountId)?.nickname
+/** An account as named on screen: its name in Trove, else its bank ("Nubank"). */
+export function accountName(accountId: string, accounts: Account[], institutions: Institution[]): string {
+  return shownName(accounts.find((a) => a.id === accountId), bankName(accountId, accounts, institutions))
 }
 
-/** How a recurring charge is paid: "Cartão Nubank", "Pix Itaú" (with the account's name in Trove when set: "Pix Conta da casa"). */
+/** How a recurring charge is paid: its card or account by name in Trove ("Cartão da casa", "Pix Conta da casa"), else "Cartão Nubank", "Pix Itaú". */
 export function paymentLabel(method: PaymentMethod, accountId: string, accounts: Account[], institutions: Institution[]): string {
-  const nickname = nicknameOf(accountId, accounts)
-  if (nickname) return method === 'card' ? nickname : t.recurring.account[method](nickname).trim()
-  return t.recurring.account[method](bankName(accountId, accounts, institutions)).trim()
+  const account = accounts.find((a) => a.id === accountId)
+  const bank = bankName(accountId, accounts, institutions)
+  if (method === 'card') return shownName(account, t.recurring.account.card(bank).trim())
+  return t.recurring.account[method](shownName(account, bank)).trim()
 }
 
 /** A projected event's name and description ("Fatura Nubank", "Cartão de crédito"). */
@@ -34,7 +36,7 @@ export function describeEvent(e: ProjectionEvent, accounts: Account[], instituti
   switch (e.kind) {
     case 'bill':
       return {
-        name: p.event.bill(nicknameOf(e.accountId, accounts) ?? bankName(e.accountId, accounts, institutions)),
+        name: p.event.bill(accountName(e.accountId, accounts, institutions)),
         meta: e.installments > 0 ? p.event.billMetaInstallments(formatMoney(e.installments)) : p.event.billMeta,
       }
     case 'recurring':

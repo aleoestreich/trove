@@ -5,7 +5,8 @@ import { Card } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { formatDay, formatMonthName } from '../lib/dates'
 import { formatCompactMoney, formatMoney } from '../lib/money'
-import { bankName, describeEvent, joinList } from '../lib/insightText'
+import { accountName, bankName, describeEvent, joinList } from '../lib/insightText'
+import { shownName } from '../lib/accountLabel'
 import { DEFAULT_PROJECTION_SETTINGS, projectionAccounts, type Projection as ProjectionData } from '../data/projection'
 import type { Account, Institution } from '../data/types'
 import { ProjectionChart, ProjectionLegend, Waterfall } from '../components/insights/ProjectionChart'
@@ -90,7 +91,7 @@ function HowCard({ projection }: { projection: ProjectionData }) {
         ? p.notes.receitas(salary ? Number(salary.date.slice(8, 10)) : projection.salary.day, projection.settings.includeFreelance)
         : p.notes.receitasNone,
     faturas: bills.length
-      ? p.notes.faturas(joinList(bills.map((e) => (e.kind === 'bill' ? bankName(e.accountId, accounts, institutions) : ''))), formatMoney(b.parcelasDentroDasFaturas))
+      ? p.notes.faturas(joinList(bills.map((e) => (e.kind === 'bill' ? accountName(e.accountId, accounts, institutions) : ''))), formatMoney(b.parcelasDentroDasFaturas))
       : p.notes.faturasNone,
     recorrentes: recurring.length ? p.notes.recorrentes(shortList(recurring.map((e) => describeEvent(e, accounts, institutions).name), p.andMore)) : p.notes.recorrentesNone,
     diaADia: projection.settings.includeDaily ? p.notes.diaADia(formatMoney(projection.dailyAverage)) : p.notes.diaADiaOff,
@@ -131,10 +132,9 @@ function shortList(names: string[], andMore: (names: string, n: number) => strin
 function accountLabel(id: string, accounts: Account[], institutions: Institution[]): string {
   const account = accounts.find((a) => a.id === id)
   if (!account) return ''
-  if (account.nickname) return account.nickname
   const bank = bankName(id, accounts, institutions)
   const sameBank = accounts.filter((a) => a.type === 'BANK' && a.institutionId === account.institutionId).length > 1
-  return sameBank ? `${bank} · ${account.name}` : bank
+  return shownName(account, sameBank ? `${bank} · ${account.name}` : bank)
 }
 
 function EventsCard({ projection }: { projection: ProjectionData }) {
@@ -261,8 +261,8 @@ function AccountPicker({ chosen, onClose, onApply }: { chosen: string[]; onClose
                   <SelectBox state={on ? 'on' : 'off'} />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-px">
-                  <span className="truncate text-[15px] leading-5 font-medium text-ink">{bankName(a.id, accounts, institutions)}</span>
-                  <span className="truncate text-xs leading-4 text-muted">{a.name}</span>
+                  <span className="truncate text-[15px] leading-5 font-medium text-ink">{accountName(a.id, accounts, institutions)}</span>
+                  {!a.nickname && <span className="truncate text-xs leading-4 text-muted">{a.name}</span>}
                 </span>
                 <span className="tabular text-[13px] text-ink-2">
                   {a.foreign ? formatMoney(a.foreign.balance, a.foreign.currency) : formatMoney(a.balance)}
