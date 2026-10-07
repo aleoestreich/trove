@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defaultCategories } from '../data/edits'
 import type { Transaction } from '../data/types'
-import { filterTransactions } from '../pages/Transactions'
+import { filterTransactions, newestFirst } from '../pages/Transactions'
 import { groupState, rangeIds, selectAllIds, summarize, toggleGroup } from './selection'
 
 const { categories } = defaultCategories((c, i) => `${c}-${i}`)
@@ -51,5 +51,12 @@ describe('bulk selection', () => {
       { categoryId: 'groceries', subcategoryId: 'groceries-0', count: 1 },
     ])
     expect(summarize([list[0], list[4]], categoriesById).kind).toBeNull()
+  })
+})
+
+describe('transactions page order', () => {
+  it('shows the newest day first and keeps the order within a day', () => {
+    const list = [tx('a', { date: '2026-09-01' }), tx('b', { date: '2026-10-02' }), tx('c', { date: '2026-10-02' }), tx('d', { date: '2026-09-30' })]
+    expect(newestFirst(list).map((t) => t.id)).toEqual(['b', 'c', 'd', 'a'])
   })
 })

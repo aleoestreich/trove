@@ -491,6 +491,19 @@ describe('mapping to Trove', () => {
     })
   })
 
+  it('lists newest first, and same-day transactions by time, latest first', () => {
+    const s = toSnapshot(
+      data([
+        tx({ id: 'zz-morning', date: '2026-09-15T12:00:00.000Z' }),
+        tx({ id: 'aa-evening', date: '2026-09-15T22:30:00.000Z' }),
+        tx({ id: 'mm-noon', date: '2026-09-15T15:00:00.000Z' }),
+        tx({ id: 'older', date: '2026-09-14T23:00:00.000Z' }),
+        tx({ id: 'newer', date: '2026-09-16T10:00:00.000Z' }),
+      ]),
+    )
+    expect(s.transactions.map((t) => t.id)).toEqual(['newer', 'aa-evening', 'mm-noon', 'zz-morning', 'older'])
+  })
+
   it('ignores accounts and transactions from connections that were not requested', () => {
     const other: PluggyAccount = { ...checking, id: 'x', itemId: 'someone-else' }
     const s = toSnapshot(data([tx({ accountId: 'x' })], [checking, other]))

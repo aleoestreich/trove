@@ -30,6 +30,12 @@ export interface TransactionFilters {
   query?: string
 }
 
+/**
+ * Newest day first. Stable, so within a day the order from the data stays
+ * (the server sorts same-day transactions by time, latest first).
+ */
+export const newestFirst = (txs: Transaction[]): Transaction[] => [...txs].sort((a, b) => b.date.localeCompare(a.date))
+
 /** The transactions matching the filters. Hidden ones are left out (they have their own view). */
 export function filterTransactions(transactions: Transaction[], categoriesById: Map<string, Category>, f: TransactionFilters): Transaction[] {
   const q = f.query?.trim().toLowerCase()
@@ -160,9 +166,10 @@ export function Transactions() {
   const billCard = params.get('bill') ? accounts.find((a) => a.id === params.get('bill')) : undefined
   const bill = billCard ? currentBill(billCard, transactions, plans) : null
   const filtered = useMemo(() => {
-    if (!bill || !billCard) return filterTransactions(transactions, categoriesById, filters)
-    const inCycle = transactions.filter((tx) => inBill(tx, billCard.id, bill))
-    return filterTransactions(inCycle, categoriesById, { ...filters, month: undefined, accountId: undefined })
+    const shown = !bill || !billCard
+      ? filterTransactions(transactions, categoriesById, filters)
+      : filterTransactions(transactions.filter((tx) => inBill(tx, billCard.id, bill)), categoriesById, { ...filters, month: undefined, accountId: undefined })
+    return newestFirst(shown)
   }, [transactions, categoriesById, params, bill?.closeDate])
 
   // Grouped by day, each with its net (transfers excluded).
@@ -530,7 +537,7 @@ export function HiddenTransactions() {
   const accountLabel = useAccountLabel()
   const days = useMemo(() => {
     const groups = new Map<string, Transaction[]>()
-    for (const tx of transactions) if (tx.hidden) groups.set(tx.date, [...(groups.get(tx.date) ?? []), tx])
+    for (const tx of newestFirst(transactions)) if (tx.hidden) groups.set(tx.date, [...(groups.get(tx.date) ?? []), tx])
     return [...groups].map(([date, txs]) => ({ date, label: formatDayHeading(date), txs }))
   }, [transactions])
 
