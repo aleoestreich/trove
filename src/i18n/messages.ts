@@ -102,6 +102,9 @@ export interface Messages {
     billTotal: (amount: string) => string
     billExpected: (amount: string) => string
     allMonths: string
+    /** Older months are fetched from the database when chosen. */
+    fetchingStored: string
+    fetchStoredFailed: string
     type: string
     allTypes: string
     account: string
@@ -603,6 +606,8 @@ export const messages: Messages = {
     billTotal: (amount) => `Total da fatura ${amount}`,
     billExpected: (amount) => `Inclui ${amount} em parcelas que ainda não entraram.`,
     allMonths: 'Todos os meses',
+    fetchingStored: 'Buscando as transações salvas…',
+    fetchStoredFailed: 'Não foi possível buscar as transações salvas.',
     type: 'Tipo',
     allTypes: 'Todos os tipos',
     account: 'Conta',

@@ -2,6 +2,8 @@ import type { Repository } from './repository'
 import type { Snapshot, SyncInfo, SyncJob } from './types'
 import { messages } from '../i18n/messages'
 import type { BulkResult } from './edits'
+import { transactionQueryParams } from './transactionFilter'
+import type { Transaction } from './types'
 
 /** Pluggy or the database isn't configured on the server yet (see docs/pluggy-setup.md, docs/neon-setup.md). */
 export class NotConfiguredError extends Error {}
@@ -108,6 +110,11 @@ export function createApiRepository(fetchFn: Fetch = (...a) => fetch(...a)): Rep
       if (!res.ok) throw await failure(res)
       return ((await res.json()) as { job: SyncJob | null }).job
     },
+    async transactions(query) {
+      const res = await request(fetchFn, `/api/transactions?${transactionQueryParams(query)}`)
+      if (!res.ok) throw await failure(res)
+      return ((await res.json()) as { transactions: Transaction[] }).transactions
+    },
   }
 }
 
@@ -142,6 +149,9 @@ export function withDemoFallback(live: Repository, demo: Repository): Repository
     },
     syncStatus() {
       return live.syncStatus()
+    },
+    transactions(q) {
+      return (usingDemo ? demo : live).transactions(q)
     },
   }
 }

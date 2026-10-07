@@ -323,9 +323,12 @@ columns (`name`, `raw`…), never `nickname`, so a sync never changes it.
 ## Reads
 
 Every screen works from one snapshot (`GET /api/finance`): connections,
-accounts, every stored transaction (back to `HISTORY_START`, January 2025:
-Transações lists them all; the Overview and the insights use the months they
-need) and the categories. Totals, bills,
+accounts, the last 14 months of transactions (6 shown on most screens; the
+insights use the rest), the list of every stored month and the categories.
+Older months are read when Transações asks for them:
+`GET /api/transactions?month=YYYY-MM|all&type=&account=&category=&q=`
+answers `{ transactions }` with the same mapping and Transações' filters
+applied (one function with `/api/finance`, through a `vercel.json` rewrite). Totals, bills,
 installments and transfers are computed from it. The reads:
 
 1. **Connections and accounts:** `bank_connections` joined to `accounts`.

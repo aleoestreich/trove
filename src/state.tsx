@@ -4,8 +4,9 @@ import { errorMessage, SyncStartError } from './data/apiRepository'
 import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/syncProblems'
 import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
-import { MONTHS_OF_HISTORY, type Account, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type Transaction } from './data/types'
+import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type Transaction } from './data/types'
 import { computeInsights, type Insights } from './data/insights'
+import type { TransactionQuery } from './data/transactionFilter'
 import type { RecurringAction } from './data/recurring'
 import { lastMonths, monthKey, toISO } from './lib/dates'
 import { useI18n } from './i18n/I18nProvider'
@@ -18,8 +19,19 @@ interface AppData extends Snapshot {
    * the 6-complete-month averages). The snapshot loads more for the insights.
    */
   transactions: Transaction[]
-  /** Everything loaded (MONTHS_OF_ANALYSIS months), for the insights. */
+  /**
+   * Everything loaded: MONTHS_OF_ANALYSIS months, plus older ones Transações
+   * fetched (fetchTransactions).
+   */
   allTransactions: Transaction[]
+  /** First month the load covers in full (YYYY-MM); older ones need fetchTransactions. Null: all of it (demo). */
+  loadedFrom: string | null
+  /** Every month with stored transactions, oldest first (the loaded months for demo data). */
+  storedMonths: string[]
+  /** Changes on every load (e.g. after a sync), so fetched months can be fetched again. */
+  dataVersion: number
+  /** Fetches stored transactions for Transações (older months, "Todos os meses") and adds them to the data. */
+  fetchTransactions(query: TransactionQuery): Promise<void>
   /** Today (ISO date), as the insights see it. */
   today: string
   /** Month-end projection, unusual categories and recurring charges (src/data/insights.ts). */
@@ -105,7 +117,15 @@ export function DataProvider({ repository, children }: { repository: Repository;
   const [attempt, setAttempt] = useState(0)
   const [editError, setEditError] = useState<string | null>(null)
 
-  const load = useCallback(() => repository.load().then(setSnapshot), [repository])
+  const [dataVersion, setDataVersion] = useState(0)
+  const load = useCallback(
+    () =>
+      repository.load().then((s) => {
+        setSnapshot(s)
+        setDataVersion((v) => v + 1)
+      }),
+    [repository],
+  )
 
   useEffect(() => {
     setError(null)
@@ -291,6 +311,20 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [snapshot?.sync, syncing, sync],
   )
 
+  // Older transactions join the loaded ones (the loaded copy wins: it may hold edits not yet saved).
+  const fetchTransactions = useCallback(
+    async (query: TransactionQuery) => {
+      const fetched = await repository.transactions(query)
+      setSnapshot((s) => {
+        if (!s) return s
+        const known = new Set(s.transactions.map((t) => t.id))
+        const added = fetched.filter((t) => !known.has(t.id))
+        return added.length ? { ...s, transactions: [...s.transactions, ...added] } : s
+      })
+    },
+    [repository],
+  )
+
   const saveProjectionSettings = useCallback((settings: ProjectionSettings) => edit({ op: 'setProjectionSettings', settings }), [edit])
   const answerRecurring = useCallback((id: string, action: RecurringAction) => edit({ op: 'recurringAction', id, action, at: toISO(new Date()) }), [edit])
 
@@ -302,12 +336,21 @@ export function DataProvider({ repository, children }: { repository: Repository;
     const subcategories = [...snapshot.subcategories].sort(byOrder)
     const today = toISO(new Date())
     const from = `${lastMonths(monthKey(today), MONTHS_OF_HISTORY + 1)[0]}-01`
+    // Demo data is all in memory; live data loads MONTHS_OF_ANALYSIS months.
+    const loadedFrom = snapshot.source === 'demo' ? null : lastMonths(monthKey(today), MONTHS_OF_ANALYSIS)[0]
+    // The insights always look at the same months, whatever Transações fetched.
+    const analysed = loadedFrom ? snapshot.transactions.filter((t) => t.date >= `${loadedFrom}-01`) : snapshot.transactions
+    const loadedMonths = [...new Set(snapshot.transactions.map((t) => monthKey(t.date)))].sort()
     return {
       ...snapshot,
       transactions: snapshot.transactions.filter((t) => t.date >= from),
       allTransactions: snapshot.transactions,
+      loadedFrom,
+      storedMonths: snapshot.storedMonths ?? loadedMonths,
+      dataVersion,
+      fetchTransactions,
       today,
-      insights: computeInsights({ ...snapshot, accounts, categories }, today),
+      insights: computeInsights({ ...snapshot, transactions: analysed, accounts, categories }, today),
       saveProjectionSettings,
       answerRecurring,
       accounts,
@@ -323,7 +366,7 @@ export function DataProvider({ repository, children }: { repository: Repository;
       saveIncomeFilter,
       setCardDays,
     }
-  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, cardDays, setCardDays, saveProjectionSettings, answerRecurring])
+  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, cardDays, setCardDays, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

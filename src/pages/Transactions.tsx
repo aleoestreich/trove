@@ -2,12 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
-import type { Category, CategoryKind, Transaction } from '../data/types'
+import type { CategoryKind, Transaction } from '../data/types'
+import { filterTransactions, type TransactionFilters, type TransactionQuery } from '../data/transactionFilter'
+
+export { filterTransactions, type TransactionFilters }
 import { formatDayHeading, formatMonth, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
 import { currentBill, inBill } from '../lib/bills'
 import { installmentPlans } from '../lib/installments'
 import { formatMoney } from '../lib/money'
-import { kindOf, totals } from '../lib/summary'
+import { totals } from '../lib/summary'
 import { Icon } from '../components/Icon'
 import { Amount, Button, EmptyState, PageHeader } from '../components/ui'
 import { CategoryLine, TransactionRow, useAccountLabel } from '../components/TransactionRow'
@@ -20,41 +23,54 @@ import { useI18n } from '../i18n/I18nProvider'
 import { accountLabel, shownName } from '../lib/accountLabel'
 import { useIsDesktop } from '../lib/useIsDesktop'
 
-export interface TransactionFilters {
-  month?: string
-  accountId?: string
-  /** A category ID, or "none" for uncategorized. */
-  categoryId?: string
-  kind?: CategoryKind
-  query?: string
-}
-
 /**
  * Newest day first. Stable, so within a day the order from the data stays
  * (the server sorts same-day transactions by time, latest first).
  */
 export const newestFirst = (txs: Transaction[]): Transaction[] => [...txs].sort((a, b) => b.date.localeCompare(a.date))
 
-/** Every month from the oldest transaction to `latest`, oldest first (at least `latest`). */
-export function monthsWithData(transactions: Transaction[], latest: string): string[] {
-  const first = transactions.reduce((min, t) => (t.date < min ? t.date : min), `${latest}-01`)
+/** Every month from `first` to `latest` (YYYY-MM), oldest first; just `latest` when `first` is later or missing. */
+export function monthsBetween(first: string | undefined, latest: string): string[] {
+  if (!first || first > latest) return [latest]
   const [y, m] = latest.split('-').map(Number)
   const count = (y - Number(first.slice(0, 4))) * 12 + (m - Number(first.slice(5, 7))) + 1
-  return lastMonths(latest, Math.max(1, count))
+  return lastMonths(latest, count)
 }
 
-/** The transactions matching the filters. Hidden ones are left out (they have their own view). */
-export function filterTransactions(transactions: Transaction[], categoriesById: Map<string, Category>, f: TransactionFilters): Transaction[] {
-  const q = f.query?.trim().toLowerCase()
-  return transactions.filter(
-    (t) =>
-      !t.hidden &&
-      (!f.month || monthKey(t.date) === f.month) &&
-      (!f.accountId || t.accountId === f.accountId) &&
-      (!f.categoryId || (f.categoryId === 'none' ? !t.transfer && !(t.categoryId && categoriesById.has(t.categoryId)) : t.categoryId === f.categoryId)) &&
-      (!f.kind || kindOf(t, categoriesById) === f.kind) &&
-      (!q || t.description.toLowerCase().includes(q)),
-  )
+/**
+ * Transações' older months: when "Todos os meses" or a month before the
+ * loaded ones is chosen, fetches the stored transactions (with the other
+ * filters) and adds them to the data. The search is debounced. Fetches each
+ * query once per load.
+ */
+function useStoredTransactions(query: TransactionQuery | null) {
+  const { fetchTransactions, dataVersion } = useData()
+  const [state, setState] = useState<{ key: string; status: 'loading' | 'done' | 'error' } | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const key = query ? `${dataVersion}|${JSON.stringify(query)}` : null
+  const [debounced, setDebounced] = useState(key)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(key), 300)
+    return () => clearTimeout(timer)
+  }, [key])
+  useEffect(() => {
+    if (!debounced || !query || debounced !== key) return
+    let cancelled = false
+    setState({ key: debounced, status: 'loading' })
+    fetchTransactions(query).then(
+      () => !cancelled && setState({ key: debounced, status: 'done' }),
+      (e) => {
+        console.error(e)
+        if (!cancelled) setState({ key: debounced, status: 'error' })
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the query
+  }, [debounced, attempt])
+  const status = !key ? 'done' : state?.key === key ? state.status : 'loading'
+  return { status, retry: () => setAttempt((n) => n + 1) }
 }
 
 /**
@@ -99,7 +115,7 @@ function nextDay(iso: string): string {
 
 export function Transactions() {
   // Every stored transaction (since the first sync's start), not just the months the Overview shows.
-  const { allTransactions: transactions, accounts, institutionsById, categories, categoriesById } = useData()
+  const { allTransactions: transactions, accounts, institutionsById, categories, categoriesById, loadedFrom, storedMonths } = useData()
   const [params, setParams] = useSearchParams()
   const [selected, setSelected] = useState<Transaction | null>(null)
   const { t, categoryName } = useI18n()
@@ -162,6 +178,10 @@ export function Transactions() {
     query: params.get('q') ?? undefined,
   }
 
+  // "Todos os meses", or a month older than what's loaded: fetch it from the database, with the other filters.
+  const older = !params.get('bill') && !!loadedFrom && (!filters.month || filters.month < loadedFrom)
+  const stored = useStoredTransactions(older ? { ...filters, month: filters.month ?? 'all' } : null)
+
   const set = (key: string, value: string) => {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
@@ -215,7 +235,21 @@ export function Transactions() {
   // A bill spans two months: no month in the count or the empty message.
   const shownMonth = bill ? undefined : filters.month
   const countText = t.transactions.count(filtered.length, shownMonth ? formatMonth(shownMonth) : null)
-  const empty = (
+  const storedNote =
+    stored.status === 'loading' ? (
+      <p role="status" className="flex items-center gap-2 px-4 py-2 text-[13px] leading-[18px] text-muted lg:px-0">
+        <Icon name="refresh" className="size-4 animate-spin motion-reduce:animate-none" strokeWidth={2} />
+        {t.transactions.fetchingStored}
+      </p>
+    ) : stored.status === 'error' ? (
+      <p role="alert" className="flex flex-wrap items-center gap-x-2 px-4 py-1 text-[13px] leading-[18px] text-critical lg:px-0">
+        {t.transactions.fetchStoredFailed}
+        <button type="button" onClick={stored.retry} className="h-11 rounded-sm px-2 font-medium text-accent hover:bg-track">
+          {t.tryAgain}
+        </button>
+      </p>
+    ) : null
+  const empty = stored.status === 'loading' ? null : (
     <EmptyState
       icon="search"
       title={t.transactions.emptyTitle}
@@ -271,7 +305,7 @@ export function Transactions() {
               </span>
             ) : (
             <FilterChip label={monthLabel} applied value={monthValue} onChange={(v) => set('m', v)}>
-              {monthsWithData(transactions, latest)
+              {monthsBetween(storedMonths[0], latest)
                 .reverse()
                 .map((m) => (
                   <option key={m} value={m}>
@@ -332,6 +366,7 @@ export function Transactions() {
           </div>
         )}
 
+        {storedNote}
         {desktop ? (
           <div className="flex items-start gap-5">
             <div className="min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-surface">

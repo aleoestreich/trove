@@ -145,6 +145,11 @@ export interface Snapshot {
   incomeFilter?: IncomeFilter
   /** What the month-end projection counts (the defaults when absent). */
   projectionSettings?: ProjectionSettings
+  /**
+   * Live data: every month with a stored transaction (YYYY-MM, oldest first).
+   * `transactions` holds the recent ones; Transações fetches older months.
+   */
+  storedMonths?: string[]
   /** Names set in Trove for accounts and cards, by account ID (applied to `accounts`). */
   accountNames?: Record<string, string>
   /** Hand-set answers about detected recurring charges, by recurring charge ID. */
