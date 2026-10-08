@@ -102,6 +102,16 @@ suite('database', () => {
     expect((await row('n1')).category_id).toBe('restaurants')
   })
 
+  it('files a new Mercado Livre purchase under shopping, and never changes a stored category', async () => {
+    await sync([tx('ml', { category: 'Groceries', description: 'MERCADOLIVRE*LOJAEXEMPLO' }), tx('super', { category: 'Groceries', description: 'SUPERMERCADO EXEMPLO' })])
+    expect((await row('ml')).category_id).toBe('shopping')
+    expect((await row('super')).category_id).toBe('groceries')
+    // A category already stored stays as it is on later syncs.
+    await pool.query(`UPDATE transactions SET category_id = 'groceries' WHERE id = 'ml'`)
+    await sync([tx('ml', { category: 'Groceries', description: 'MERCADOLIVRE*LOJAEXEMPLO' })])
+    expect((await row('ml')).category_id).toBe('groceries')
+  })
+
   describe('bulk categorize', () => {
     const ctx = { itemIds: ['item-1'] }
     const many = (transactionIds: string[], categoryId: string | null, subcategoryId: string | null) =>

@@ -231,10 +231,21 @@ function pairCardPayments(txs: Transaction[], bankDebits: Set<string>, cardCredi
 /** Generic transfers (Pix/TED to someone): an expense or income unless paired with another own account. */
 const GENERIC_TRANSFER = /transfer|pix|ted\b|doc\b|transfer[eê]ncia/i
 
-export function categoryFor(tx: Pick<PluggyTransaction, 'category' | 'type'>): string {
+/**
+ * Mercado Livre is a marketplace, not a supermarket: "mercado" in its name
+ * must not file it under groceries. Applies to new transactions only: the
+ * sync never changes a stored category.
+ */
+export const MERCADO_LIVRE = /\bmercado\s*livre\b|\bmercadolivre/i
+
+export function categoryFor(tx: Pick<PluggyTransaction, 'category' | 'type'> & Partial<Pick<PluggyTransaction, 'description' | 'descriptionRaw' | 'merchant'>>): string {
   const name = tx.category ?? ''
-  for (const [re, id] of CATEGORY_RULES) if (re.test(name)) return id
-  return tx.type === 'CREDIT' ? 'other-income' : 'other-expense'
+  const rule = CATEGORY_RULES.find(([re]) => re.test(name))?.[1]
+  if (rule === 'groceries') {
+    const text = [tx.description, tx.descriptionRaw, tx.merchant?.name, tx.merchant?.businessName].filter(Boolean).join(' ')
+    if (MERCADO_LIVRE.test(text)) return 'shopping'
+  }
+  return rule ?? (tx.type === 'CREDIT' ? 'other-income' : 'other-expense')
 }
 
 /** Marks generic transfers that have an opposite twin in another own account. */
