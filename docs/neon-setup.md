@@ -56,6 +56,11 @@ Then run [`db/migrations/007_account_nickname.sql`](../db/migrations/007_account
 it adds the accounts' `nickname`, the name set in Trove for an account or
 card (see [Account names](#account-names)).
 
+Then run [`db/migrations/008_mercado_livre_category.sql`](../db/migrations/008_mercado_livre_category.sql):
+Mercado Livre purchases that the sync filed under "Mercado" (groceries)
+move to "Compras" (shopping). Categories set by hand are kept. Later syncs
+file them under "Compras" from the start.
+
 ## 3. Give Vercel the connection string
 
 1. In Neon, open **Connect**, choose the database and role, and turn

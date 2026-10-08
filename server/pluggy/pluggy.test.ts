@@ -374,6 +374,17 @@ describe('mapping to Trove', () => {
     for (const [category, type, expected] of cases) expect(categoryFor({ category, type }), String(category)).toBe(expected)
   })
 
+  it('never files Mercado Livre under groceries, whatever "mercado" in its name suggests', () => {
+    const groceries = { category: 'Groceries', type: 'DEBIT' as const }
+    expect(categoryFor({ ...groceries, description: 'MERCADOLIVRE*LOJAEXEMPLO' })).toBe('shopping')
+    expect(categoryFor({ ...groceries, description: 'Compra', descriptionRaw: 'MERCADO LIVRE 04/10' })).toBe('shopping')
+    expect(categoryFor({ ...groceries, description: 'Compra', merchant: { name: 'Mercado Livre' } })).toBe('shopping')
+    // A real supermarket, and Mercado Livre under another Pluggy category, keep their guess.
+    expect(categoryFor({ ...groceries, description: 'SUPERMERCADO EXEMPLO' })).toBe('groceries')
+    expect(categoryFor({ category: 'Electronics', type: 'DEBIT', description: 'MERCADOLIVRE*LOJAEXEMPLO' })).toBe('shopping')
+    expect(categoryFor({ category: 'Food delivery', type: 'DEBIT', description: 'MERCADO LIVRE' })).toBe('food')
+  })
+
   it('treats bill payments and transfers between own accounts as transfers, not income or expenses', () => {
     const s = toSnapshot(data([
       tx({ id: 'salary', type: 'CREDIT', amount: 10000, category: 'Salary' }),

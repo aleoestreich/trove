@@ -74,6 +74,9 @@ export interface PluggyTransaction {
   currencyCode: string
   category?: string | null
   categoryId?: string | null
+  /** The bank's own wording, when Pluggy cleaned up `description`. */
+  descriptionRaw?: string | null
+  merchant?: { name?: string | null; businessName?: string | null } | null
   status?: 'PENDING' | 'POSTED'
   creditCardMetadata?: {
     installmentNumber?: number
