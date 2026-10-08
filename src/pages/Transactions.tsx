@@ -390,7 +390,7 @@ export function Transactions() {
             {chosen.length >= 2 ? (
               <BulkPanel txs={chosen} onClear={() => setSelectedIds(new Set())} onApplied={onApplied} />
             ) : (
-              selected && <TransactionPanel tx={selected} onClose={() => setSelected(null)} />
+              selected && <TransactionPanel key={selected.id} tx={selected} onClose={() => setSelected(null)} />
             )}
           </div>
         ) : byDate.length === 0 ? (
@@ -445,7 +445,7 @@ export function Transactions() {
           </>
         )}
 
-        {!desktop && selected && <TransactionSheet tx={selected} onClose={() => setSelected(null)} />}
+        {!desktop && selected && <TransactionSheet key={selected.id} tx={selected} onClose={() => setSelected(null)} />}
       </div>
 
       {!desktop && !selecting && headerSlot && filtered.some(selectable) &&

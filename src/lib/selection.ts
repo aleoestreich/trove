@@ -68,3 +68,18 @@ export function summarize(txs: Transaction[], categoriesById: Map<string, Catego
     current: [...groups.values()].sort((a, b) => b.count - a.count),
   }
 }
+
+/**
+ * The bulk sheet's chosen category and subcategory, while they still fit the
+ * selection: the category is of the selection's kind and the subcategory is
+ * one of its own. The selection can change after the pick (desktop rows stay
+ * checkable), so a pick for expenses never applies to income.
+ */
+export function bulkPick<S extends { categoryId: string }>(
+  kind: SelectionSummary['kind'],
+  category: Category | undefined,
+  sub: S | undefined,
+): { category?: Category; sub?: S } {
+  if (!category || category.type !== kind) return {}
+  return { category, sub: sub?.categoryId === category.id ? sub : undefined }
+}

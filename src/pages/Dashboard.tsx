@@ -393,7 +393,7 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {selected && <TransactionSheet tx={selected} onClose={() => setSelected(null)} />}
+      {selected && <TransactionSheet key={selected.id} tx={selected} onClose={() => setSelected(null)} />}
     </>
   )
 }

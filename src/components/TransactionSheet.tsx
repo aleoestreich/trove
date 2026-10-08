@@ -17,11 +17,12 @@ import { useI18n } from '../i18n/I18nProvider'
  * page shows it in a side panel (`panel`).
  */
 function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose(): void; variant: 'sheet' | 'panel' }) {
-  const { categories, categoriesById, subcategories, edit, transactions } = useData()
+  const { categories, categoriesById, subcategories, edit, allTransactions } = useData()
   const { t, categoryName } = useI18n()
   const accountLabel = useAccountLabel()
   const closeRef = useRef<HTMLButtonElement>(null)
-  const current = transactions.find((x) => x.id === tx.id) ?? tx
+  // The latest copy, edits included: older months fetched by Transações too.
+  const current = allTransactions.find((x) => x.id === tx.id) ?? tx
   const category = current.categoryId ? categoriesById.get(current.categoryId) : undefined
   const kind = kindOf(current, categoriesById)
 
