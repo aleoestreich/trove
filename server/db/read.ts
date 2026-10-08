@@ -11,7 +11,7 @@ import { withAccountNames } from '../../src/data/edits.js'
 import type { Db } from './connection.js'
 import { HISTORY_START } from './sync.js'
 import { filterTransactions, type TransactionQuery } from '../../src/data/transactionFilter.js'
-import { addDays, daysInMonth, monthKey } from '../../src/lib/dates.js'
+import { addDays, daysInMonth } from '../../src/lib/dates.js'
 
 /** When each configured connection last synced; overall = the oldest of them (null until all have). */
 export async function readSyncInfo(db: Db, itemIds: string[]): Promise<SyncInfo> {
@@ -29,9 +29,13 @@ export async function readSyncInfo(db: Db, itemIds: string[]): Promise<SyncInfo>
   return { lastSyncedAt: oldest, connections }
 }
 
+/** Days read before `from` (and after `to`) so transfer and bill-payment pairs across the edge are still matched (pairing spans up to 5 days). */
+const PAIRING_MARGIN = 7
+
 /**
  * The snapshot from the database, or null when no configured connection has
- * synced yet: transactions from `from` (and up to `to`, when given).
+ * synced yet: transactions from `from` (and up to `to`, when given). A few
+ * more days are read on each side for the pairing, then left out.
  */
 export async function readSnapshot(db: Db, itemIds: string[], from: string, to: string | null = null): Promise<Snapshot | null> {
   const sync = await readSyncInfo(db, itemIds)
@@ -48,7 +52,7 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string, to: 
      WHERE a.connection_id = ANY($1::text[]) AND t.removed_at IS NULL AND t.booked_on >= $2::date
        AND ($3::date IS NULL OR t.booked_on <= $3::date)
      ORDER BY t.booked_on DESC, t.date DESC`,
-    [itemIds, from, to],
+    [itemIds, addDays(from, -PAIRING_MARGIN), to && addDays(to, PAIRING_MARGIN)],
   )
   // Every month with a stored transaction, for Transações' month filter (older ones are fetched on demand).
   const months = await db.query<{ month: string }>(
@@ -79,6 +83,7 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string, to: 
   })
   return withAccountNames({
     ...snapshot,
+    transactions: snapshot.transactions.filter((t) => t.date >= from && (!to || t.date <= to)),
     accountNames: Object.fromEntries(accounts.rows.filter((r) => r.nickname).map((r) => [r.id, r.nickname!])),
     storedMonths: months.rows.map((r) => r.month),
     sync,
@@ -106,9 +111,6 @@ export function readStart(now: Date): string {
   return historyStart(now, MONTHS_OF_ANALYSIS - MONTHS_OF_HISTORY)
 }
 
-/** Days read around a month, so transfer pairs across its edges are still matched. */
-const PAIRING_MARGIN = 7
-
 /**
  * GET /api/transactions: a month's (or every stored month's) transactions,
  * mapped as the app maps them, with Transações' filters applied. Null when
@@ -118,8 +120,7 @@ export async function readTransactions(db: Db, itemIds: string[], q: Transaction
   const all = q.month === 'all'
   const first = all ? HISTORY_START : `${q.month}-01`
   const last = all ? null : `${q.month}-${String(daysInMonth(q.month)).padStart(2, '0')}`
-  const s = await readSnapshot(db, itemIds, addDays(first, -PAIRING_MARGIN), last && addDays(last, PAIRING_MARGIN))
+  const s = await readSnapshot(db, itemIds, first, last)
   if (!s) return null
-  const inRange = s.transactions.filter((t) => all || monthKey(t.date) === q.month)
-  return filterTransactions(inRange, new Map(s.categories.map((c) => [c.id, c])), { ...q, month: undefined })
+  return filterTransactions(s.transactions, new Map(s.categories.map((c) => [c.id, c])), { ...q, month: undefined })
 }

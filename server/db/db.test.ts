@@ -483,6 +483,15 @@ suite('database', () => {
     expect((await readSnapshot(pool, ['item-1'], '2026-10-01'))!.storedMonths).toEqual(['2025-02', '2025-03', '2026-10'])
   })
 
+  it('matches a bill payment whose bank debit is just before the days read', async () => {
+    const card: PluggyAccount = { id: 'card-1', itemId: 'item-1', type: 'CREDIT', subtype: 'CREDIT_CARD', name: 'Cartão Exemplo', balance: 0, currencyCode: 'BRL' }
+    await inTransaction(pool, (db) =>
+      save(db, { ...fetched([tx('debit', { date: '2026-09-29T12:00:00.000Z', description: 'DEBITO EXEMPLO', amount: -500 }), tx('credit', { accountId: 'card-1', date: '2026-10-02T12:00:00.000Z', type: 'CREDIT', amount: 500, description: 'CREDITO EXEMPLO' })]), accounts: [checking, card] }, now),
+    )
+    const s = (await readSnapshot(pool, ['item-1'], '2026-10-01'))!
+    expect(s.transactions.map((t) => [t.id, t.transfer])).toEqual([['credit', 'card-payment']])
+  })
+
   describe('insight routes', () => {
     const config = () => ({ pluggy: { clientId: 'cid', clientSecret: 'secret', itemIds: ['item-1'], baseUrl: 'https://api.pluggy.ai' }, databaseUrl: url! })
     const deps = { now: () => now }
