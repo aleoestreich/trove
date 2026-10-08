@@ -109,7 +109,7 @@ describe('demo repository', () => {
 })
 
 describe('bulk categorize', () => {
-  const bulk = (transactionIds: string[], categoryId = 'restaurants', subcategoryId = 'restaurants-0') =>
+  const bulk = (transactionIds: string[], categoryId = 'restaurants', subcategoryId: string | null = 'restaurants-0') =>
     ({ op: 'categorizeMany', transactionIds, categoryId, subcategoryId }) as const
   const reason = (f: () => unknown) => {
     try {
@@ -142,6 +142,15 @@ describe('bulk categorize', () => {
       ['t2', 'groceries', 'groceries-1'],
       ['t3', 'restaurants', 'restaurants-0'],
     ])
+  })
+
+  it('sets a category without a subcategory, clearing the one they had', () => {
+    const s = applyEdit(snapshot(), validateEdit({ op: 'categorizeMany', transactionIds: ['t1', 't2'], categoryId: 'restaurants', subcategoryId: null }))
+    expect(s.transactions.filter((t) => ['t1', 't2'].includes(t.id)).map((t) => [t.id, t.categoryId, t.subcategoryId ?? null])).toEqual([
+      ['t1', 'restaurants', null],
+      ['t2', 'restaurants', null],
+    ])
+    expect(reason(() => applyEdit(mixed(), bulk(['t1', 'pay'], 'restaurants', null)))).toBe('mixed_types')
   })
 
   it('refuses transfers, mixed types, a category of the other type and a subcategory of another category', () => {

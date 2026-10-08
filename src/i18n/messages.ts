@@ -277,7 +277,7 @@ export interface Messages {
     current: string
     resultLabel: (n: number) => string
     pickCategory: string
-    pickSubcategory: string
+    noSubcategory: string
     cancel: string
     apply: (n: number) => string
     saving: string
@@ -778,7 +778,7 @@ export const messages: Messages = {
     current: 'Hoje estão em',
     resultLabel: (n) => (n === 1 ? 'A 1 vai para' : `As ${n} vão para`),
     pickCategory: 'Escolha a categoria',
-    pickSubcategory: 'Escolha a subcategoria',
+    noSubcategory: 'sem subcategoria',
     cancel: 'Cancelar',
     apply: (n) => `Aplicar a ${n}`,
     saving: 'Salvando…',

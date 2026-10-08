@@ -21,7 +21,7 @@ export interface Applied {
 
 /**
  * Bulk categorization: what the selection is filed under today, the category
- * (of the selection's type), the required subcategory, a preview, and
+ * (of the selection's type), an optional subcategory, a preview, and
  * Cancel / Apply. Saved all at once; on error the message shows under the buttons.
  */
 function BulkContent({
@@ -49,7 +49,7 @@ function BulkContent({
   const category = categoryId ? categoriesById.get(categoryId) : undefined
   const sub = subcategoryId ? subcategoriesById.get(subcategoryId) : undefined
   const options = summary.kind ? categories.filter((c) => c.type === summary.kind) : []
-  const ready = (clearing || (!!category && !!sub && !!summary.kind)) && !saving
+  const ready = (clearing || (!!category && !!summary.kind)) && !saving
 
   const apply = async () => {
     if (!ready) return
@@ -57,8 +57,8 @@ function BulkContent({
     setError(null)
     const ids = txs.map((x) => x.id)
     try {
-      const result = clearing ? await categorizeMany(ids, null, null) : await categorizeMany(ids, category!.id, sub!.id)
-      const label = clearing ? t.transactions.uncategorized : `${categoryName(category!)} › ${sub!.name}`
+      const result = clearing ? await categorizeMany(ids, null, null) : await categorizeMany(ids, category!.id, sub?.id ?? null)
+      const label = clearing ? t.transactions.uncategorized : `${categoryName(category!)}${sub ? ` › ${sub.name}` : ''}`
       onApplied({ ids, count: result.updated, label, previous: result.previous })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -158,7 +158,8 @@ function BulkContent({
           current={subcategoryId}
           small={panel}
           options={subcategories.filter((x) => x.categoryId === category.id)}
-          onPick={setSubcategoryId}
+          // Tapping the chosen one again leaves them without a subcategory.
+          onPick={(id) => setSubcategoryId((current) => (current === id ? null : id))}
           onAdd={(name) => {
             const id = newId()
             edit({ op: 'createSubcategory', subcategory: { id, categoryId: category.id, name } })
@@ -177,7 +178,8 @@ function BulkContent({
             </span>
           ) : category ? (
             <span className="truncate text-sm leading-5 font-medium" style={{ color: catInk(category.color, 70) }}>
-              {categoryName(category)} › {sub ? sub.name : <span className="font-normal text-muted">{t.bulk.pickSubcategory}</span>}
+              {categoryName(category)}
+              {sub ? ` › ${sub.name}` : <span className="font-normal text-muted"> · {t.bulk.noSubcategory}</span>}
             </span>
           ) : (
             <span className="text-sm leading-5 text-muted">{t.bulk.pickCategory}</span>

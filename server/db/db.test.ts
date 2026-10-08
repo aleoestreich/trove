@@ -144,6 +144,17 @@ suite('database', () => {
       expect((await row('t1')).category_id).toBe('restaurants')
     })
 
+    it('sets a category without a subcategory', async () => {
+      const delivery = await subOf('restaurants', 'Delivery')
+      await sync([tx('t1'), tx('t2')])
+      await many(['t1'], 'restaurants', delivery)
+      await many(['t1', 't2'], 'restaurants', null)
+      expect((await state()).map((r) => [r.id, r.category_id, r.subcategory_id])).toEqual([
+        ['t1', 'restaurants', null],
+        ['t2', 'restaurants', null],
+      ])
+    })
+
     it('is all or nothing: one transfer, an unknown ID or another connection’s transaction changes nothing', async () => {
       await sync([tx('t1', { category: 'Supermarkets' }), tx('t2'), tx('bill', { category: 'Credit card payment' })])
       const before = await state()
