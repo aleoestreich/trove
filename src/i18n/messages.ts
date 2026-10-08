@@ -16,6 +16,12 @@ export interface Messages {
   mainNav: string
   demoData: string
   demoNote: string
+  /** Privacy mode: amounts, charts and descriptions blurred, for public places. */
+  privacy: {
+    hide: string
+    show: string
+    on: string
+  }
   loading: string
   loadErrorTitle: string
   loadErrorBody: string
@@ -549,6 +555,11 @@ export const messages: Messages = {
   mainNav: 'Principal',
   demoData: 'Dados de exemplo',
   demoNote: 'Mostrando dados de exemplo até o Meu Pluggy ser conectado.',
+  privacy: {
+    hide: 'Ocultar valores',
+    show: 'Mostrar valores',
+    on: 'Valores ocultos',
+  },
   loading: 'Carregando suas finanças',
   loadErrorTitle: 'Não foi possível carregar suas finanças',
   loadErrorBody: 'Verifique sua conexão e tente de novo. Nada foi alterado; seus dados estão seguros.',

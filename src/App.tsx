@@ -17,6 +17,7 @@ import { Wordmark } from './components/Logo'
 import { I18nProvider, useI18n } from './i18n/I18nProvider'
 import type { Messages } from './i18n/messages'
 import { isDeployed } from './lib/useIsDesktop'
+import { usePrivacy } from './lib/privacy'
 
 // Deployed: data from the database via /api (demo data until configured and synced).
 // Local development: demo data.
@@ -70,8 +71,11 @@ function Shell() {
               </span>
             )}
           </div>
-          {/* Page actions (e.g. "Selecionar" on Transactions) are rendered here by the page. */}
-          <div id="header-actions" className="flex shrink-0 items-center" />
+          <div className="flex shrink-0 items-center">
+            {/* Page actions (e.g. "Selecionar" on Transactions) are rendered here by the page. */}
+            <div id="header-actions" className="flex items-center" />
+            <PrivacyToggle />
+          </div>
         </div>
       </header>
 
@@ -162,6 +166,7 @@ function Sidebar() {
         ))}
       </nav>
       <div className="mt-auto flex flex-col gap-4 px-1">
+        <PrivacyToggle variant="sidebar" />
         <SyncBar variant="sidebar" />
         {isDemo && !syncInfo && (
           <div className="flex flex-col gap-1 rounded-md bg-page p-3">
@@ -181,5 +186,44 @@ function Sidebar() {
         )}
       </div>
     </aside>
+  )
+}
+
+/**
+ * "Ocultar valores": blurs amounts, charts and descriptions, for opening the
+ * app in public. An eye button in the phone header; a switch row in the
+ * desktop sidebar. Remembered on this device.
+ */
+function PrivacyToggle({ variant = 'header' }: { variant?: 'header' | 'sidebar' }) {
+  const { t } = useI18n()
+  const [hidden, setHidden] = usePrivacy()
+  const label = hidden ? t.privacy.show : t.privacy.hide
+  if (variant === 'header')
+    return (
+      <button
+        type="button"
+        onClick={() => setHidden(!hidden)}
+        aria-pressed={hidden}
+        aria-label={label}
+        title={label}
+        className={`flex size-12 shrink-0 items-center justify-center rounded-full ${hidden ? 'text-accent' : 'text-ink-2'} hover:bg-track active:bg-track`}
+      >
+        <Icon name={hidden ? 'eyeOff' : 'eye'} className="size-[22px]" />
+      </button>
+    )
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={hidden}
+      onClick={() => setHidden(!hidden)}
+      className="flex min-h-11 items-center gap-2.5 rounded-sm px-2 text-left text-sm font-medium text-ink-2 hover:bg-track"
+    >
+      <Icon name={hidden ? 'eyeOff' : 'eye'} className="size-[18px] shrink-0" />
+      <span className="min-w-0 flex-1">{t.privacy.hide}</span>
+      <span aria-hidden className={`flex h-6 w-10 shrink-0 items-center rounded-full border-2 px-0.5 transition-colors ${hidden ? 'justify-end border-accent bg-accent' : 'border-muted bg-track'}`}>
+        <span className={`rounded-full ${hidden ? 'size-4 bg-surface' : 'size-3 bg-muted'}`} />
+      </span>
+    </button>
   )
 }

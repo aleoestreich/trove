@@ -69,7 +69,20 @@ function useDialog(ref: RefObject<HTMLElement | null>, onClose: () => void) {
 }
 
 /** A bottom sheet over a scrim (a centred dialog from tablets up). */
-export function Sheet({ title, onClose, children, footer }: { title: string; onClose(): void; children: ReactNode; footer?: ReactNode }) {
+export function Sheet({
+  title,
+  onClose,
+  children,
+  footer,
+  privateTitle = false,
+}: {
+  title: string
+  onClose(): void
+  children: ReactNode
+  footer?: ReactNode
+  /** The title is data (a merchant's name): blurred in privacy mode. */
+  privateTitle?: boolean
+}) {
   const ref = useRef<HTMLElement>(null)
   const { t } = useI18n()
   useDialog(ref, onClose)
@@ -87,7 +100,7 @@ export function Sheet({ title, onClose, children, footer }: { title: string; onC
           <span className="h-1 w-8 rounded-full bg-line" />
         </div>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-lg leading-6 font-medium text-ink">{title}</h2>
+          <h2 className={`text-lg leading-6 font-medium text-ink ${privateTitle ? 'private' : ''}`}>{title}</h2>
           <button type="button" onClick={onClose} aria-label={t.close} className="-mr-2 flex size-11 items-center justify-center rounded-md text-ink-2 hover:bg-track">
             <Icon name="close" className="size-5" />
           </button>

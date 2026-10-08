@@ -67,7 +67,7 @@ export function Progress({
       aria-valuemax={label ? 100 : undefined}
       aria-valuenow={label ? Math.round(pct) : undefined}
       aria-hidden={label ? undefined : true}
-      className="rounded-full bg-track"
+      className="private rounded-full bg-track"
       style={{ height }}
     >
       <div className="rounded-full" style={{ height, width: `${pct}%`, background: fill }} />

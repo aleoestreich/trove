@@ -135,6 +135,7 @@ export function RecurringHistorySheet({ item, onClose }: { item: RecurringItem; 
   return (
     <Sheet
       title={item.merchant}
+      privateTitle
       onClose={onClose}
       footer={
         <button

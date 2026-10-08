@@ -4,7 +4,7 @@
  */
 export function Mark({ className, label }: { className?: string; label?: string }) {
   return (
-    <svg viewBox="11 14 42 40" className={className} role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
+    <svg viewBox="11 14 42 40" className={className} role={label ? 'img' : undefined} data-public aria-label={label} aria-hidden={label ? undefined : true}>
       <g style={{ isolation: 'isolate' }}>
         <circle cx="25" cy="28" r="14" fill="var(--logo-1)" className="logo-disc" />
         <circle cx="39" cy="28" r="14" fill="var(--logo-2)" className="logo-disc" />

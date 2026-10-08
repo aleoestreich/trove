@@ -86,7 +86,7 @@ function ProjectionCardBody({ projection }: { projection: Projection }) {
         </div>
         <p className="mt-1 flex items-center gap-1.5 text-xs leading-4 text-ink-2">
           <LowRing />
-          {lowNote}
+          <span className="private">{lowNote}</span>
         </p>
         <dl className="mt-3.5 border-t border-line">
           {lines.map((l) => (
@@ -126,7 +126,7 @@ function ProjectionCardBody({ projection }: { projection: Projection }) {
         <ProjectionChart projection={projection} variant="full" height={176} />
         <p className="mt-1 flex items-center gap-1.5 text-xs leading-4 text-ink-2">
           <LowRing />
-          {lowNote}
+          <span className="private">{lowNote}</span>
         </p>
       </div>
       <div className="hidden grid-cols-5 gap-2 lg:grid">
@@ -174,7 +174,7 @@ export function UnusualHeadline({ c }: { c: CategoryComparison }) {
       <span className="mt-px shrink-0" style={{ color: tone }}>
         <Icon name={up ? 'arrowUp' : 'arrowDown'} className="size-[18px]" strokeWidth={2.2} />
       </span>
-      <span>{text}</span>
+      <span className="private">{text}</span>
     </p>
   )
 }
@@ -286,7 +286,7 @@ function UnusualCardBody({ unusual }: { unusual: UnusualResult }) {
       {(unusual.unusual.length > 0 || desktopRows.length > 0) && <DivergingLegend />}
       {unusual.normal.length > 0 && (
         <p className="rounded-sm bg-page px-3 py-2.5 text-[13px] leading-[18px] text-ink-2 lg:hidden">
-          <span className="font-medium text-ink">{s.normalLabel}</span> {normalList}
+          <span className="font-medium text-ink">{s.normalLabel}</span> <span className="private">{normalList}</span>
         </p>
       )}
       <Link to="/insights/unusual" className="-my-1.5 -ml-3 inline-flex h-11 items-center self-start rounded-sm px-3 text-sm font-medium text-accent active:bg-track lg:hover:bg-track">
@@ -354,7 +354,7 @@ export function RecurringCard({ summary }: { summary: RecurringSummary }) {
                     <div key={`${a.type}-${a.recurringId}`} className="flex min-h-14 items-center gap-2.5 border-b border-line">
                       <AlertBadge kind={a.type} fixed />
                       <span className="flex min-w-0 flex-1 flex-col gap-px">
-                        <span className="truncate text-sm leading-[19px] font-medium text-ink">{item.merchant}</span>
+                        <span className="private truncate text-sm leading-[19px] font-medium text-ink">{item.merchant}</span>
                         <span className="tabular truncate text-xs leading-4 text-ink-2">{alertText(a, item)}</span>
                       </span>
                     </div>
@@ -370,7 +370,7 @@ export function RecurringCard({ summary }: { summary: RecurringSummary }) {
                   <div key={`${a.type}-${a.recurringId}`} className="flex flex-col gap-1.5 rounded-sm border border-line px-3 py-2.5">
                     <div className="flex min-w-0 items-center gap-2">
                       <AlertBadge kind={a.type} small />
-                      <span className="truncate text-sm font-medium text-ink">{item.merchant}</span>
+                      <span className="private truncate text-sm font-medium text-ink">{item.merchant}</span>
                     </div>
                     <span className="tabular text-[13px] leading-[18px] text-ink-2">{alertText(a, item)}</span>
                     <div className="-ml-2.5 flex gap-1">
@@ -412,7 +412,7 @@ export function RecurringCard({ summary }: { summary: RecurringSummary }) {
             >
               <span className="flex min-w-0 items-center gap-3">
                 <CategoryBadge category={i.categoryId ? categoriesById.get(i.categoryId) : null} size={32} />
-                <span className="truncate text-sm font-medium text-ink" title={categoryName(i.categoryId ? categoriesById.get(i.categoryId) : null)}>
+                <span className="private truncate text-sm font-medium text-ink" title={categoryName(i.categoryId ? categoriesById.get(i.categoryId) : null)}>
                   {i.merchant}
                 </span>
                 <RecurringFlag item={i} />

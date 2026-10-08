@@ -76,7 +76,7 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
       <div className="flex items-start gap-3 pt-1 pb-3 lg:pt-0">
         <TransactionBadge tx={current} categoriesById={categoriesById} size={44} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
-          <h2 className="text-lg leading-6 font-medium [overflow-wrap:anywhere] text-ink">{current.description}</h2>
+          <h2 className="private text-lg leading-6 font-medium [overflow-wrap:anywhere] text-ink">{current.description}</h2>
           <span className="text-[13px] leading-[18px] text-muted">{accountLabel(current.accountId)}</span>
         </div>
         <button

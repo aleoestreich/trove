@@ -194,7 +194,7 @@ export function Dashboard() {
                 <div key={c.id} className={`flex min-w-0 flex-col gap-0.5 ${i > 0 ? 'items-end text-right' : ''}`}>
                   <span className="flex items-center gap-1.5 text-[13px] text-ink-2">
                     <Swatch color={CURRENCY_COLORS[c.id] ?? 'var(--series-6)'} />
-                    {c.id} · {formatPercent(bal.cash > 0 ? (c.amount / bal.cash) * 100 : 0)}
+                    {c.id} · <span className="tabular">{formatPercent(bal.cash > 0 ? (c.amount / bal.cash) * 100 : 0)}</span>
                   </span>
                   <span className="tabular text-[15px] font-medium text-ink lg:text-sm">
                     {c.id === 'BRL' ? formatMoney(c.amount) : formatMoney(foreignBalance(c.id), c.id as 'USD')}
@@ -214,7 +214,7 @@ export function Dashboard() {
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-[15px] font-medium text-ink lg:text-sm">
-                        {s.label} <span className="text-[13px] font-normal text-muted lg:text-xs">{formatPercent(share)}</span>
+                        {s.label} <span className="tabular text-[13px] font-normal text-muted lg:text-xs">{formatPercent(share)}</span>
                       </span>
                       <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink lg:text-sm">{formatMoney(s.amount)}</span>
                     </div>

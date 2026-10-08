@@ -195,6 +195,22 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * Privacy mode ("Ocultar valores", src/lib/privacy.ts): amounts and
+ * percentages (.tabular), anything marked .private (descriptions, amounts
+ * inside sentences) and every chart ([role='img'], the logo excepted) are
+ * blurred, and can't be selected. The blur scales with the text size, so
+ * large figures are as unreadable as small ones.
+ */
+:root[data-privacy] :is(.tabular, .private) {
+  filter: blur(0.42em);
+  user-select: none;
+}
+:root[data-privacy] [role='img']:not([data-public]) {
+  filter: blur(10px);
+  user-select: none;
+}
+
 /* Overline: small caps label above a group ("By bank"). */
 .label-caps {
   font-size: 12px;
