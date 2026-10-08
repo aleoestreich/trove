@@ -50,8 +50,9 @@ Run `npm test` and `npm run build` before pushing.
   category and subcategory (or none), a `transfer` kind (own transfer or card
   bill payment, which never have a category) and a `hidden` flag. Hidden
   transactions are left out of every total, chart, average, category
-  breakdown and installments total (balances and card bills still include
-  them: those are the bank's figures). Category colours are the `--cat-*`
+  breakdown and installments total, and the net worth history doesn't move
+  with them (balances and card bills still include them: those are the
+  bank's figures). Category colours are the `--cat-*`
   tokens; icons come from `src/assets/icons/` through `Icon`/`CategoryIcon`.
 - **Text:** the app is Brazilian Portuguese (pt-BR) only, with no language
   switch. UI text lives in `src/i18n/messages.ts`; never hardcode UI strings,
