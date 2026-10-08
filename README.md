@@ -148,7 +148,8 @@ between accounts, and card bill payments.
   (the pencil next to it). The name is shown everywhere in Trove and saved
   in the database (`accounts.nickname`), a column a sync never writes;
   "Usar o nome do banco" goes back to the bank's.
-- **Hidden transactions** are left out of every total, chart, average,
+- **Hidden transactions** are left out of every total, chart (net worth's
+  history included: they never move its line), average,
   category breakdown and installments total. Balances, net worth and card
   bills still include them, as they are the bank's figures.
 - Net worth = money in accounts − open credit card bills. Its history is

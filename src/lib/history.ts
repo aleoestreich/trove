@@ -18,10 +18,14 @@ export interface BalancePoint {
  * The last point is today. Foreign-currency accounts are rebuilt in their own
  * currency and converted at that month's rate (taken from that month's
  * transactions; today's rate if the month had none).
+ *
+ * Hidden transactions are left out: they don't move the line. Today's point
+ * is still the bank's balance (which includes them), so a hidden transaction
+ * shifts the months before it instead of showing as a jump.
  */
 export function balanceHistory(accounts: Account[], transactions: Transaction[], months: string[]): BalancePoint[] {
   const byAccount = new Map<string, Transaction[]>()
-  for (const t of transactions) byAccount.set(t.accountId, [...(byAccount.get(t.accountId) ?? []), t])
+  for (const t of transactions) if (!t.hidden) byAccount.set(t.accountId, [...(byAccount.get(t.accountId) ?? []), t])
 
   return months.map((month) => {
     let cash = 0

@@ -37,6 +37,12 @@ describe('balanceHistory', () => {
     tx('usd', '2026-09-15', 250_00, { foreign: { currency: 'USD', amount: 50_00 } }), // 5.0 BRL/USD
   ]
 
+  it('leaves hidden transactions out: they never move the line', () => {
+    const hidden = [...transactions, tx('chk', '2026-09-20', -5_000_00, { hidden: true }), tx('card', '2026-09-21', -900_00, { hidden: true })]
+    const months = ['2026-08', '2026-09']
+    expect(balanceHistory(accounts, hidden, months)).toEqual(balanceHistory(accounts, transactions, months))
+  })
+
   it('rebuilds month-end balances backwards from today', () => {
     const [jul, aug, sep] = balanceHistory(accounts, transactions, ['2026-07', '2026-08', '2026-09'])
     expect(sep).toEqual({ month: '2026-09', cash: 1_550_00, cardDebt: 300_00, net: 1_250_00 })
