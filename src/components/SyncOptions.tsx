@@ -12,7 +12,8 @@ import { SelectBox } from './SelectBox'
 /**
  * Advanced sync: how far back (Padrão, 3 meses, 6 meses, 1 ano, Tudo) and
  * which accounts and cards. A bottom sheet on phones, a centred dialog on
- * wider screens. Esc and the scrim close it.
+ * wider screens. Esc and the scrim close it. Its sections never shrink: on a
+ * short screen the sheet scrolls instead of cutting off the last options.
  */
 export function SyncOptionsSheet({ onClose }: { onClose(): void }) {
   const { t } = useI18n()
@@ -69,7 +70,7 @@ export function SyncOptionsSheet({ onClose }: { onClose(): void }) {
         role="dialog"
         aria-modal
         aria-labelledby="sync-options-title"
-        className="flex max-h-[92dvh] w-full max-w-[480px] flex-col overflow-y-auto rounded-t-xl bg-surface px-4 pb-[calc(16px+env(safe-area-inset-bottom))] md:rounded-xl md:px-5 md:pt-4"
+        className="flex max-h-[92dvh] w-full max-w-[480px] flex-col overflow-y-auto [&>*]:shrink-0 rounded-t-xl bg-surface px-4 pb-[calc(16px+env(safe-area-inset-bottom))] md:rounded-xl md:px-5 md:pt-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-[22px] shrink-0 items-center justify-center md:hidden" aria-hidden>
