@@ -4,7 +4,7 @@ import { newId } from '../data/edits'
 import type { Transaction } from '../data/types'
 import { useData } from '../state'
 import { formatMoney } from '../lib/money'
-import { summarize } from '../lib/selection'
+import { bulkPick, summarize } from '../lib/selection'
 import { Icon } from './Icon'
 import { CategoryBadge, catInk, catVar } from './CategoryBadge'
 import { CategoryChip, SubcategoryPicker } from './TransactionSheet'
@@ -46,10 +46,14 @@ function BulkContent({
   const [error, setError] = useState<string | null>(null)
   const panel = variant === 'panel'
   const n = summary.count
-  const category = categoryId ? categoriesById.get(categoryId) : undefined
-  const sub = subcategoryId ? subcategoriesById.get(subcategoryId) : undefined
+  // Only while it fits the selection, which can change on desktop after the pick.
+  const { category, sub } = bulkPick(
+    summary.kind,
+    categoryId ? categoriesById.get(categoryId) : undefined,
+    subcategoryId ? subcategoriesById.get(subcategoryId) : undefined,
+  )
   const options = summary.kind ? categories.filter((c) => c.type === summary.kind) : []
-  const ready = (clearing || (!!category && !!sub && !!summary.kind)) && !saving
+  const ready = (clearing || (!!category && !!sub)) && !saving
 
   const apply = async () => {
     if (!ready) return
@@ -139,10 +143,10 @@ function BulkContent({
               category={c}
               name={categoryName(c)}
               size={panel ? 36 : 40}
-              on={!clearing && c.id === categoryId}
+              on={!clearing && c.id === category?.id}
               onClick={() => {
                 setClearing(false)
-                if (c.id === categoryId) return
+                if (c.id === category?.id) return
                 setCategoryId(c.id)
                 setSubcategoryId(null)
               }}
