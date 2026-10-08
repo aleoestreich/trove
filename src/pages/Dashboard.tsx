@@ -7,14 +7,14 @@ import { balances, expensesByCategory, inMonth, totals, visible } from '../lib/s
 import { incomeAverage, NO_FILTER } from '../data/incomeAverage'
 import { catVar } from '../components/CategoryBadge'
 import { SyncBar } from '../components/SyncBar'
-import { balanceHistory, cashByCurrency, cashByInstitution } from '../lib/history'
+import { cashByCurrency, cashByInstitution } from '../lib/history'
 import { installmentPlans, upcomingByMonth } from '../lib/installments'
 import { currentBill, isIdleCard } from '../lib/bills'
 import { dayOfMonth, formatFullDate, formatMonthName, formatMonthShort, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
 import { formatMoney, formatPercent } from '../lib/money'
-import { Badge, Card, CardTitle, IconDisc, MonthSwitcher, Overline, PageHeader, Progress, RangeSwitcher, SeeAll, Swatch, parseRange, type Range } from '../components/ui'
+import { Card, CardTitle, IconDisc, MonthSwitcher, Overline, PageHeader, Progress, RangeSwitcher, SeeAll, Swatch, parseRange, type Range } from '../components/ui'
 import { InstitutionBadge } from '../components/BankBadge'
-import { CashFlowChart, NetWorthChart, StackedMonthChart, seriesColor } from '../components/charts'
+import { CashFlowChart, StackedMonthChart, seriesColor } from '../components/charts'
 import { TransactionRow } from '../components/TransactionRow'
 import { AverageIncomeCard } from '../components/AverageIncome'
 import { TransactionSheet } from '../components/TransactionSheet'
@@ -41,12 +41,13 @@ export function Dashboard() {
 
   const bal = balances(accounts)
 
-  // Net worth history (month ends; the last point is today) and the change since last month.
-  const history = useMemo(() => balanceHistory(accounts, allTransactions, months), [accounts, allTransactions, months])
-  const netPoints = history.map((h) => ({ label: formatMonthShort(h.month), net: h.net, cash: h.cash, cardDebt: h.cardDebt }))
-  const previous = history.length > 1 ? history[history.length - 2].net : history[0].net
-  const change = bal.net - previous
-  const changePct = previous !== 0 ? (change / Math.abs(previous)) * 100 : 0
+  // Net worth now, as the banks report it: no month-by-month reconstruction.
+  const debtShare = bal.cash > 0 ? (bal.cardDebt / bal.cash) * 100 : null
+  // Desktop: each bank's share of it (its accounts minus its cards).
+  const netByBank = [...institutionsById.values()]
+    .map((inst) => ({ inst, ...balances(accounts.filter((a) => a.institutionId === inst.id)) }))
+    .filter((b) => b.cash !== 0 || b.cardDebt !== 0)
+    .sort((a, b) => b.net - a.net)
 
   // Where the money is.
   const institutionNames = new Map([...institutionsById].map(([id, i]) => [id, i.name]))
@@ -109,12 +110,6 @@ export function Dashboard() {
   const monthTotals = totals(monthTxs, categoriesById)
   const byCategory = expensesByCategory(monthTxs, categoriesById)
 
-  const nwLabel = t.overview.netWorthChart(
-    range,
-    formatMoney(history[0].net),
-    formatMoney(history[history.length - 1].net),
-  )
-
   // Each control keeps the other's choice in the address.
   const setParam = (key: 'm' | 'r', value: string) =>
     setParams(
@@ -140,25 +135,43 @@ export function Dashboard() {
 
       {/* Phones: one column in reading order. Desktop: a 12-column grid, reordered. */}
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-12 lg:gap-5">
-        {/* 1. Net worth now and over time */}
-        <Card className="flex flex-col lg:order-1 lg:col-span-8">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between lg:gap-4">
-            <div className="flex flex-col">
-              <p className="text-[13px] leading-[18px] font-medium text-muted">{t.overview.netWorth}</p>
-              <p className="tabular mt-0.5 text-4xl leading-[44px] font-bold tracking-[-0.02em] text-ink lg:text-[40px] lg:leading-[48px]">
-                {formatMoney(bal.net)}
-              </p>
+        {/* 1. Net worth now: the accounts' balances minus the cards' bills, as the banks report them */}
+        <Card className="flex flex-col gap-4 lg:order-1 lg:col-span-8">
+          <div className="flex flex-col">
+            <p className="text-[13px] leading-[18px] font-medium text-muted">{t.overview.netWorth}</p>
+            <p className="tabular mt-0.5 text-4xl leading-[44px] font-bold tracking-[-0.02em] text-ink lg:text-[40px] lg:leading-[48px]">
+              {formatMoney(bal.net)}
+            </p>
+            <p className="mt-0.5 text-[13px] leading-[18px] text-muted">{t.overview.netWorthNote}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 lg:gap-3">
+            <div className="flex min-w-0 flex-col gap-0.5 rounded-md bg-page p-3 lg:px-4">
+              <span className="text-xs leading-4 text-muted">{t.overview.inAccounts}</span>
+              <span className="tabular truncate text-base font-medium text-ink lg:text-lg">{formatMoney(bal.cash)}</span>
             </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2 lg:mt-0 lg:pt-[22px]">
-              <Badge tone={change >= 0 ? 'income' : 'critical'} icon={change >= 0 ? 'trendUp' : 'trendDown'}>
-                {formatMoney(change, 'BRL', { signed: true })} · {formatPercent(changePct, 1)}
-              </Badge>
-              <span className="text-[13px] text-muted">{t.overview.vsLastMonth}</span>
+            <div className="flex min-w-0 flex-col gap-0.5 rounded-md bg-page p-3 lg:px-4">
+              <span className="text-xs leading-4 text-muted">{t.overview.cardBills}</span>
+              <span className="tabular truncate text-base font-medium text-ink lg:text-lg">{formatMoney(-bal.cardDebt)}</span>
             </div>
           </div>
-          <div className="mt-4 lg:mt-5 lg:flex lg:min-h-[206px] lg:flex-1 lg:flex-col">
-            <NetWorthChart points={netPoints} label={nwLabel} />
+          <div className="hidden flex-col gap-1 border-t border-line pt-3 lg:flex">
+            <Overline>{t.overview.byBankNet}</Overline>
+            <div className="grid grid-cols-2 gap-x-6">
+              {netByBank.map((b) => (
+                <div key={b.inst.id} className="flex min-h-12 items-center gap-3 border-b border-line">
+                  <InstitutionBadge institution={b.inst} size={32} />
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink">{b.inst.name}</span>
+                  <span className={`tabular text-sm font-medium whitespace-nowrap ${b.net < 0 ? 'text-critical' : 'text-ink'}`}>{formatMoney(b.net)}</span>
+                </div>
+              ))}
+            </div>
           </div>
+          {debtShare !== null && (
+            <div className="flex flex-col gap-1.5 lg:mt-auto">
+              <Progress value={debtShare} height={6} tone={debtShare >= 50 ? 'critical' : 'bar'} label={t.overview.debtShare(formatPercent(debtShare))} role="meter" />
+              <span className="tabular text-xs leading-4 text-ink-2">{t.overview.debtShare(formatPercent(debtShare))}</span>
+            </div>
+          )}
         </Card>
 
         {/* Insights: month-end projection, unusual categories, recurring charges (desktop: right below net worth) */}

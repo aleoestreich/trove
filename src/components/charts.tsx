@@ -1,4 +1,3 @@
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useState } from 'react'
 import { formatCompact, formatMoney } from '../lib/money'
 import { useI18n } from '../i18n/I18nProvider'
@@ -16,86 +15,6 @@ const reais = (cents: number) => cents / 100
 const tooltipBox = 'rounded-sm border border-line bg-surface px-3 py-2 text-[13px] text-ink shadow-sm'
 
 // ---------------------------------------------------------------------------
-
-export interface NetWorthPoint {
-  label: string
-  net: number
-  cash: number
-  cardDebt: number
-}
-
-/** Net worth at the end of each month (last point is today). Tap for the value. */
-export function NetWorthChart({ points, label }: { points: NetWorthPoint[]; label: string }) {
-  const data = points.map((p) => ({ ...p, value: reais(p.net) }))
-  const last = data.length - 1
-  // A year: every other month is labelled (always the latest), so labels don't collide.
-  const labelled = (i: number) => data.length <= 6 || (last - i) % 2 === 0
-  return (
-    <div className="h-[140px] lg:h-auto lg:flex-1" role="img" aria-label={label}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="2 4" />
-          <XAxis
-            dataKey="label"
-            tickLine={false}
-            axisLine={{ stroke: 'var(--line)' }}
-            interval={0}
-            padding={{ left: 14, right: 10 }}
-            tick={(p: { x: number | string; y: number | string; index: number; payload: { value: string } }) => (
-              <text
-                x={Number(p.x)}
-                y={Number(p.y) + 12}
-                textAnchor="middle"
-                fontSize={11}
-                fill={p.index === last ? 'var(--ink)' : 'var(--muted)'}
-                fontWeight={p.index === last ? 500 : 400}
-              >
-                {labelled(p.index) ? p.payload.value : ''}
-              </text>
-            )}
-          />
-          <YAxis
-            orientation="right"
-            width={52}
-            tickLine={false}
-            axisLine={false}
-            tickCount={3}
-            domain={['auto', 'auto']}
-            tick={{ fill: 'var(--muted)', fontSize: 11 }}
-            tickFormatter={(v: number) => formatCompact(v)}
-          />
-          <Tooltip cursor={{ stroke: 'var(--muted)', strokeDasharray: '3 3' }} content={(p) => <NetWorthTooltip active={p.active} payload={p.payload} label={p.label} />} />
-          <Area
-            type="linear"
-            dataKey="value"
-            stroke="var(--accent)"
-            strokeWidth={2}
-            fill="var(--accent)"
-            fillOpacity={0.12}
-            dot={(p: { cx?: number; cy?: number; index?: number }) =>
-              p.index === last ? <circle key="last" cx={p.cx} cy={p.cy} r={5} fill="var(--accent)" stroke="var(--surface)" strokeWidth={2} /> : <g key={p.index} />
-            }
-            activeDot={{ r: 5, fill: 'var(--accent)', stroke: 'var(--surface)', strokeWidth: 2 }}
-            isAnimationActive={false}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
-
-function NetWorthTooltip({ active, payload, label }: { active?: boolean; payload?: readonly { payload?: unknown }[]; label?: unknown }) {
-  const { t } = useI18n()
-  if (!active || !payload?.length) return null
-  const p = payload[0].payload as NetWorthPoint
-  return (
-    <div className={tooltipBox}>
-      <p className="text-xs text-muted">{String(label)}</p>
-      <p className="tabular font-medium">{formatMoney(p.net)}</p>
-      <p className="tabular text-xs text-muted">{t.overview.chartAccountsCards(formatMoney(p.cash), formatMoney(p.cardDebt))}</p>
-    </div>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Bar charts are plain HTML: a baseline, bars that grow from it, and month

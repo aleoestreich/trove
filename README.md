@@ -120,8 +120,8 @@ between accounts, and card bill payments.
 - **Average income** (Overview) averages the last 6 complete months of
   income in the categories chosen on its card (all by default; the choice is
   saved in the database and shared between devices).
-- **Overview periods:** the multi-month charts (net worth, income vs
-  expenses, spending by category) show 3 months, 6 months (default) or 1 year,
+- **Overview periods:** the multi-month charts (income vs expenses, spending
+  by category) show 3 months, 6 months (default) or 1 year,
   chosen at the top of the Overview (kept in the address, `?r=3|6|12`). The
   month picker belongs to "Mês em detalhe" and changes only that card.
 - **Previsão do fim do mês** (Overview, then its detail page) projects what
@@ -151,12 +151,12 @@ between accounts, and card bill payments.
   (the pencil next to it). The name is shown everywhere in Trove and saved
   in the database (`accounts.nickname`), a column a sync never writes;
   "Usar o nome do banco" goes back to the bank's.
-- **Hidden transactions** are left out of every total, chart (net worth's
-  history included: they never move its line), average,
+- **Hidden transactions** are left out of every total, chart, average,
   category breakdown and installments total. Balances, net worth and card
   bills still include them, as they are the bank's figures.
-- Net worth = money in accounts − open credit card bills. Its history is
-  rebuilt from today's balances minus the transactions since each month end.
+- Net worth = money in accounts − credit card bills, as the banks report
+  them at the last sync. The Overview shows it now (with what it's made of),
+  not as a month-by-month history.
 - **Installments (parcelas):** each installment is charged in its own bill and
   counts as an expense in the month it's charged, as the bank bills it.
   Installments not charged yet still reduce the card's available limit
