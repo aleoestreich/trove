@@ -133,9 +133,14 @@ export function validateEdit(e: unknown): Edit {
     case 'categorizeMany': {
       const ids = Array.isArray(x.transactionIds) ? x.transactionIds.map((v) => id(v, 'transaction')) : bad('transactions')
       if (ids.length === 0 || ids.length > BULK_MAX || new Set(ids).size !== ids.length) bad('transactions')
-      // Uncategorized: both null. Otherwise a category and one of its subcategories.
+      // Uncategorized: both null. Otherwise a category, with one of its subcategories or none.
       if (x.categoryId === null && x.subcategoryId === null) return { op: 'categorizeMany', transactionIds: ids, categoryId: null, subcategoryId: null }
-      return { op: 'categorizeMany', transactionIds: ids, categoryId: id(x.categoryId, 'category'), subcategoryId: id(x.subcategoryId, 'subcategory') }
+      return {
+        op: 'categorizeMany',
+        transactionIds: ids,
+        categoryId: id(x.categoryId, 'category'),
+        subcategoryId: x.subcategoryId === null ? null : id(x.subcategoryId, 'subcategory'),
+      }
     }
     case 'restoreCategories': {
       const items = Array.isArray(x.items) ? x.items : bad('items')
@@ -361,7 +366,7 @@ export function checkIncomeFilter(categories: Category[], subcategories: Subcate
  * - none is a transfer (own transfer or card bill payment: no category);
  * - to leave them uncategorized (category null), nothing else;
  * - otherwise all are of one kind, expenses or income, the category is of
- *   that kind, and the subcategory belongs to it.
+ *   that kind, and the subcategory (if any) belongs to it.
  * Returns the previous values. Throws EditError with a `reason`.
  */
 export function checkBulk(s: Snapshot, e: { transactionIds: string[]; categoryId: string | null; subcategoryId: string | null }): PreviousCategory[] {
@@ -375,6 +380,7 @@ export function checkBulk(s: Snapshot, e: { transactionIds: string[]; categoryId
   if (kinds.size !== 1) throw new EditError('invalid', 'Select only expenses or only income.', 'mixed_types')
   const category = categoriesById.get(e.categoryId) ?? fail('not_found', 'category')
   if (category.type !== [...kinds][0]) throw new EditError('invalid', 'The category is not of the transactions’ type.', 'category_type')
+  if (e.subcategoryId === null) return previous
   const sub = s.subcategories.find((x) => x.id === e.subcategoryId) ?? fail('not_found', 'subcategory')
   if (sub.categoryId !== e.categoryId) throw new EditError('invalid', 'The subcategory belongs to another category.', 'subcategory_category')
   return previous
