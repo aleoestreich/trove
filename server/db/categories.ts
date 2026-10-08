@@ -285,7 +285,7 @@ async function categorizeMany(db: Db, e: Extract<Edit, { op: 'categorizeMany' }>
   )
   // Every ID must be a live transaction of a configured connection.
   if (rows.rowCount !== e.transactionIds.length) throw new EditError('not_found', 'No such transaction.')
-  // Transfer pairs are matched within a day, so reading from the earliest day is enough.
+  // readSnapshot reads a few days around them, so pairs across the earliest day are matched as the app shows them.
   const from = rows.rows.reduce((min, r) => (r.day < min ? r.day : min), rows.rows[0].day)
   const snapshot = await readSnapshot(db, itemIds, from)
   if (!snapshot) throw new EditError('not_found', 'No such transaction.')
