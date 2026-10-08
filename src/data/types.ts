@@ -221,6 +221,21 @@ export interface SyncJob {
   }[]
 }
 
+/**
+ * How far back a sync reads: "default" re-reads 35 days before the last sync
+ * (everything since January 2025 on a connection's first sync); the others
+ * read the current month and the ones before it (3, 6 or 12 months in all),
+ * or everything the bank provides ("all").
+ */
+export type SyncPeriod = 'default' | '3m' | '6m' | '1y' | 'all'
+export const SYNC_PERIODS: readonly SyncPeriod[] = ['default', '3m', '6m', '1y', 'all']
+
+/** Advanced sync: which accounts and cards (null or absent: all of them) and how far back. */
+export interface SyncOptions {
+  accountIds?: string[] | null
+  period?: SyncPeriod
+}
+
 /** The result of syncing one bank connection. */
 export interface SyncResult {
   connectionId: string

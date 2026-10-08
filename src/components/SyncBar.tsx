@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useDataSource, useEditError, useSync } from '../state'
 import { daysBetween, formatShortDate, formatTime, toISO } from '../lib/dates'
@@ -6,6 +6,7 @@ import { isDeployed } from '../lib/useIsDesktop'
 import { useI18n } from '../i18n/I18nProvider'
 import { Icon, type IconName } from './Icon'
 import { needsReconnect } from '../lib/syncProblems'
+import { SyncOptionsSheet } from './SyncOptions'
 
 /** After this many days without a sync, the bar says how long it's been. */
 const STALE_DAYS = 7
@@ -15,12 +16,14 @@ const STALE_DAYS = 7
  * and Accounts (`bar`). Desktop: in the sidebar (`sidebar`).
  * States: synced (time), syncing (bank n of m, progress), failure (with the
  * reason per bank, and Retry), a bank to reconnect in Meu Pluggy, stale (over
- * 7 days), never synced (demo data), not connected.
+ * 7 days), never synced (demo data), not connected. Next to Sync, a button
+ * opens the advanced sync (which accounts, how far back).
  */
 export function SyncBar({ variant = 'bar', className = '' }: { variant?: 'bar' | 'sidebar'; className?: string }) {
   const { t } = useI18n()
-  const { info, status, progress, failed, sync } = useSync()
+  const { info, status, progress, failed, sync, accounts } = useSync()
   const source = useDataSource()
+  const [advanced, setAdvanced] = useState(false)
   if (!isDeployed() && !info) return null // local development: demo data, nothing to sync
   if (!source) return null
 
@@ -28,6 +31,8 @@ export function SyncBar({ variant = 'bar', className = '' }: { variant?: 'bar' |
   let tone = 'text-muted'
   let message: string
   let action: { label: string; icon: IconName; onClick?: () => void; to?: string; disabled?: boolean } | null = null
+  // Advanced sync: for live data with stored accounts, whenever Sync can start.
+  let options = false
   /** Lines under the message: why each bank failed, or what to do. */
   let details: string[] = []
   const toReconnect = (info?.connections ?? []).filter((c) => needsReconnect(c.status))
@@ -54,12 +59,14 @@ export function SyncBar({ variant = 'bar', className = '' }: { variant?: 'bar' |
       ? reasons[0].problem === 'network' ? [] : [t.sync.problems[reasons[0].problem]]
       : reasons.map((f) => (f.name ? t.sync.problemFor(f.name, t.sync.problems[f.problem]) : t.sync.problems[f.problem]))
     action = { label: t.sync.retry, icon: 'sync', onClick: () => sync(failed.map((f) => f.id)) }
+    options = true
   } else if (toReconnect.length > 0 && source !== 'demo') {
     icon = 'alert'
     tone = 'text-critical'
     message = t.sync.reconnect(toReconnect.map((c) => c.name ?? '?').join(', '))
     details = [t.sync.reconnectNote]
     action = { label: t.sync.syncNow, icon: 'sync', onClick: () => sync() }
+    options = true
   } else if (source === 'demo' || !info.lastSyncedAt) {
     icon = 'plug'
     message = t.sync.neverSynced
@@ -75,6 +82,7 @@ export function SyncBar({ variant = 'bar', className = '' }: { variant?: 'bar' |
         days === 0 ? t.sync.syncedToday(formatTime(at)) : days === 1 ? t.sync.syncedYesterday(formatTime(at)) : t.sync.syncedOn(formatShortDate(toISO(at)), formatTime(at))
     }
     action = { label: t.sync.syncNow, icon: 'sync', onClick: () => sync() }
+    options = true
   }
 
   const syncing = status === 'syncing' && progress
@@ -109,7 +117,22 @@ export function SyncBar({ variant = 'bar', className = '' }: { variant?: 'bar' |
           <span className={`min-w-0 text-[13px] leading-[18px] ${tone === 'text-muted' ? '' : 'text-ink'}`}>{message}</span>
         </div>
         {details.length > 0 && side && <Details lines={details} />}
-        {button && <div className={side ? '-ml-3' : ''}>{button}</div>}
+        {button && (
+          <div className={`flex items-center ${side ? '-ml-3' : ''}`}>
+            {button}
+            {options && source === 'pluggy' && accounts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setAdvanced(true)}
+                aria-label={t.sync.advanced.open}
+                title={t.sync.advanced.open}
+                className="flex size-12 shrink-0 items-center justify-center rounded-md text-accent hover:bg-accent-faint lg:size-11"
+              >
+                <Icon name="filterLines" className="size-[18px]" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
       {details.length > 0 && !side && (
         <div className="-mt-1 pr-3.5 pb-3 pl-[42px]">
@@ -128,6 +151,7 @@ export function SyncBar({ variant = 'bar', className = '' }: { variant?: 'bar' |
           <div className="h-[3px] bg-accent transition-[width]" style={{ width: `${((progress.index - 0.5) / progress.total) * 100}%` }} />
         </div>
       )}
+      {advanced && <SyncOptionsSheet onClose={() => setAdvanced(false)} />}
     </div>
   )
 }

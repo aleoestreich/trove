@@ -4,7 +4,7 @@ import { errorMessage, SyncStartError } from './data/apiRepository'
 import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/syncProblems'
 import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
-import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type Transaction } from './data/types'
+import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type SyncOptions, type Transaction } from './data/types'
 import { computeInsights, type Insights } from './data/insights'
 import type { TransactionQuery } from './data/transactionFilter'
 import type { RecurringAction } from './data/recurring'
@@ -83,8 +83,11 @@ export interface SyncState {
   failed: { id: string; name: string | null; problem: SyncProblem }[]
   /** After a successful sync: new and updated transactions, for the snackbar. */
   result: { inserted: number; updated: number; at: number } | null
-  /** Syncs every connection, or just `only` (Retry). */
-  sync(only?: string[]): void
+  /** Syncs every connection, or just `only` (Retry); `options`: advanced sync (which accounts, how far back). */
+  sync(only?: string[], options?: SyncOptions): void
+  /** The stored accounts and cards and their banks, for choosing what an advanced sync reads. */
+  accounts: Account[]
+  institutions: Institution[]
   dismissResult(): void
 }
 
@@ -95,6 +98,8 @@ const SyncContext = createContext<SyncState>({
   failed: [],
   result: null,
   sync() {},
+  accounts: [],
+  institutions: [],
   dismissResult() {},
 })
 
@@ -261,12 +266,12 @@ export function DataProvider({ repository, children }: { repository: Repository;
   }, [hasConnections, repository, follow])
 
   const sync = useCallback(
-    async (only?: string[]) => {
+    async (only?: string[], options?: SyncOptions) => {
       if (polling.current) return
       setStartError(null)
       setResult(null)
       try {
-        await follow(await repository.startSync(only), true)
+        await follow(await repository.startSync(only, options), true)
       } catch (e) {
         console.error(e)
         setStartError({
@@ -305,10 +310,12 @@ export function DataProvider({ repository, children }: { repository: Repository;
     () => ({
       info: snapshot?.sync ?? null,
       ...syncing,
-      sync: (only) => void sync(only),
+      sync: (only, options) => void sync(only, options),
+      accounts: snapshot?.source === 'pluggy' ? snapshot.accounts : [],
+      institutions: snapshot?.institutions ?? [],
       dismissResult: () => setResult(null),
     }),
-    [snapshot?.sync, syncing, sync],
+    [snapshot?.sync, snapshot?.source, snapshot?.accounts, snapshot?.institutions, syncing, sync],
   )
 
   // Older transactions join the loaded ones (the loaded copy wins: it may hold edits not yet saved).

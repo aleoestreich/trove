@@ -12,12 +12,16 @@
 //   pending purchase that posted under a new ID) are marked removed, not
 //   deleted; their edits (category, hidden, card-payment answer) move to the
 //   transaction that replaced them.
+// - Advanced sync (SyncOptions) can read only some accounts and cards, and
+//   choose how far back (SyncPeriod). The other accounts' balances are still
+//   updated; only the chosen ones' transactions and bills are read.
 // - Each run is logged in sync_runs with counts only; errors keep status
 //   codes, never amounts, descriptions or credentials.
 
 import type pg from 'pg'
 import { fromGuess } from '../../src/data/categories.js'
-import type { SyncResult } from '../../src/data/types.js'
+import { ALL_HISTORY, periodStart } from '../../src/data/syncPeriod.js'
+import type { SyncPeriod, SyncResult } from '../../src/data/types.js'
 import { PluggyClient } from '../pluggy/client.js'
 import { brazilDate, categoryFor, isMeuPluggy, itemBankName } from '../pluggy/map.js'
 import { ratesToBRL } from '../pluggy/rates.js'
@@ -49,6 +53,13 @@ export function syncFrom(lastSyncedAt: Date | null, fetchedFrom: string | null):
   return new Date(lastSyncedAt.getTime() - OVERLAP_DAYS * 86_400_000).toISOString().slice(0, 10)
 }
 
+export { ALL_HISTORY }
+
+/** The first day a chosen period reads (src/data/syncPeriod.ts), today being Brazil's date. */
+export function periodFrom(period: Exclude<SyncPeriod, 'default'>, now: Date): string {
+  return periodStart(period, brazilDate(now.toISOString()))
+}
+
 /** A connection's name in Trove: the bank for Meu Pluggy items, else the connector. */
 export function connectionName(item: PluggyItem, accounts: PluggyAccount[]): string {
   return (isMeuPluggy(item) ? itemBankName(accounts) : null) ?? item.connector.name
@@ -62,6 +73,14 @@ export interface Fetched {
   bills: { accountId: string; bill: PluggyBill }[]
   from: string
   rates: Record<string, number>
+  /** The accounts whose transactions and bills were read (absent: all of `accounts`). */
+  accountIds?: string[]
+  /**
+   * A history read (a chosen period, or the first full fetch): only what's
+   * after the earliest day Pluggy returned can be marked removed, since a bank
+   * may keep less history than asked for. Absent: when `from` <= HISTORY_START.
+   */
+  history?: boolean
 }
 
 /** One entry per ID, the last one winning (Pluggy's pages can repeat a row). */
@@ -69,15 +88,20 @@ export function uniqueById<T>(rows: T[], id: (row: T) => string): T[] {
   return [...new Map(rows.map((r) => [id(r), r])).values()]
 }
 
-/** Everything from Pluggy for one connection. Nothing is written until it's all fetched. */
-export async function fetchConnection(client: PluggyClient, itemId: string, from: string, fetchFn: typeof fetch): Promise<Fetched> {
+/**
+ * Everything from Pluggy for one connection: every account (for balances),
+ * and the transactions and bills of `accountIds` (null: all). Nothing is
+ * written until it's all fetched.
+ */
+export async function fetchConnection(client: PluggyClient, itemId: string, from: string, fetchFn: typeof fetch, accountIds: string[] | null = null): Promise<Fetched> {
   const item = await client.getItem(itemId)
   const accounts = await client.getAccounts(itemId)
-  const transactions = (await Promise.all(accounts.map((a) => client.getTransactions(a.id, from)))).flat()
+  const read = accountIds ? accounts.filter((a) => accountIds.includes(a.id)) : accounts
+  const transactions = (await Promise.all(read.map((a) => client.getTransactions(a.id, from)))).flat()
   // Bills are optional: a card whose bills can't be read still syncs the rest.
   const bills = (
     await Promise.all(
-      accounts
+      read
         .filter((a) => a.type === 'CREDIT')
         .map((a) => client.getBills(a.id).then((list) => list.map((bill) => ({ accountId: a.id, bill })), () => [])),
     )
@@ -85,28 +109,40 @@ export async function fetchConnection(client: PluggyClient, itemId: string, from
   // Rates are optional here: if every source fails, the last stored ones are used when reading.
   const currencies = [...accounts.map((a) => a.currencyCode), ...transactions.map((t) => t.currencyCode)].filter(Boolean)
   const rates = await ratesToBRL(currencies, fetchFn).catch(() => ({}))
-  return { item, accounts, transactions, bills, from, rates }
+  return { item, accounts, transactions, bills, from, rates, accountIds: read.map((a) => a.id) }
 }
 
-/** Syncs one connection: fetch from Pluggy, then save. */
+/**
+ * Syncs one connection: fetch from Pluggy, then save. `accountIds` (null:
+ * all) and `period` come from an advanced sync. The default window starts
+ * from the chosen accounts' oldest transaction sync, so an account left out
+ * of an earlier sync still gets everything since its own last one.
+ */
 export async function syncConnection(
   pool: pg.Pool,
   client: PluggyClient,
   itemId: string,
-  deps: { now?: Date; fetch?: typeof fetch; trigger?: string } = {},
+  deps: { now?: Date; fetch?: typeof fetch; trigger?: string; period?: SyncPeriod; accountIds?: string[] | null } = {},
 ): Promise<SyncResult> {
   const now = deps.now ?? new Date()
-  const last = await pool.query<{ synced_at: Date }>(`SELECT synced_at FROM bank_connections WHERE id = $1`, [itemId])
+  const period = deps.period ?? 'default'
+  const accountIds = deps.accountIds ?? null
+  const last = await pool.query<{ at: Date | null }>(
+    `SELECT min(coalesce(a.transactions_synced_at, c.synced_at)) AS at
+     FROM bank_connections c LEFT JOIN accounts a ON a.connection_id = c.id AND ($2::text[] IS NULL OR a.id = ANY($2::text[]))
+     WHERE c.id = $1`,
+    [itemId, accountIds],
+  )
   const fetchedFrom = await pool.query<{ day: string }>(`SELECT value #>> '{}' AS day FROM app_settings WHERE key = $1`, [fetchedFromKey(itemId)])
-  const from = syncFrom(last.rows[0]?.synced_at ?? null, fetchedFrom.rows[0]?.day ?? null)
+  const from = period === 'default' ? syncFrom(last.rows[0]?.at ?? null, fetchedFrom.rows[0]?.day ?? null) : periodFrom(period, now)
   const run = await pool.query<{ id: string }>(`INSERT INTO sync_runs (connection_id, trigger, started_at) VALUES (NULL, $1, $2) RETURNING id`, [
     deps.trigger ?? 'manual',
     now,
   ])
   const runId = run.rows[0].id
   try {
-    const fetched = await fetchConnection(client, itemId, from, deps.fetch ?? fetch)
-    const result = await inTransaction(pool, (db) => save(db, fetched, now))
+    const fetched = await fetchConnection(client, itemId, from, deps.fetch ?? fetch, accountIds)
+    const result = await inTransaction(pool, (db) => save(db, { ...fetched, history: period !== 'default' || undefined }, now))
     await pool.query(
       `UPDATE sync_runs SET connection_id = $2, finished_at = now(), ok = true, transactions_upserted = $3, transactions_removed = $4 WHERE id = $1`,
       [runId, itemId, result.inserted + result.updated, result.removed],
@@ -126,6 +162,9 @@ export async function save(db: Db, f: Fetched, now: Date): Promise<SyncResult> {
   const accounts = uniqueById(f.accounts, (a) => a.id)
   const transactions = uniqueById(f.transactions, (t) => t.id)
   const bills = uniqueById(f.bills, (b) => b.bill.id)
+  // The accounts whose transactions were read; the others only get their balance.
+  const read = f.accountIds ?? accounts.map((a) => a.id)
+  const everyAccount = accounts.every((a) => read.includes(a.id))
   // One sync per connection at a time; the lock is released with the transaction.
   await db.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`sync:${item.id}`])
   const name = connectionName(item, accounts)
@@ -309,25 +348,30 @@ export async function save(db: Db, f: Fetched, now: Date): Promise<SyncResult> {
     [json, now],
   )
 
-  // In the fetched window, what Pluggy no longer returns is marked removed. On a
-  // full fetch (from HISTORY_START), the window starts at the earliest day Pluggy
-  // returned: a bank that keeps less history than asked for must not remove the
-  // older transactions stored. A normal sync (35 days) uses its whole window, so
-  // a pending transaction replaced by a later-dated one is still removed.
+  // In the fetched window of the accounts read, what Pluggy no longer returns
+  // is marked removed. On a history read (a full fetch, or a chosen period),
+  // the window starts at the earliest day Pluggy returned: a bank that keeps
+  // less history than asked for must not remove the older transactions
+  // stored. A normal sync (35 days) uses its whole window, so a pending
+  // transaction replaced by a later-dated one is still removed.
   const earliest = txRows.reduce((min, r) => (r.booked_on < min ? r.booked_on : min), '9999-12-31')
-  const removeFrom = f.from <= HISTORY_START && txRows.length && earliest > f.from ? earliest : f.from
+  const history = f.history ?? f.from <= HISTORY_START
+  const removeFrom = history && txRows.length && earliest > f.from ? earliest : f.from
   const removed = await db.query(
     `UPDATE transactions SET removed_at = $4
      WHERE account_id = ANY($1::text[]) AND booked_on >= $2::date AND removed_at IS NULL AND NOT (id = ANY($3::text[]))`,
-    [accounts.map((a) => a.id), removeFrom, ids, now],
+    [read, removeFrom, ids, now],
   )
-  // How far back this connection has been fetched (only ever moves earlier).
-  await db.query(
-    `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, to_jsonb($2::text), $3)
-     ON CONFLICT (key) DO UPDATE SET value = CASE WHEN app_settings.value #>> '{}' <= $2 THEN app_settings.value ELSE excluded.value END,
-       updated_at = excluded.updated_at`,
-    [fetchedFromKey(item.id), f.from, now],
-  )
+  await db.query(`UPDATE accounts SET transactions_synced_at = $2 WHERE id = ANY($1::text[])`, [read, now])
+  // How far back this connection has been fetched (only ever moves earlier),
+  // when every account was read.
+  if (everyAccount)
+    await db.query(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, to_jsonb($2::text), $3)
+       ON CONFLICT (key) DO UPDATE SET value = CASE WHEN app_settings.value #>> '{}' <= $2 THEN app_settings.value ELSE excluded.value END,
+         updated_at = excluded.updated_at`,
+      [fetchedFromKey(item.id), f.from, now],
+    )
   await carryEdits(db, new Set(ids.filter((id) => !existing.rows.some((r) => r.id === id))), now)
 
   for (const [currency, rate] of Object.entries(f.rates)) {

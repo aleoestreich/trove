@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   card_brand              text,
   card_level              text,
   nickname                text,                  -- set in Trove; syncs never change it
+  transactions_synced_at  timestamptz,           -- when its transactions were last read (an advanced sync can skip it)
   raw                     jsonb NOT NULL,
   synced_at               timestamptz NOT NULL DEFAULT now()
 );
@@ -195,7 +196,10 @@ CREATE INDEX IF NOT EXISTS sync_runs_connection_started_idx ON sync_runs (connec
 CREATE TABLE IF NOT EXISTS sync_jobs (
   id           text PRIMARY KEY,                -- a UUID
   created_at   timestamptz NOT NULL DEFAULT now(),
-  finished_at  timestamptz                      -- set when no item is queued or running
+  finished_at  timestamptz,                     -- set when no item is queued or running
+  period       text NOT NULL DEFAULT 'default'  -- how far back it reads (SyncPeriod)
+               CONSTRAINT sync_jobs_period_check CHECK (period IN ('default', '3m', '6m', '1y', 'all')),
+  account_ids  text[]                           -- the accounts and cards it reads; null: all
 );
 CREATE INDEX IF NOT EXISTS sync_jobs_created_idx ON sync_jobs (created_at DESC);
 

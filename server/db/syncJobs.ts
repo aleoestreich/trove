@@ -9,9 +9,11 @@
 //   stays queued, and the next GET /api/sync starts a worker for it.
 // - An item left "running" by a worker that was stopped is marked failed
 //   (`timeout`) after STALE_MS, so it can be retried.
+// - A job keeps its advanced options (period, accounts), for whichever
+//   worker runs its items.
 
 import type pg from 'pg'
-import type { SyncJob } from '../../src/data/types.js'
+import type { SyncJob, SyncOptions, SyncPeriod } from '../../src/data/types.js'
 import { PluggyError, type PluggyClient } from '../pluggy/client.js'
 import { syncConnection } from './sync.js'
 
@@ -78,11 +80,11 @@ async function failStale(pool: pg.Pool, jobId: string) {
  * Starts a job for these connections, or returns the unfinished one (a second
  * press while syncing doesn't start another).
  */
-export async function startJob(pool: pg.Pool, connectionIds: string[]): Promise<SyncJob> {
+export async function startJob(pool: pg.Pool, connectionIds: string[], options: SyncOptions = {}): Promise<SyncJob> {
   const latest = await readJob(pool)
   if (latest && !latest.done) return latest
   const id = crypto.randomUUID()
-  await pool.query(`INSERT INTO sync_jobs (id) VALUES ($1)`, [id])
+  await pool.query(`INSERT INTO sync_jobs (id, period, account_ids) VALUES ($1, $2, $3)`, [id, options.period ?? 'default', options.accountIds ?? null])
   await pool.query(
     `INSERT INTO sync_job_items (job_id, connection_id, position)
      SELECT $1, c, p::smallint FROM unnest($2::text[]) WITH ORDINALITY AS t(c, p)`,
@@ -120,11 +122,20 @@ export async function runJob(
 ): Promise<void> {
   const started = Date.now()
   const budget = deps.budgetMs ?? RUN_BUDGET_MS
+  const options = await pool
+    .query<{ period: SyncPeriod; account_ids: string[] | null }>(`SELECT period, account_ids FROM sync_jobs WHERE id = $1`, [jobId])
+    .then((r) => r.rows[0], () => undefined)
   while (Date.now() - started < budget) {
     const connectionId = await claim(pool, jobId).catch(() => null)
     if (!connectionId) break
     try {
-      const r = await syncConnection(pool, client, connectionId, { now: deps.now?.(), fetch: deps.fetch, trigger: 'manual' })
+      const r = await syncConnection(pool, client, connectionId, {
+        now: deps.now?.(),
+        fetch: deps.fetch,
+        trigger: 'manual',
+        period: options?.period ?? 'default',
+        accountIds: options?.account_ids ?? null,
+      })
       await pool.query(
         `UPDATE sync_job_items SET status = 'ok', finished_at = now(), inserted = $3, updated = $4, removed = $5 WHERE job_id = $1 AND connection_id = $2`,
         [jobId, connectionId, r.inserted, r.updated, r.removed],

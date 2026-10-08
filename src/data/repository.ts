@@ -1,5 +1,5 @@
 import type { BulkResult, Edit } from './edits'
-import type { Snapshot, SyncJob, Transaction } from './types'
+import type { Snapshot, SyncJob, SyncOptions, Transaction } from './types'
 import type { TransactionQuery } from './transactionFilter'
 
 /**
@@ -17,8 +17,9 @@ export interface Repository {
   /**
    * Starts a background sync of these connections (default: all), or returns
    * the one already running. The server keeps going with the app closed.
+   * `options` (advanced sync): which accounts, and how far back.
    */
-  startSync(connectionIds?: string[]): Promise<SyncJob>
+  startSync(connectionIds?: string[], options?: SyncOptions): Promise<SyncJob>
   /** The latest sync job, for progress (null if there was none). */
   syncStatus(): Promise<SyncJob | null>
   /**
