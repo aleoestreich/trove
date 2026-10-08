@@ -56,6 +56,11 @@ Then run [`db/migrations/007_account_nickname.sql`](../db/migrations/007_account
 it adds the accounts' `nickname`, the name set in Trove for an account or
 card (see [Account names](#account-names)).
 
+Then run [`db/migrations/008_sync_options.sql`](../db/migrations/008_sync_options.sql):
+it adds the sync jobs' `period` and `account_ids` and the accounts'
+`transactions_synced_at`, for [Advanced sync](#advanced-sync). Until it
+runs, every sync fails with a database error.
+
 ## 3. Give Vercel the connection string
 
 1. In Neon, open **Connect**, choose the database and role, and turn
@@ -168,13 +173,37 @@ database transaction:
   returns what each bank provides from there (often about a year). How far
   back each connection has been fetched is kept in `app_settings`
   (`fetched_from:<item ID>`). After that, syncs re-read from 35 days before
-  the previous sync;
+  the oldest last read of the accounts being synced
+  (`accounts.transactions_synced_at`, else the connection's last sync);
 - transactions in that window that Pluggy no longer returns are marked
   removed (on a full fetch, only from the earliest day Pluggy returned, so a
   bank with a shorter history never removes older stored transactions);
 - the day's balances and exchange rates are saved, so loading the app calls
   neither Pluggy nor a rate service;
 - each run is logged in `sync_runs` (counts and status codes only).
+
+### Advanced sync
+
+The button next to **Sync** opens the advanced sync: how far back, and which
+accounts and cards. `POST /api/sync` takes `{ period?, accountIds? }`
+(`SyncOptions`, kept on the job):
+
+- `period`: `default` (the window above), or `3m`, `6m`, `1y` (from the 1st
+  of the month that makes 3, 6 or 12 months with the current one, Brazil
+  time) or `all` (from 2000-01-01: everything the bank provides).
+  `src/data/syncPeriod.ts` holds the rule, shared with the app's labels. A
+  chosen period is a history read: only what's after the earliest day
+  Pluggy returned can be marked removed;
+- `accountIds`: stored accounts of connections in `PLUGGY_ITEM_IDS` (`403`
+  otherwise; `400` for an empty, repeated or malformed list). Only their
+  connections are synced, and only their transactions and bills are read.
+  The other accounts of those connections still get their balance; their
+  stored transactions are left as they are, and their next sync reads back
+  from their own last read. `fetched_from` only moves when every account of
+  the connection was read.
+
+Edits are kept as in any sync: a sync never overwrites a stored category,
+subcategory or hidden flag.
 
 If one connection fails, the others are still saved and the sync bar offers
 **Retry** (a new job for the failed connections), with the reason for each

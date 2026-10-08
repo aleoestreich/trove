@@ -1,5 +1,5 @@
 import type { Repository } from './repository'
-import type { Snapshot, SyncInfo, SyncJob } from './types'
+import type { Snapshot, SyncInfo, SyncJob, SyncOptions } from './types'
 import { messages } from '../i18n/messages'
 import type { BulkResult } from './edits'
 import { transactionQueryParams } from './transactionFilter'
@@ -99,8 +99,13 @@ export function createApiRepository(fetchFn: Fetch = (...a) => fetch(...a)): Rep
       if (!res.ok) throw await failure(res)
       return e.op === 'categorizeMany' ? ((await res.json()) as BulkResult) : null
     },
-    async startSync(connectionIds) {
-      const res = await post('/api/sync', connectionIds ? { connectionIds } : {}).catch(() => null)
+    async startSync(connectionIds, options: SyncOptions = {}) {
+      const body = {
+        ...(connectionIds ? { connectionIds } : {}),
+        ...(options.accountIds ? { accountIds: options.accountIds } : {}),
+        ...(options.period && options.period !== 'default' ? { period: options.period } : {}),
+      }
+      const res = await post('/api/sync', body).catch(() => null)
       if (!res || !res.ok) throw new SyncStartError(res?.status ?? 0)
       return (await res.json()) as SyncJob
     },
@@ -144,8 +149,8 @@ export function withDemoFallback(live: Repository, demo: Repository): Repository
     edit(e) {
       return (usingDemo ? demo : live).edit(e)
     },
-    startSync(ids) {
-      return live.startSync(ids)
+    startSync(ids, options) {
+      return live.startSync(ids, options)
     },
     syncStatus() {
       return live.syncStatus()

@@ -141,8 +141,9 @@ visible after reopening the app until a later sync of that connection succeeds.
 | `error` | Unknown | Vercel → Logs |
 
 When the sync can't start at all, the reason comes from the HTTP status of
-`POST /api/sync`: no answer (network), `503` (a setting is missing), `403` (a
-connection not in `PLUGGY_ITEM_IDS`), or `5xx` (server or database).
+`POST /api/sync`: no answer (network), `503` (a setting is missing), `400`
+(invalid advanced sync options), `403` (a connection not in
+`PLUGGY_ITEM_IDS`, or an account not of one), or `5xx` (server or database).
 
 ## Implementation
 
@@ -152,8 +153,8 @@ connection not in `PLUGGY_ITEM_IDS`), or `5xx` (server or database).
   never_synced` before the first sync; the app then shows demo data.
 - `api/sync.ts` → `server/db/syncJobs.ts` and `server/db/sync.ts`:
   `POST /api/sync` starts a background sync (optionally of some
-  `connectionIds`, which must be in `PLUGGY_ITEM_IDS`; `403` otherwise) and
-  answers `202`; `GET /api/sync` returns the latest job's progress. See
+  `connectionIds`, which must be in `PLUGGY_ITEM_IDS`; `403` otherwise, and
+  with the advanced sync's `period` and `accountIds`) and answers `202`; `GET /api/sync` returns the latest job's progress. See
   [docs/neon-setup.md](neon-setup.md#sync).
 - `server/pluggy/client.ts`: minimal `fetch` client. It calls `POST /auth`,
   sends the API key as `X-API-KEY`, and uses `GET /items/{id}`,

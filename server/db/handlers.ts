@@ -8,8 +8,10 @@
 //   POST /api/edits    one change to categories or transactions (src/data/edits.ts)
 //        204 · 400 invalid (with a `reason` for bulk rules) · 404 not_found · 409 name_taken
 //        categorizeMany: 200 { updated, previous }; restoreCategories: 200 { updated }
-//   POST /api/sync     { connectionIds? }: start a background sync (default: every connection)
-//        202 SyncJob (the running one if a sync is already in progress) · 403 not in PLUGGY_ITEM_IDS
+//   POST /api/sync     { connectionIds?, accountIds?, period? }: start a background sync (default: every
+//        connection and account, the default window; see SyncOptions)
+//        202 SyncJob (the running one if a sync is already in progress) · 400 invalid
+//        · 403 a connection not in PLUGGY_ITEM_IDS, or an account not of one
 //   GET  /api/sync     the latest sync job, for progress: 200 { job: SyncJob | null }
 //   (The three income routes below share one function, api/insights.ts, with the insight routes in server/db/insights.ts, through vercel.json rewrites.)
 //   GET  /api/overview/income-average             the average income card under the saved filter
@@ -25,7 +27,7 @@
 
 import { EditError, validateEdit } from '../../src/data/edits.js'
 import { filterLabel, incomeAverage, incomeOptions, summarizeIncomeFilter, NO_FILTER } from '../../src/data/incomeAverage.js'
-import type { Snapshot } from '../../src/data/types.js'
+import { SYNC_PERIODS, type Snapshot, type SyncPeriod } from '../../src/data/types.js'
 import { messages } from '../../src/i18n/messages.js'
 import { brazilDate } from '../pluggy/map.js'
 import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
@@ -124,22 +126,51 @@ function startWorker(pool: ReturnType<typeof getPool>, config: DbConfig & { plug
   background(runJob(pool, new PluggyClient(config.pluggy, fetchFn), jobId, { fetch: fetchFn, now: deps.now }))
 }
 
+/** Most accounts an advanced sync can name. */
+const MAX_SYNC_ACCOUNTS = 200
+
 /**
- * POST /api/sync { connectionIds? }: starts a background sync of these
- * connections (default: all of PLUGGY_ITEM_IDS), or returns the one already
- * running. Answers 202 with the job at once.
+ * POST /api/sync { connectionIds?, accountIds?, period? }: starts a
+ * background sync of these connections (default: all of PLUGGY_ITEM_IDS), or
+ * returns the one already running. With `accountIds`, only those accounts'
+ * transactions are read, and only their connections are synced; `period`
+ * sets how far back (SyncPeriod). Answers 202 with the job at once.
  */
 export async function startSync(request: Request, config: DbConfig, deps: Partial<HandlerDeps> = {}, background: Background = waitUntil): Promise<Response> {
   if (!config.pluggy || !config.databaseUrl) return notConfigured()
-  const body = (await request.json().catch(() => ({}))) as { connectionIds?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { connectionIds?: unknown; accountIds?: unknown; period?: unknown } | null
   const all = config.pluggy.itemIds
   const wanted = Array.isArray(body?.connectionIds) ? body.connectionIds : all
   if (wanted.length === 0 || !wanted.every((id): id is string => typeof id === 'string' && all.includes(id))) {
     return json(403, { error: 'connection_not_configured' })
   }
+  const period = body?.period ?? 'default'
+  if (!SYNC_PERIODS.includes(period as SyncPeriod)) return json(400, { error: 'invalid' })
+  const accountIds = body?.accountIds ?? null
+  if (
+    accountIds !== null &&
+    (!Array.isArray(accountIds) ||
+      accountIds.length === 0 ||
+      accountIds.length > MAX_SYNC_ACCOUNTS ||
+      !accountIds.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 200) ||
+      new Set(accountIds).size !== accountIds.length)
+  ) {
+    return json(400, { error: 'invalid' })
+  }
   try {
     const pool = getPool(config.databaseUrl)
-    const job = await startJob(pool, all.filter((id) => wanted.includes(id)))
+    let connections = all.filter((id) => wanted.includes(id))
+    if (accountIds) {
+      // Each account must belong to a connection being synced; only those connections are.
+      const found = await pool.query<{ connection_id: string }>(`SELECT connection_id FROM accounts WHERE id = ANY($1::text[]) AND connection_id = ANY($2::text[])`, [
+        accountIds,
+        connections,
+      ])
+      if (found.rowCount !== accountIds.length) return json(403, { error: 'account_not_configured' })
+      const used = new Set(found.rows.map((r) => r.connection_id))
+      connections = connections.filter((id) => used.has(id))
+    }
+    const job = await startJob(pool, connections, { period: period as SyncPeriod, accountIds: accountIds as string[] | null })
     if (needsWorker(job)) startWorker(pool, { ...config, pluggy: config.pluggy }, job.id, deps, background)
     return json(202, job)
   } catch (e) {

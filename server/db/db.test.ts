@@ -10,7 +10,7 @@ import { applyEditSql, ensureSeeded } from './categories.js'
 import { dbErrorCode, inTransaction } from './connection.js'
 import { readSnapshot, readStart } from './read.js'
 import { financeRoutes } from './handlers.js'
-import { HISTORY_START, save, syncFrom, type Fetched } from './sync.js'
+import { ALL_HISTORY, HISTORY_START, periodFrom, save, syncFrom, type Fetched } from './sync.js'
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
 import { edits, incomeAverageRoute, incomeRoutes, incomeCategoriesRoute, saveIncomeFilterRoute, startSync, syncStatus } from './handlers.js'
 import { previewAverage } from '../../src/data/incomeAverage.js'
@@ -448,6 +448,91 @@ suite('database', () => {
       const bad = await startSync(new Request('https://t/api/sync', { method: 'POST', body: '{"connectionIds":["other"]}' }), settings, {}, background)
       expect(bad.status).toBe(403)
     })
+
+    describe('advanced sync', () => {
+      const card: PluggyAccount = { id: 'card-1', itemId: 'item-1', type: 'CREDIT', subtype: 'CREDIT_CARD', name: 'Cartão Exemplo', balance: 200, currencyCode: 'BRL' }
+      /** Fake Pluggy with a checking account and a card; records which accounts were read, and from when. */
+      const twoAccounts = (balance = 1500) => {
+        const reads: string[] = []
+        const fetchFn = (async (input: string | URL) => {
+          const u = new URL(String(input))
+          const ok = (body: unknown) => Response.json(body)
+          if (u.pathname === '/auth') return ok({ apiKey: 'k' })
+          if (u.pathname === '/items/item-1') return ok(item)
+          if (u.pathname === '/accounts') return ok({ results: [{ ...checking, balance }, card], page: 1, total: 2, totalPages: 1 })
+          if (u.pathname === '/v2/transactions') {
+            const account = u.searchParams.get('accountId')!
+            reads.push(`${account} ${u.searchParams.get('dateFrom')}`)
+            return ok({ results: account === 'card-1' ? [tx('c1', { accountId: 'card-1' })] : [], next: null })
+          }
+          if (u.pathname === '/bills') {
+            reads.push(`bills ${u.searchParams.get('accountId')}`)
+            return ok({ results: [], page: 1, total: 0, totalPages: 1 })
+          }
+          return new Response('{}', { status: 404 })
+        }) as typeof fetch
+        return { reads, fetchFn }
+      }
+      const settings = () => ({ pluggy: config, databaseUrl: url! })
+      /** Both accounts stored, with a checking transaction. */
+      const seededAt = new Date('2026-09-20T12:00:00.000Z')
+      const seed = (txs = [tx('kept')]) => inTransaction(pool, (db) => save(db, { ...fetched(txs), accounts: [checking, card] }, seededAt))
+      const start = async (body: unknown, fetchFn: typeof fetch) => {
+        const work: Promise<unknown>[] = []
+        const res = await startSync(new Request('https://t/api/sync', { method: 'POST', body: JSON.stringify(body) }), settings(), { fetch: fetchFn, now: () => now }, (p) => void work.push(p))
+        await Promise.all(work)
+        return res
+      }
+
+      it('reads only the chosen accounts, over the chosen period; the others keep their transactions and get their balance', async () => {
+        await seed()
+        const { reads, fetchFn } = twoAccounts(9900)
+        const res = await start({ accountIds: ['card-1'], period: '3m' }, fetchFn)
+        expect(res.status).toBe(202)
+        // Only item-1 is synced (the card's connection), from Aug 1 (Aug, Sep and Oct).
+        expect((await res.json()).items.map((i: { connectionId: string }) => i.connectionId)).toEqual(['item-1'])
+        expect(reads).toEqual(['card-1 2026-08-01', 'bills card-1'])
+        expect((await pool.query(`SELECT id FROM transactions WHERE removed_at IS NULL ORDER BY id`)).rows.map((r) => r.id)).toEqual(['c1', 'kept'])
+        expect((await pool.query(`SELECT balance_cents FROM accounts WHERE id = 'acc-1'`)).rows[0].balance_cents).toBe('990000')
+        const at = (await pool.query(`SELECT id, transactions_synced_at AS at FROM accounts ORDER BY id`)).rows
+        expect(at).toEqual([
+          { id: 'acc-1', at: seededAt }, // not read this time
+          { id: 'card-1', at: now },
+        ])
+      })
+
+      it('starts the default window at the oldest last read of the chosen accounts', async () => {
+        await seed()
+        const { reads, fetchFn } = twoAccounts()
+        await start({ accountIds: ['card-1'] }, fetchFn)
+        // Checking was last read on Sep 10, the card just now: both are read back 35 days from the older.
+        await pool.query(`UPDATE accounts SET transactions_synced_at = '2026-09-10T12:00:00Z' WHERE id = 'acc-1'`)
+        await pool.query(`INSERT INTO app_settings (key, value) VALUES ('fetched_from:item-1', to_jsonb('2025-01-01'::text)) ON CONFLICT (key) DO UPDATE SET value = excluded.value`)
+        reads.length = 0
+        await start({}, fetchFn)
+        expect(reads.filter((r) => !r.startsWith('bills'))).toEqual(['acc-1 2026-08-06', 'card-1 2026-08-06'])
+      })
+
+      it('"all" reads everything the bank has, and removes only after the earliest day returned', async () => {
+        await seed([tx('old', { date: '2025-03-01T12:00:00.000Z' })])
+        const { reads, fetchFn } = twoAccounts()
+        await start({ period: 'all' }, fetchFn)
+        expect(reads.filter((r) => !r.startsWith('bills'))).toEqual([`acc-1 ${ALL_HISTORY}`, `card-1 ${ALL_HISTORY}`])
+        // Checking returned nothing this time: its stored history is kept.
+        expect((await pool.query(`SELECT removed_at IS NULL AS kept FROM transactions WHERE id = 'old'`)).rows[0].kept).toBe(true)
+      })
+
+      it('refuses an unknown period, an empty or malformed account list, and an account of another connection', async () => {
+        await seed()
+        const { fetchFn } = twoAccounts()
+        expect((await start({ period: '2y' }, fetchFn)).status).toBe(400)
+        expect((await start({ accountIds: [] }, fetchFn)).status).toBe(400)
+        expect((await start({ accountIds: [1] }, fetchFn)).status).toBe(400)
+        expect((await start({ accountIds: ['acc-1', 'acc-1'] }, fetchFn)).status).toBe(400)
+        expect((await start({ accountIds: ['nope'] }, fetchFn)).status).toBe(403)
+        expect((await start({ connectionIds: ['item-2'], accountIds: ['acc-1'] }, fetchFn)).status).toBe(403)
+      })
+    })
   })
 
   it('reads the snapshot with the stored categories and hidden flags', async () => {
@@ -598,6 +683,17 @@ describe('sync window', () => {
     expect(syncFrom(new Date('2026-10-01T00:00:00Z'), '2025-10-01')).toBe('2025-01-01')
     expect(syncFrom(new Date('2026-10-01T00:00:00Z'), null)).toBe('2025-01-01')
     expect(syncFrom(new Date('2026-10-01T00:00:00Z'), '2025-01-01')).toBe('2026-08-27')
+  })
+
+  it('reads a chosen period from the 1st of its first month, in Brazil time', () => {
+    const now = new Date('2026-10-06T12:00:00Z')
+    expect(periodFrom('3m', now)).toBe('2026-08-01')
+    expect(periodFrom('6m', now)).toBe('2026-05-01')
+    expect(periodFrom('1y', now)).toBe('2025-11-01')
+    expect(periodFrom('all', now)).toBe(ALL_HISTORY)
+    // 01:00 UTC on March 1st is still February in Brazil.
+    expect(periodFrom('3m', new Date('2026-03-01T01:00:00Z'))).toBe('2025-12-01')
+    expect(periodFrom('1y', new Date('2026-01-15T12:00:00Z'))).toBe('2025-02-01')
   })
 })
 

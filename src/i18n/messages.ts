@@ -3,6 +3,8 @@
 // Transaction descriptions and account names are not translated: they are
 // data from the banks (via Pluggy) and shown as the bank sends them.
 
+import type { SyncPeriod } from '../data/types.js'
+
 export interface Messages {
   nav: {
     overview: string
@@ -372,6 +374,23 @@ export interface Messages {
     /** A connection Pluggy marks as needing attention (expired consent…). */
     reconnect: (banks: string) => string
     reconnectNote: string
+    /** Advanced sync: which accounts, and how far back. */
+    advanced: {
+      open: string
+      title: string
+      period: string
+      periods: Record<SyncPeriod, string>
+      defaultNote: string
+      since: (month: string, year: string) => string
+      allNote: string
+      longNote: string
+      accounts: string
+      allAccounts: string
+      skippedNote: string
+      noneSelected: string
+      cancel: string
+      start: string
+    }
   }
   /** Month-end projection, unusual categories and recurring charges. */
   insights: {
@@ -927,6 +946,22 @@ export const messages: Messages = {
     problemFor: (bank, reason) => `${bank}: ${reason}`,
     reconnect: (banks) => `${banks} precisa ser reconectado no app Meu Pluggy.`,
     reconnectNote: 'Os dados param de atualizar até lá. Reconecte e depois sincronize.',
+    advanced: {
+      open: 'Sincronização avançada',
+      title: 'Sincronização avançada',
+      period: 'Período',
+      periods: { default: 'Padrão', '3m': '3 meses', '6m': '6 meses', '1y': '1 ano', all: 'Tudo' },
+      defaultNote: 'O que mudou desde a última sincronização',
+      since: (month, year) => `Desde ${month} de ${year}`,
+      allNote: 'Todo o histórico que o banco oferece',
+      longNote: 'Períodos longos podem levar alguns minutos.',
+      accounts: 'Contas e cartões',
+      allAccounts: 'Todas as contas',
+      skippedNote: 'As desmarcadas não são lidas agora: mantêm o que já está salvo, e só o saldo é atualizado.',
+      noneSelected: 'Escolha ao menos uma conta.',
+      cancel: 'Cancelar',
+      start: 'Sincronizar',
+    },
   },
   insights: {
     back: 'Visão geral',
