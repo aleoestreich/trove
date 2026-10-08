@@ -201,7 +201,7 @@ function CreditCardBlock({ account, label, bill, futureInstallments }: { account
       <div className="grid grid-cols-2 gap-2 lg:hidden">
         <div className="flex flex-col gap-0.5">
           <span className="text-xs leading-4 text-muted">
-            {t.accounts.used} · {formatPercent(share * 100)}
+            {t.accounts.used} · <span className="tabular">{formatPercent(share * 100)}</span>
           </span>
           <span className="tabular text-sm font-medium text-ink">{formatMoney(used)}</span>
         </div>

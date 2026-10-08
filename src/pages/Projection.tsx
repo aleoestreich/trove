@@ -66,7 +66,7 @@ function FigureCard({ projection }: { projection: ProjectionData }) {
       </div>
       <p className="mt-1.5 flex items-center gap-1.5 text-xs leading-4 text-ink-2">
         <span aria-hidden className="size-2 shrink-0 rounded-full border-2 border-critical" />
-        {lowNote}
+        <span className="private">{lowNote}</span>
       </p>
       <div className="mt-2">
         <ProjectionLegend />
@@ -108,7 +108,7 @@ function HowCard({ projection }: { projection: ProjectionData }) {
           <div key={l.key} className="flex min-h-[52px] items-center justify-between gap-3 border-b border-line py-1.5">
             <dt className="flex min-w-0 flex-col gap-px">
               <span className="text-sm leading-[19px] text-ink">{l.label}</span>
-              <span className="text-xs leading-4 text-muted">{notes[l.key]}</span>
+              <span className="private text-xs leading-4 text-muted">{notes[l.key]}</span>
             </dt>
             <dd className={`tabular text-sm font-medium whitespace-nowrap ${l.income ? 'text-income' : 'text-ink'}`}>{l.value}</dd>
           </div>
@@ -157,7 +157,7 @@ function EventsCard({ projection }: { projection: ProjectionData }) {
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-px">
                 <span className="truncate text-sm leading-[19px] font-medium text-ink">{d.name}</span>
-                <span className="truncate text-xs leading-4 text-muted">{d.meta}</span>
+                <span className="private truncate text-xs leading-4 text-muted">{d.meta}</span>
               </span>
               <span className={`tabular text-sm font-medium whitespace-nowrap ${e.amount > 0 ? 'text-income' : 'text-ink'}`}>
                 {formatMoney(e.amount, 'BRL', { signed: e.amount > 0 })}

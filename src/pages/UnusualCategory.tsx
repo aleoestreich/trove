@@ -262,7 +262,7 @@ function NormalNote({ u }: { u: UnusualResult }) {
   if (!u.normal.length) return null
   return (
     <p className="rounded-sm bg-page px-3 py-2.5 text-[13px] leading-[18px] text-ink-2">
-      <span className="font-medium text-ink">{t.insights.unusual.normalLabel}</span> {list}
+      <span className="font-medium text-ink">{t.insights.unusual.normalLabel}</span> <span className="private">{list}</span>
     </p>
   )
 }
