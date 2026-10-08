@@ -25,9 +25,10 @@ export type Edit =
   | { op: 'linkSubcategory'; id: string; categoryId: string }
   /**
    * Sets the same category and subcategory on many transactions, all or none
-   * (see checkBulk). The server answers with a BulkResult, for undo.
+   * (see checkBulk), or leaves them all uncategorized (both null). The server
+   * answers with a BulkResult, for undo.
    */
-  | { op: 'categorizeMany'; transactionIds: string[]; categoryId: string; subcategoryId: string }
+  | { op: 'categorizeMany'; transactionIds: string[]; categoryId: string | null; subcategoryId: string | null }
   /** Puts back what categorizeMany replaced (its BulkResult's `previous`). */
   | { op: 'restoreCategories'; items: PreviousCategory[] }
   /** Marks a transaction as an own transfer ('own') or a card bill payment ('card-payment'), or says it is neither ('none'). */
@@ -132,6 +133,8 @@ export function validateEdit(e: unknown): Edit {
     case 'categorizeMany': {
       const ids = Array.isArray(x.transactionIds) ? x.transactionIds.map((v) => id(v, 'transaction')) : bad('transactions')
       if (ids.length === 0 || ids.length > BULK_MAX || new Set(ids).size !== ids.length) bad('transactions')
+      // Uncategorized: both null. Otherwise a category and one of its subcategories.
+      if (x.categoryId === null && x.subcategoryId === null) return { op: 'categorizeMany', transactionIds: ids, categoryId: null, subcategoryId: null }
       return { op: 'categorizeMany', transactionIds: ids, categoryId: id(x.categoryId, 'category'), subcategoryId: id(x.subcategoryId, 'subcategory') }
     }
     case 'restoreCategories': {
@@ -356,22 +359,25 @@ export function checkIncomeFilter(categories: Category[], subcategories: Subcate
  * shows them (the server builds the same view first):
  * - every transaction exists;
  * - none is a transfer (own transfer or card bill payment: no category);
- * - all are of one kind, expenses or income;
- * - the category is of that kind, and the subcategory belongs to it.
+ * - to leave them uncategorized (category null), nothing else;
+ * - otherwise all are of one kind, expenses or income, the category is of
+ *   that kind, and the subcategory belongs to it.
  * Returns the previous values. Throws EditError with a `reason`.
  */
-export function checkBulk(s: Snapshot, e: { transactionIds: string[]; categoryId: string; subcategoryId: string }): PreviousCategory[] {
+export function checkBulk(s: Snapshot, e: { transactionIds: string[]; categoryId: string | null; subcategoryId: string | null }): PreviousCategory[] {
   const categoriesById = new Map(s.categories.map((c) => [c.id, c]))
   const byId = new Map(s.transactions.map((t) => [t.id, t]))
   const txs = e.transactionIds.map((id) => byId.get(id) ?? fail('not_found', 'transaction'))
   if (txs.some((t) => t.transfer)) throw new EditError('invalid', 'Transfers between own accounts and card bill payments have no category.', 'transfer')
+  const previous = txs.map((t) => ({ id: t.id, categoryId: t.categoryId, subcategoryId: t.subcategoryId ?? null }))
+  if (e.categoryId === null) return previous
   const kinds = new Set(txs.map((t) => kindOf(t, categoriesById)))
   if (kinds.size !== 1) throw new EditError('invalid', 'Select only expenses or only income.', 'mixed_types')
   const category = categoriesById.get(e.categoryId) ?? fail('not_found', 'category')
   if (category.type !== [...kinds][0]) throw new EditError('invalid', 'The category is not of the transactions’ type.', 'category_type')
   const sub = s.subcategories.find((x) => x.id === e.subcategoryId) ?? fail('not_found', 'subcategory')
   if (sub.categoryId !== e.categoryId) throw new EditError('invalid', 'The subcategory belongs to another category.', 'subcategory_category')
-  return txs.map((t) => ({ id: t.id, categoryId: t.categoryId, subcategoryId: t.subcategoryId ?? null }))
+  return previous
 }
 
 function fail(code: EditError['code'], what: string): never {

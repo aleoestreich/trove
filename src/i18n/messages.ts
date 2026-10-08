@@ -153,6 +153,8 @@ export interface Messages {
     markCardPayment: string
     markCardPaymentNote: string
     notCardPayment: string
+    /** Clears the category and subcategory. */
+    removeCategory: string
     cardPaymentNote: string
     noCategoriesOfType: (kind: string) => string
   }
@@ -265,6 +267,9 @@ export interface Messages {
     categorizeN: (n: number) => string
     transfersNote: string
     mixedNote: string
+    /** The bulk choice that clears the category and subcategory. */
+    uncategorize: string
+    uncategorizeNote: string
     total: string
     current: string
     resultLabel: (n: number) => string
@@ -658,6 +663,7 @@ export const messages: Messages = {
     markCardPayment: 'Marcar como pagamento de fatura',
     markCardPaymentNote: 'Não conta como despesa: as compras do cartão já contam.',
     notCardPayment: 'Não é pagamento de fatura',
+    removeCategory: 'Remover categoria',
     cardPaymentNote: 'Pagamentos de fatura não contam como despesa: as compras do cartão já contam. Continua no saldo da conta e na fatura.',
     noCategoriesOfType: (kind) => `Nenhuma categoria de ${kind} ainda. Crie uma em Categorias.`,
   },
@@ -760,7 +766,9 @@ export const messages: Messages = {
     totalSelected: 'Total selecionado',
     categorizeN: (n) => (n === 1 ? 'Categorizar 1 transação' : `Categorizar ${n} transações`),
     transfersNote: 'Transferências entre suas contas não têm categoria e não podem ser selecionadas.',
-    mixedNote: 'Selecione só despesas ou só receitas para categorizar.',
+    mixedNote: 'Para escolher uma categoria, selecione só despesas ou só receitas. Sem categoria vale para qualquer seleção.',
+    uncategorize: 'Sem categoria',
+    uncategorizeNote: 'Remove a categoria e a subcategoria',
     total: 'Total',
     current: 'Hoje estão em',
     resultLabel: (n) => (n === 1 ? 'A 1 vai para' : `As ${n} vão para`),

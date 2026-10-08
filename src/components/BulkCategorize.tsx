@@ -39,6 +39,8 @@ function BulkContent({
   const { t, categoryName } = useI18n()
   const summary = summarize(txs, categoriesById)
   const [categoryId, setCategoryId] = useState<string | null>(null)
+  // "Sem categoria": clears the category and subcategory (any selection, income and expenses mixed included).
+  const [clearing, setClearing] = useState(false)
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,16 +49,17 @@ function BulkContent({
   const category = categoryId ? categoriesById.get(categoryId) : undefined
   const sub = subcategoryId ? subcategoriesById.get(subcategoryId) : undefined
   const options = summary.kind ? categories.filter((c) => c.type === summary.kind) : []
-  const ready = !!category && !!sub && !!summary.kind && !saving
+  const ready = (clearing || (!!category && !!sub && !!summary.kind)) && !saving
 
   const apply = async () => {
-    if (!ready || !category || !sub) return
+    if (!ready) return
     setSaving(true)
     setError(null)
     const ids = txs.map((x) => x.id)
     try {
-      const result = await categorizeMany(ids, category.id, sub.id)
-      onApplied({ ids, count: result.updated, label: `${categoryName(category)} › ${sub.name}`, previous: result.previous })
+      const result = clearing ? await categorizeMany(ids, null, null) : await categorizeMany(ids, category!.id, sub!.id)
+      const label = clearing ? t.transactions.uncategorized : `${categoryName(category!)} › ${sub!.name}`
+      onApplied({ ids, count: result.updated, label, previous: result.previous })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setSaving(false)
@@ -112,28 +115,43 @@ function BulkContent({
       <h3 id={`bulk-${variant}-category`} className={`label-caps pb-2 ${panel ? 'pt-4' : 'pt-4'}`}>
         {t.category}
       </h3>
-      {summary.kind ? (
-        <div role="radiogroup" aria-labelledby={`bulk-${variant}-category`} className={`flex flex-wrap ${panel ? 'gap-1.5' : 'gap-2'}`}>
-          {options.map((c) => (
+      <div role="radiogroup" aria-labelledby={`bulk-${variant}-category`} className={`flex flex-wrap ${panel ? 'gap-1.5' : 'gap-2'}`}>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={clearing}
+          onClick={() => {
+            setClearing(true)
+            setCategoryId(null)
+            setSubcategoryId(null)
+          }}
+          className={`inline-flex items-center gap-2 rounded-full border pr-3.5 pl-1.5 text-sm font-medium whitespace-nowrap ${panel ? 'h-9' : 'h-10'} ${
+            clearing ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-surface text-ink-2 hover:bg-track'
+          }`}
+        >
+          <CategoryBadge category={null} size={panel ? 24 : 28} />
+          {t.bulk.uncategorize}
+        </button>
+        {summary.kind &&
+          options.map((c) => (
             <CategoryChip
               key={c.id}
               category={c}
               name={categoryName(c)}
               size={panel ? 36 : 40}
-              on={c.id === categoryId}
+              on={!clearing && c.id === categoryId}
               onClick={() => {
+                setClearing(false)
                 if (c.id === categoryId) return
                 setCategoryId(c.id)
                 setSubcategoryId(null)
               }}
             />
           ))}
-        </div>
-      ) : (
-        <p className="text-[13px] leading-[18px] text-muted">{t.bulk.mixedNote}</p>
-      )}
+      </div>
+      {!summary.kind && <p className="mt-2 text-[13px] leading-[18px] text-muted">{t.bulk.mixedNote}</p>}
 
-      {category && (
+      {category && !clearing && (
         <SubcategoryPicker
           variant={`bulk-${variant}`}
           category={category}
@@ -150,10 +168,14 @@ function BulkContent({
       )}
 
       <div className="mt-4 flex items-center gap-2.5 border-t border-line pt-3">
-        <CategoryBadge category={category} size={panel ? 28 : 36} />
+        <CategoryBadge category={clearing ? null : category} size={panel ? 28 : 36} />
         <span className="flex min-w-0 flex-col gap-px">
           <span className="text-xs leading-4 text-muted">{t.bulk.resultLabel(n)}</span>
-          {category ? (
+          {clearing ? (
+            <span className="text-sm leading-5 font-medium text-ink-2">
+              {t.bulk.uncategorize} <span className="font-normal text-muted">· {t.bulk.uncategorizeNote}</span>
+            </span>
+          ) : category ? (
             <span className="truncate text-sm leading-5 font-medium" style={{ color: catInk(category.color, 70) }}>
               {categoryName(category)} › {sub ? sub.name : <span className="font-normal text-muted">{t.bulk.pickSubcategory}</span>}
             </span>

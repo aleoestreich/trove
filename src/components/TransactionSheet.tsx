@@ -164,6 +164,16 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
               }}
             />
           )}
+          {category && (
+            <button
+              type="button"
+              onClick={() => edit({ op: 'categorize', transactionId: current.id, categoryId: null, subcategoryId: null })}
+              className="mt-2 -ml-3 inline-flex h-12 items-center gap-2 self-start rounded-md px-3 text-sm font-medium text-accent hover:bg-accent-faint active:bg-track"
+            >
+              <Icon name="close" className="size-[18px]" strokeWidth={2} />
+              {t.transactions.removeCategory}
+            </button>
+          )}
         </>
       )}
 

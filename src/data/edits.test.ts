@@ -124,6 +124,17 @@ describe('bulk categorize', () => {
     transactions: [...snapshot().transactions, tx('pay', { amount: 3000_00, categoryId: null }), tx('own', { categoryId: null, transfer: 'own' })],
   })
 
+  it('leaves them uncategorized, income and expenses together, but never transfers', () => {
+    const s = applyEdit(mixed(), validateEdit({ op: 'categorizeMany', transactionIds: ['t1', 'pay'], categoryId: null, subcategoryId: null }))
+    expect(s.transactions.filter((t) => ['t1', 'pay'].includes(t.id)).map((t) => [t.categoryId, t.subcategoryId ?? null])).toEqual([
+      [null, null],
+      [null, null],
+    ])
+    expect(reason(() => applyEdit(mixed(), { op: 'categorizeMany', transactionIds: ['t1', 'own'], categoryId: null, subcategoryId: null }))).toBe('transfer')
+    // A subcategory without a category is refused.
+    expect(() => validateEdit({ op: 'categorizeMany', transactionIds: ['t1'], categoryId: null, subcategoryId: 'groceries-1' })).toThrow(EditError)
+  })
+
   it('sets one category and subcategory on every transaction', () => {
     const s = applyEdit(snapshot(), bulk(['t1', 't3']))
     expect(s.transactions.map((t) => [t.id, t.categoryId, t.subcategoryId ?? null])).toEqual([

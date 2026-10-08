@@ -104,11 +104,24 @@ suite('database', () => {
 
   describe('bulk categorize', () => {
     const ctx = { itemIds: ['item-1'] }
-    const many = (transactionIds: string[], categoryId: string, subcategoryId: string) =>
+    const many = (transactionIds: string[], categoryId: string | null, subcategoryId: string | null) =>
       applyEditSql(pool, { op: 'categorizeMany', transactionIds, categoryId, subcategoryId }, ctx)
     const reasonOf = (p: Promise<unknown>) => p.then(() => 'none', (e) => (e instanceof EditError ? e.reason ?? e.code : String(e)))
     const state = async () =>
       (await pool.query(`SELECT id, category_id, subcategory_id, category_edited_at IS NOT NULL AS edited FROM transactions ORDER BY id`)).rows
+
+    it('leaves them uncategorized, marked edited, so a sync never guesses again; undo restores them', async () => {
+      await sync([tx('t1', { category: 'Supermarkets' }), tx('t2', { category: 'Supermarkets' })])
+      const result = await many(['t1', 't2'], null, null)
+      expect(result).toMatchObject({ updated: 2 })
+      await sync([tx('t1', { category: 'Supermarkets' }), tx('t2', { category: 'Supermarkets' })])
+      expect(await state()).toEqual([
+        { id: 't1', category_id: null, subcategory_id: null, edited: true },
+        { id: 't2', category_id: null, subcategory_id: null, edited: true },
+      ])
+      await applyEditSql(pool, { op: 'restoreCategories', items: (result as BulkResult).previous }, ctx)
+      expect((await state()).map((r) => r.category_id)).toEqual(['groceries', 'groceries'])
+    })
 
     it('sets the category on all of them, marks them edited and returns the previous values', async () => {
       await sync([tx('t1', { category: 'Supermarkets' }), tx('t2'), tx('t3', { category: 'Supermarkets' })])
