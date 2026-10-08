@@ -55,6 +55,8 @@ interface AppData extends Snapshot {
   restoreCategories(previous: PreviousCategory[]): Promise<void>
   /** Saves the average income's filter (server first); rejects with a message for the UI. */
   saveIncomeFilter(filter: IncomeFilter): Promise<void>
+  /** Renames an account or card (null: back to the bank's name), server first; rejects with a message for the UI. */
+  renameAccount(accountId: string, name: string | null): Promise<void>
   /** Set (or clear, with null) a card's closing and due days; saved on this device. */
   setCardDays(accountId: string, days: CardDays | null): void
 }
@@ -83,6 +85,8 @@ export interface SyncState {
   failed: { id: string; name: string | null; problem: SyncProblem }[]
   /** After a successful sync: new and updated transactions, for the snackbar. */
   result: { inserted: number; updated: number; at: number } | null
+  /** The options of the latest sync started here (null: a plain sync, or one started elsewhere): for the bar and Retry. */
+  run: SyncOptions | null
   /** Syncs every connection, or just `only` (Retry); `options`: advanced sync (which accounts, how far back). */
   sync(only?: string[], options?: SyncOptions): void
   /** The stored accounts and cards and their banks, for choosing what an advanced sync reads. */
@@ -97,6 +101,7 @@ const SyncContext = createContext<SyncState>({
   progress: null,
   failed: [],
   result: null,
+  run: null,
   sync() {},
   accounts: [],
   institutions: [],
@@ -210,6 +215,12 @@ export function DataProvider({ repository, children }: { repository: Repository;
     },
     [save],
   )
+  const renameAccount = useCallback(
+    async (accountId: string, name: string | null) => {
+      await save({ op: 'renameAccount', accountId, name })
+    },
+    [save],
+  )
 
   const [cardDays, setCardDaysState] = useState(readCardDays)
   const setCardDays = useCallback((accountId: string, days: CardDays | null) => {
@@ -265,11 +276,13 @@ export function DataProvider({ repository, children }: { repository: Repository;
     )
   }, [hasConnections, repository, follow])
 
+  const [run, setRun] = useState<SyncOptions | null>(null)
   const sync = useCallback(
     async (only?: string[], options?: SyncOptions) => {
       if (polling.current) return
       setStartError(null)
       setResult(null)
+      setRun(options && (options.accountIds || (options.period && options.period !== 'default')) ? options : null)
       try {
         await follow(await repository.startSync(only, options), true)
       } catch (e) {
@@ -310,12 +323,13 @@ export function DataProvider({ repository, children }: { repository: Repository;
     () => ({
       info: snapshot?.sync ?? null,
       ...syncing,
+      run,
       sync: (only, options) => void sync(only, options),
       accounts: snapshot?.source === 'pluggy' ? snapshot.accounts : [],
       institutions: snapshot?.institutions ?? [],
       dismissResult: () => setResult(null),
     }),
-    [snapshot?.sync, snapshot?.source, snapshot?.accounts, snapshot?.institutions, syncing, sync],
+    [snapshot?.sync, snapshot?.source, snapshot?.accounts, snapshot?.institutions, syncing, sync, run],
   )
 
   // Older transactions join the loaded ones (the loaded copy wins: it may hold edits not yet saved).
@@ -371,9 +385,10 @@ export function DataProvider({ repository, children }: { repository: Repository;
       categorizeMany,
       restoreCategories,
       saveIncomeFilter,
+      renameAccount,
       setCardDays,
     }
-  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, cardDays, setCardDays, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
+  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, cardDays, setCardDays, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

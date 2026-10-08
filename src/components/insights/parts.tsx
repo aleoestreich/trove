@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon, type IconName } from '../Icon'
-import { formatPercent } from '../../lib/money'
+import { formatPercent, signOf } from '../../lib/money'
 import { useI18n } from '../../i18n/I18nProvider'
 
 // Small pieces shared by the insight cards and pages.
@@ -9,7 +9,7 @@ import { useI18n } from '../../i18n/I18nProvider'
 /** "+45%" / "−35%" from a fraction (0.45). */
 export function signedPct(fraction: number): string {
   const pct = Math.round(fraction * 100)
-  return `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${formatPercent(Math.abs(pct))}`
+  return `${signOf(pct)}${formatPercent(Math.abs(pct))}`
 }
 
 export const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
@@ -74,14 +74,11 @@ export function Sheet({
   onClose,
   children,
   footer,
-  privateTitle = false,
 }: {
   title: string
   onClose(): void
   children: ReactNode
   footer?: ReactNode
-  /** The title is data (a merchant's name): blurred in privacy mode. */
-  privateTitle?: boolean
 }) {
   const ref = useRef<HTMLElement>(null)
   const { t } = useI18n()
@@ -93,14 +90,14 @@ export function Sheet({
         role="dialog"
         aria-modal
         aria-label={title}
-        className="flex max-h-[92dvh] w-full max-w-[480px] flex-col overflow-y-auto rounded-t-xl bg-surface px-4 pb-[calc(16px+env(safe-area-inset-bottom))] md:rounded-xl md:pt-4"
+        className="flex max-h-[92dvh] w-full max-w-[480px] flex-col overflow-y-auto rounded-t-xl bg-surface px-4 pb-[calc(16px+env(safe-area-inset-bottom))] md:rounded-xl md:px-6 md:pt-5 md:pb-5 [&>*]:shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-[22px] shrink-0 items-center justify-center md:hidden" aria-hidden>
           <span className="h-1 w-8 rounded-full bg-line" />
         </div>
         <div className="flex items-center justify-between gap-2">
-          <h2 className={`text-lg leading-6 font-medium text-ink ${privateTitle ? 'private' : ''}`}>{title}</h2>
+          <h2 className="text-lg leading-6 font-medium text-ink">{title}</h2>
           <button type="button" onClick={onClose} aria-label={t.close} className="-mr-2 flex size-11 items-center justify-center rounded-md text-ink-2 hover:bg-track">
             <Icon name="close" className="size-5" />
           </button>
@@ -147,7 +144,7 @@ export function LegendItem({ children, swatch }: { children: ReactNode; swatch: 
 }
 
 export function Legend({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`flex flex-wrap gap-x-3.5 gap-y-1.5 text-xs leading-4 text-muted ${className}`}>{children}</div>
+  return <div data-legend className={`flex flex-wrap gap-x-3.5 gap-y-1.5 text-xs leading-4 text-muted ${className}`}>{children}</div>
 }
 
 export const swatch = (background: string, extra = '') => <span aria-hidden className={`h-2 w-3 rounded-[2px] ${extra}`} style={{ background }} />

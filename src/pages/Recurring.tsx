@@ -56,12 +56,12 @@ export function Recurring() {
                   <article key={`${a.type}-${a.recurringId}`} className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface px-4 pt-3.5 pb-2">
                     <div className="flex items-center gap-2.5">
                       <CategoryBadge category={item.categoryId ? categoriesById.get(item.categoryId) : null} size={36} />
-                      <span className="private min-w-0 flex-1 truncate text-[15px] leading-5 font-medium text-ink">{item.merchant}</span>
+                      <span className="min-w-0 flex-1 truncate text-[15px] leading-5 font-medium text-ink">{item.merchant}</span>
                       <AlertBadge kind={a.type} long />
                     </div>
                     <div className="flex flex-col gap-0.5">
                       <span className="tabular text-lg leading-6 font-bold text-ink">{head}</span>
-                      <span className="private text-[13px] leading-[18px] text-ink-2">{body}</span>
+                      <span className="text-[13px] leading-[18px] text-ink-2">{body}</span>
                     </div>
                     {a.type === 'price_up' && item.priceHistory.length > 1 && <PriceBars item={item} />}
                     <div className="-mr-2 flex flex-wrap justify-end gap-1">
@@ -102,7 +102,7 @@ export function Recurring() {
                   >
                     <CategoryBadge category={i.categoryId ? categoriesById.get(i.categoryId) : null} size={40} />
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="private truncate text-[15px] leading-5 font-medium text-ink">{i.merchant}</span>
+                      <span className="truncate text-[15px] leading-5 font-medium text-ink">{i.merchant}</span>
                       <span className="truncate text-xs leading-4 text-muted">{r.stoppedMeta(formatDay(i.lastDate))}</span>
                     </span>
                     <span className="tabular text-[15px] font-medium whitespace-nowrap text-muted line-through">{formatMoney(i.amount)}</span>
@@ -132,10 +132,10 @@ function ActiveRow({ item, divider, meta, onOpen }: { item: RecurringItem; divid
       <CategoryBadge category={item.categoryId ? categoriesById.get(item.categoryId) : null} size={40} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="private truncate text-[15px] leading-5 font-medium text-ink">{item.merchant}</span>
+          <span className="truncate text-[15px] leading-5 font-medium text-ink">{item.merchant}</span>
           <RecurringFlag item={item} />
         </span>
-        <span className="private truncate text-xs leading-4 text-muted">{meta}</span>
+        <span className="truncate text-xs leading-4 text-muted">{meta}</span>
       </span>
       <span className="flex shrink-0 flex-col items-end gap-px">
         <span className="tabular text-[15px] leading-5 font-medium whitespace-nowrap text-ink">{formatMoney(item.amount)}</span>

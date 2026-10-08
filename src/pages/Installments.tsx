@@ -96,7 +96,7 @@ export function Installments() {
         highlight="first"
         label={t.installments.committedPerMonth}
       />
-      <ul className="flex flex-wrap gap-x-3.5 gap-y-2 lg:gap-x-4">
+      <ul data-legend className="flex flex-wrap gap-x-3.5 gap-y-2 lg:gap-x-4">
         {chartSeries.map((s) => (
           <li key={s.key} className="inline-flex items-center gap-1.5 text-[13px] leading-[18px] text-ink-2">
             <Swatch color={colorOf.get(s.key)!} />

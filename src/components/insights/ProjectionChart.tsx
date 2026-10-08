@@ -84,6 +84,7 @@ export function ProjectionChart({ projection, variant, height }: { projection: P
     <div className="relative" style={{ height: H + (full ? 24 : 16) }}>
       <div
         ref={ref}
+        data-chart
         className="relative touch-pan-y"
         style={{ height: H }}
         onPointerMove={onMove}
@@ -250,6 +251,7 @@ export function Waterfall({ projection }: { projection: Projection }) {
   return (
     <div
       role="img"
+      data-chart
       aria-label={p.waterfallChart(formatMoney(b.saldoHoje), formatMoney(b.receitasPrevistas), formatMoney(b.faturas), formatMoney(b.recorrentes), formatMoney(b.diaADia), formatMoney(projection.end))}
     >
       <div ref={ref} className="relative border-b border-line" style={{ height: H }}>

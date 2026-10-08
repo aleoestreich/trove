@@ -21,6 +21,11 @@ export interface Messages {
     hide: string
     show: string
     on: string
+    showShort: string
+    turnedOn: string
+    staysOn: string
+    chartHidden: string
+    comparisonsHidden: string
   }
   loading: string
   loadErrorTitle: string
@@ -44,13 +49,20 @@ export interface Messages {
   oneUnitIs: (currency: string, rate: string) => string
   overview: {
     subtitle: (date: string) => string
+    /** "Patrimônio líquido · hoje": today's value only, what it is made of, and when it was updated. */
     netWorth: string
-    /** Net worth now: what it is made of. */
-    netWorthNote: string
+    accountsLink: string
     inAccounts: string
     cardBills: string
-    debtShare: (pct: string) => string
-    byBankNet: string
+    accountsCount: (n: number) => string
+    cardsCount: (n: number) => string
+    netWorthNote: string
+    updated: (when: string) => string
+    today: (time: string) => string
+    yesterday: (time: string) => string
+    onDate: (date: string, time: string) => string
+    bankStale: (bank: string, date: string) => string
+    negativeNote: string
     /** Average income card. */
     avgIncome: {
       title: string
@@ -92,6 +104,11 @@ export interface Messages {
     lastMonths: (months: number) => string
     /** The period of the multi-month charts. */
     range: { label: string; months: (n: number) => string; year: string }
+    /** The section of the multi-month charts, with the period picker. */
+    trend: string
+    /** "abr. a set. 2026", "out. 2025 a set. 2026". */
+    span: (from: string, to: string) => string
+    shortHistory: (month: string) => string
     kept: string
     keptShort: string
     comingUp: string
@@ -101,6 +118,21 @@ export interface Messages {
     nextMonthPurchases: (month: string, n: number) => string
     spendingByCategory: string
     monthInDetail: string
+    /** Under the month picker: "Mês atual · até hoje, 8 out." or "Mês fechado". */
+    currentMonth: (day: string) => string
+    closedMonth: string
+    fetchingMonth: (month: string) => string
+    fetchMonthFailed: (month: string) => string
+    topCategories: string
+    /** "Escolher mês": every month stored, by year. */
+    monthPicker: {
+      open: (month: string) => string
+      title: string
+      subtitle: string
+      current: string
+      count: (n: number) => string
+      onServer: string
+    }
     categories: string
     noExpenses: string
     latestTransactions: string
@@ -115,7 +147,11 @@ export interface Messages {
     allMonths: string
     /** Older months are fetched from the database when chosen. */
     fetchingStored: string
-    fetchStoredFailed: string
+    /** For one month ("de março de 2026"), or every month (null). */
+    fetchStoredFailed: (month: string | null) => string
+    retrying: string
+    storedPending: (month: string | null) => string
+    monthSheet: { title: string; subtitle: string; allNote: string }
     type: string
     allTypes: string
     account: string
@@ -166,6 +202,8 @@ export interface Messages {
     notCardPayment: string
     /** Clears the category and subcategory. */
     removeCategory: string
+    uncategorizedNote: string
+    categoryRemoved: string
     cardPaymentNote: string
     noCategoriesOfType: (kind: string) => string
   }
@@ -233,15 +271,20 @@ export interface Messages {
     /** Renaming an account or card (kept across syncs). */
     rename: {
       action: (name: string) => string
-      titleAccount: string
-      titleCard: string
+      title: string
+      bankNameLabel: string
       label: string
-      bankName: (name: string) => string
       note: string
+      emptyNote: string
+      clear: string
       save: string
+      saving: string
       cancel: string
       useBank: string
-      tooLong: (max: number) => string
+      failed: string
+      saved: string
+      restored: string
+      undo: string
     }
     cardDays: {
       missing: string
@@ -283,9 +326,15 @@ export interface Messages {
     uncategorizeNote: string
     total: string
     current: string
-    resultLabel: (n: number) => string
+    resultLabel: string
+    clearResult: (n: number) => string
     pickCategory: string
+    pickFirst: string
+    optional: string
+    tapAgain: (name: string) => string
     noSubcategory: string
+    remove: (n: number) => string
+    failed: string
     cancel: string
     apply: (n: number) => string
     saving: string
@@ -351,8 +400,18 @@ export interface Messages {
     syncedYesterday: (time: string) => string
     syncedOn: (date: string, time: string) => string
     stale: (days: number) => string
-    syncing: (bank: string | null, n: number, total: number) => string
+    syncing: (bank: string | null) => string
+    /** Under it: "1 de 2 bancos", then the chosen period. */
+    syncingDetail: (n: number, total: number) => string
+    wait: string
+    syncedNow: string
     failed: (banks: string, _count: number) => string
+    othersOk: string
+    retryShort: string
+    doneTitle: string
+    newCount: (n: number) => string
+    accountsCount: (n: number) => string
+    tip: { title: string; body: string; ok: string }
     failedAll: string
     neverSynced: string
     notConnected: string
@@ -394,6 +453,7 @@ export interface Messages {
       allAccounts: string
       skippedNote: string
       noneSelected: string
+      selectedCount: (n: number, total: number) => string
       cancel: string
       start: string
     }
@@ -559,6 +619,11 @@ export const messages: Messages = {
     hide: 'Ocultar valores',
     show: 'Mostrar valores',
     on: 'Valores ocultos',
+    showShort: 'Mostrar',
+    turnedOn: 'Valores ocultos',
+    staysOn: 'Continua assim até você mostrar de novo',
+    chartHidden: 'Gráfico oculto',
+    comparisonsHidden: 'Com os valores ocultos, as comparações por categoria também ficam escondidas.',
   },
   loading: 'Carregando suas finanças',
   loadErrorTitle: 'Não foi possível carregar suas finanças',
@@ -582,12 +647,19 @@ export const messages: Messages = {
 
   overview: {
     subtitle: (date) => `Posição em ${date}`,
-    netWorth: 'Patrimônio líquido',
-    netWorthNote: 'Saldo das contas menos as faturas dos cartões, como os bancos informam',
-    inAccounts: 'Em contas',
-    cardBills: 'Faturas dos cartões',
-    debtShare: (pct) => `As faturas equivalem a ${pct} do saldo em contas`,
-    byBankNet: 'Por banco · contas menos cartões',
+    netWorth: 'Patrimônio líquido · hoje',
+    accountsLink: 'Contas',
+    inAccounts: 'Dinheiro nas contas',
+    cardBills: 'Faturas em aberto',
+    accountsCount: (n) => (n === 1 ? '1 conta' : `${n} contas`),
+    cardsCount: (n) => (n === 1 ? '1 cartão' : `${n} cartões`),
+    netWorthNote: 'Dinheiro nas contas menos faturas em aberto',
+    updated: (when) => `atualizado ${when}`,
+    today: (time) => `hoje às ${time}`,
+    yesterday: (time) => `ontem às ${time}`,
+    onDate: (date, time) => `em ${date} às ${time}`,
+    bankStale: (bank, date) => `${bank} não atualizou hoje. O valor usa o saldo de ${date} desse banco.`,
+    negativeNote: 'As faturas em aberto passam do dinheiro nas contas.',
     avgIncome: {
       title: 'Renda média',
       sub: (months) => `Média mensal dos últimos ${months} ${months === 1 ? 'mês completo' : 'meses completos'}`,
@@ -625,6 +697,9 @@ export const messages: Messages = {
     incomeVsExpenses: 'Receitas vs. despesas',
     lastMonths: (months) => (months === 12 ? 'Últimos 12 meses' : `Últimos ${months} meses`),
     range: { label: 'Período dos gráficos', months: (n) => `${n} meses`, year: '1 ano' },
+    trend: 'Tendência',
+    span: (from, to) => `${from} a ${to}`,
+    shortHistory: (month) => `Seus dados começam em ${month}. Os meses sem dados aparecem tracejados.`,
     kept: 'da receita do mês foi guardado',
     keptShort: 'Guardado no mês',
     comingUp: 'Próximos pagamentos',
@@ -634,6 +709,19 @@ export const messages: Messages = {
     nextMonthPurchases: (month, n) => `${month} · ${n} ${n === 1 ? 'compra' : 'compras'}`,
     spendingByCategory: 'Gastos por categoria',
     monthInDetail: 'Mês em detalhe',
+    currentMonth: (day) => `Mês atual · até hoje, ${day}`,
+    closedMonth: 'Mês fechado',
+    fetchingMonth: (month) => `Buscando ${month}…`,
+    fetchMonthFailed: (month) => `Não foi possível buscar ${month}.`,
+    topCategories: 'Maiores categorias',
+    monthPicker: {
+      open: (month) => `Escolher mês, ${month}`,
+      title: 'Escolher mês',
+      subtitle: 'Meses salvos no Trove',
+      current: 'Mês atual',
+      count: (n) => (n === 1 ? '1 transação' : `${n} transações`),
+      onServer: 'Salvo no servidor',
+    },
     categories: 'Categorias',
     noExpenses: 'Nenhuma despesa neste mês.',
     latestTransactions: 'Últimas transações',
@@ -646,8 +734,12 @@ export const messages: Messages = {
     billTotal: (amount) => `Total da fatura ${amount}`,
     billExpected: (amount) => `Inclui ${amount} em parcelas que ainda não entraram.`,
     allMonths: 'Todos os meses',
-    fetchingStored: 'Buscando as transações salvas…',
-    fetchStoredFailed: 'Não foi possível buscar as transações salvas.',
+    fetchingStored: 'Buscando transações salvas…',
+    fetchStoredFailed: (month) => (month ? `Não foi possível buscar as transações de ${month}.` : 'Não foi possível buscar as transações salvas.'),
+    retrying: 'Tentando…',
+    storedPending: (month) =>
+      `As transações ${month ? `de ${month}` : 'dos meses anteriores'} estão salvas no servidor e aparecem aqui quando a busca der certo.`,
+    monthSheet: { title: 'Mês', subtitle: 'Escolha um mês ou veja todos', allNote: 'Mais recentes primeiro' },
     type: 'Tipo',
     allTypes: 'Todos os tipos',
     account: 'Conta',
@@ -699,6 +791,8 @@ export const messages: Messages = {
     markCardPaymentNote: 'Não conta como despesa: as compras do cartão já contam.',
     notCardPayment: 'Não é pagamento de fatura',
     removeCategory: 'Remover categoria',
+    uncategorizedNote: 'Esta transação está sem categoria. Escolha uma acima quando quiser.',
+    categoryRemoved: 'Categoria removida',
     cardPaymentNote: 'Pagamentos de fatura não contam como despesa: as compras do cartão já contam. Continua no saldo da conta e na fatura.',
     noCategoriesOfType: (kind) => `Nenhuma categoria de ${kind} ainda. Crie uma em Categorias.`,
   },
@@ -757,15 +851,20 @@ export const messages: Messages = {
     closed: 'Fechou em',
     rename: {
       action: (name) => `Renomear ${name}`,
-      titleAccount: 'Renomear conta',
-      titleCard: 'Renomear cartão',
-      label: 'Nome no Trove',
-      bankName: (name) => `Nome no banco: ${name}`,
-      note: 'Só muda no Trove. A sincronização mantém este nome.',
+      title: 'Renomear',
+      bankNameLabel: 'Nome no banco',
+      label: 'Apelido',
+      note: 'Aparece no lugar do nome do banco em todo o app.',
+      emptyNote: 'Deixe em branco para usar o nome do banco.',
+      clear: 'Limpar apelido',
       save: 'Salvar',
+      saving: 'Salvando…',
       cancel: 'Cancelar',
       useBank: 'Usar o nome do banco',
-      tooLong: (max) => `Use até ${max} caracteres.`,
+      failed: 'Não foi possível salvar o apelido. Confira a conexão e tente de novo.',
+      saved: 'Apelido salvo',
+      restored: 'Nome do banco restaurado',
+      undo: 'Desfazer',
     },
     cardDays: {
       missing: 'O banco não informa a data de fechamento deste cartão, então não dá para calcular a fatura atual. Informe os dias pelo app do banco.',
@@ -801,14 +900,20 @@ export const messages: Messages = {
     totalSelected: 'Total selecionado',
     categorizeN: (n) => (n === 1 ? 'Categorizar 1 transação' : `Categorizar ${n} transações`),
     transfersNote: 'Transferências entre suas contas não têm categoria e não podem ser selecionadas.',
-    mixedNote: 'Para escolher uma categoria, selecione só despesas ou só receitas. Sem categoria vale para qualquer seleção.',
+    mixedNote: 'A seleção tem receitas e despesas. Nesse caso só dá para remover a categoria.',
     uncategorize: 'Sem categoria',
     uncategorizeNote: 'Remove a categoria e a subcategoria',
     total: 'Total',
     current: 'Hoje estão em',
-    resultLabel: (n) => (n === 1 ? 'A 1 vai para' : `As ${n} vão para`),
+    resultLabel: 'Como vai ficar',
+    clearResult: (n) => (n === 1 ? 'A 1 fica sem categoria' : `As ${n} ficam sem categoria`),
     pickCategory: 'Escolha a categoria',
+    pickFirst: 'Escolha uma categoria primeiro.',
+    optional: 'opcional',
+    tapAgain: (name) => `Toque de novo em “${name}” para deixar sem subcategoria.`,
     noSubcategory: 'sem subcategoria',
+    remove: (n) => `Remover de ${n}`,
+    failed: 'Não foi possível atualizar as transações. Nada foi alterado.',
     cancel: 'Cancelar',
     apply: (n) => `Aplicar a ${n}`,
     saving: 'Salvando…',
@@ -928,9 +1033,17 @@ export const messages: Messages = {
     syncedYesterday: (time) => `Sincronizado ontem às ${time}`,
     syncedOn: (date, time) => `Sincronizado em ${date} às ${time}`,
     stale: (days) => `Última sincronização há ${days} dias`,
-    syncing: (bank, n, total) =>
-      total === 1 ? `Sincronizando ${bank ?? 'seu banco'}…` : `Sincronizando ${bank ?? `banco ${n}`}… ${n} de ${total} bancos`,
-    failed: (banks, count) => `${banks} não ${count === 1 ? 'sincronizou' : 'sincronizaram'}. Os outros bancos estão atualizados.`,
+    syncing: (bank) => `Sincronizando ${bank ?? 'seu banco'}…`,
+    syncingDetail: (n, total) => `${n} de ${total} ${total === 1 ? 'banco' : 'bancos'}`,
+    wait: 'Aguarde',
+    syncedNow: 'Sincronizado agora',
+    failed: (banks, count) => `${banks} não ${count === 1 ? 'sincronizou' : 'sincronizaram'}.`,
+    othersOk: 'Os outros estão em dia.',
+    retryShort: 'Tentar',
+    doneTitle: 'Sincronização concluída',
+    newCount: (n) => (n === 1 ? '1 transação nova' : `${n} transações novas`),
+    accountsCount: (n) => (n === 1 ? '1 conta' : `${n} contas`),
+    tip: { title: 'Sincronização avançada', body: 'Escolha o período e as contas.', ok: 'Entendi' },
     failedAll: 'Não foi possível sincronizar. Verifique sua conexão e tente de novo.',
     neverSynced: 'Mostrando dados de exemplo. Sincronize para carregar seus bancos.',
     notConnected: 'Mostrando dados de exemplo. Conecte o Meu Pluggy para sincronizar.',
@@ -970,6 +1083,7 @@ export const messages: Messages = {
       allAccounts: 'Todas as contas',
       skippedNote: 'As desmarcadas não são lidas agora: mantêm o que já está salvo, e só o saldo é atualizado.',
       noneSelected: 'Escolha ao menos uma conta.',
+      selectedCount: (n, total) => `${n} de ${total} ${n === 1 ? 'selecionada' : 'selecionadas'}`,
       cancel: 'Cancelar',
       start: 'Sincronizar',
     },

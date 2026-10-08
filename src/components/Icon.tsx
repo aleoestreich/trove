@@ -22,6 +22,9 @@ const paths = {
   alert: 'M12 4L2.5 20h19Z M12 10v4 M12 17h.01',
   cloudOff: 'M3 3l18 18 M8.5 8.6A5 5 0 0 0 7 18h10.5 M11 6.2A6 6 0 0 1 18 11a4 4 0 0 1 2.4 6.6',
   refresh: 'M20 11a8 8 0 0 0-14.8-4 M4 4v4h4 M4 13a8 8 0 0 0 14.8 4 M20 20v-4h-4',
+  undo: 'M9 14 4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
+  info: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18Z M12 11v5 M12 8h.01',
+  sliders: 'M4 7h9 M17 7h3 M15 5v4 M4 17h3 M11 17h9 M9 15v4',
   signOut: 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3 M10 17l5-5-5-5 M15 12H4',
   // Categories
   salary: 'M4 8h16v11H4Z M9 8V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2 M4 13h16',
@@ -45,6 +48,7 @@ const paths = {
   // Bulk selection
   listCheck: 'M4 5h4v4H4Z M4 15h4v4H4Z M5 7l1 1 1.5-2 M11 7h9 M11 17h9',
   tag: 'M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z M7.5 7.5h.01',
+  tagOff: 'M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z M7.5 7.5h.01 M3 3l18 18',
   checkBox: 'M6 12.5l4 4 8-9',
   minus: 'M7 12h10',
   // Average income filter

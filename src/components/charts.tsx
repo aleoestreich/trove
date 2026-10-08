@@ -20,26 +20,54 @@ const tooltipBox = 'rounded-sm border border-line bg-surface px-3 py-2 text-[13p
 // Bar charts are plain HTML: a baseline, bars that grow from it, and month
 // labels underneath. The last column is the current month.
 
-function MonthLabels({ labels, highlight = labels.length - 1 }: { labels: string[]; highlight?: number }) {
+/**
+ * Month names under the bars. A year (more than 6 months): on phones only
+ * every third month, counting back from the highlighted one, then a row
+ * with the year where it starts and where it changes; desktop names them all.
+ */
+function MonthLabels({ labels, months, highlight = labels.length - 1 }: { labels: string[]; months?: string[]; highlight?: number }) {
   const dense = labels.length > 6
+  const years = dense && months && months[0].slice(0, 4) !== months[months.length - 1].slice(0, 4)
   return (
-    <div className="flex h-5" aria-hidden>
-      {labels.map((l, i) => (
-        <span
-          key={i}
-          className={`min-w-0 flex-1 text-center leading-5 lg:text-xs whitespace-nowrap ${dense ? 'text-[10px]' : 'text-[11px]'} ${i === highlight ? 'font-medium text-ink' : 'text-muted'}`}
-        >
-          {l}
-        </span>
-      ))}
+    <div aria-hidden>
+      <div className="flex h-5">
+        {labels.map((l, i) => (
+          <span
+            key={i}
+            className={`min-w-0 flex-1 text-center leading-5 whitespace-nowrap lg:text-xs ${dense ? 'text-[10px]' : 'text-[11px]'} ${i === highlight ? 'font-medium text-ink' : 'text-muted'} ${
+              dense && (highlight - i) % 3 !== 0 ? 'invisible lg:visible' : ''
+            }`}
+          >
+            {l}
+          </span>
+        ))}
+      </div>
+      {years && (
+        <div className="mt-1 flex h-4">
+          {months.map((m, i) => (
+            <span key={m} className={`min-w-0 flex-1 text-[10px] leading-4 text-muted ${i > 0 && m.endsWith('-01') ? 'border-l border-line pl-0.5' : ''}`}>
+              {i === 0 || m.endsWith('-01') ? m.slice(0, 4) : ''}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
+/** A month with no data yet (before the first sync's history): a dashed outline. */
+function EmptyBar({ dense }: { dense: boolean }) {
+  return <div className={`h-[22%] rounded-t-[4px] border border-b-0 border-dashed border-line ${dense ? 'w-[18px] lg:w-7' : 'w-8 lg:w-11'}`} />
+}
+
 export interface CashFlowPoint {
   label: string
+  /** YYYY-MM, for the year marks. */
+  month?: string
   income: number
   expenses: number
+  /** Before the data starts: drawn dashed. */
+  empty?: boolean
 }
 
 /** Income vs expenses per month, side by side, with a dashed top line for scale. */
@@ -50,20 +78,26 @@ export function CashFlowChart({ data, label }: { data: CashFlowPoint[]; label: s
   const top = Math.ceil(max / step) * step
   const dense = data.length > 6
   return (
-    <div role="img" aria-label={label}>
+    <div role="img" data-chart aria-label={label}>
       <div className="relative h-32 lg:h-44">
         <span className="absolute top-0 right-0 text-[11px] leading-[14px] lg:text-xs text-muted">{formatCompact(reais(top))}</span>
         <div className="absolute inset-x-0 top-4 border-t border-dashed border-line" />
         <div className="absolute inset-x-0 top-4 bottom-0 flex items-end border-b border-line">
           {data.map((d, i) => (
             <div key={i} className="flex h-full min-w-0 flex-1 items-end justify-center gap-0.5">
-              <div className={`rounded-t-[4px] bg-income ${dense ? 'w-2 lg:w-3' : 'w-3.5 lg:w-5'}`} style={{ height: `${(d.income / top) * 100}%` }} />
-              <div className={`rounded-t-[4px] bg-ink-2 ${dense ? 'w-2 lg:w-3' : 'w-3.5 lg:w-5'}`} style={{ height: `${(d.expenses / top) * 100}%` }} />
+              {d.empty ? (
+                <EmptyBar dense={dense} />
+              ) : (
+                <>
+                  <div className={`rounded-t-[4px] bg-income ${dense ? 'w-2 lg:w-3' : 'w-3.5 lg:w-5'}`} style={{ height: `${(d.income / top) * 100}%` }} />
+                  <div className={`rounded-t-[4px] bg-ink-2 ${dense ? 'w-2 lg:w-3' : 'w-3.5 lg:w-5'}`} style={{ height: `${(d.expenses / top) * 100}%` }} />
+                </>
+              )}
             </div>
           ))}
         </div>
       </div>
-      <MonthLabels labels={data.map((d) => d.label)} />
+      <MonthLabels labels={data.map((d) => d.label)} months={data.every((d) => d.month) ? data.map((d) => d.month!) : undefined} />
     </div>
   )
 }
@@ -85,12 +119,18 @@ export function StackedMonthChart({
   label,
   colors,
   highlight = 'last',
+  months,
+  empty,
 }: {
   data: Record<string, number | string>[]
   series: StackSeries[]
   label: string
   colors?: string[]
   highlight?: 'first' | 'last'
+  /** YYYY-MM per column, for the year marks. */
+  months?: string[]
+  /** Columns before the data starts: drawn dashed. */
+  empty?: boolean[]
 }) {
   const { t } = useI18n()
   const [open, setOpen] = useState<number | null>(null)
@@ -109,7 +149,7 @@ export function StackedMonthChart({
 
   return (
     // Hover (desktop), tap (phones) or focus a month to see its breakdown.
-    <div role="group" aria-label={label} className="relative" onMouseLeave={() => setOpen(null)}>
+    <div role="group" data-chart aria-label={label} className="relative" onMouseLeave={() => setOpen(null)}>
       <div className="flex h-[152px] items-end border-b border-line lg:h-[176px]">
         {data.map((d, i) => (
           <button
@@ -126,21 +166,30 @@ export function StackedMonthChart({
             onClick={() => setOpen(i)}
             className={`flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1 rounded-t-sm focus-visible:outline-2 focus-visible:outline-accent ${open === i ? 'bg-track/60' : ''}`}
           >
-            <span
-              className={`tabular leading-[14px] whitespace-nowrap ${dense ? 'text-[10px]' : 'text-[11px] lg:text-xs'} ${i === last ? 'font-medium text-ink' : 'text-muted'} ${dense && i !== last ? 'invisible lg:visible' : ''}`}
-            >
-              {formatCompact(Math.round(reais(totals[i])))}
-            </span>
-            <span className={`flex flex-col-reverse gap-0.5 overflow-hidden rounded-t-[4px] ${dense ? 'w-4 lg:w-7' : 'w-[26px] lg:w-9'}`} style={{ height: `max(2px, calc(${(totals[i] / max) * 100}% - 18px))` }}>
-              {series.map((s, j) => {
-                const v = Number(d[s.key] ?? 0)
-                return v > 0 ? <span key={s.key} className="block min-h-0.5" style={{ flexGrow: v, flexBasis: 0, background: colorOf(j) }} /> : null
-              })}
-            </span>
+            {empty?.[i] ? (
+              <EmptyBar dense={dense} />
+            ) : (
+              <>
+                <span
+                  className={`tabular leading-[14px] whitespace-nowrap ${dense ? 'text-[10px]' : 'text-[11px] lg:text-xs'} ${i === last ? 'font-medium text-ink' : 'text-muted'} ${dense && i !== last ? 'invisible lg:visible' : ''}`}
+                >
+                  {formatCompact(Math.round(reais(totals[i])))}
+                </span>
+                <span
+                  className={`flex flex-col-reverse gap-0.5 overflow-hidden rounded-t-[4px] ${dense ? 'w-4 lg:w-7' : 'w-[26px] lg:w-9'}`}
+                  style={{ height: `max(2px, calc(${(totals[i] / max) * 100}% - 18px))` }}
+                >
+                  {series.map((s, j) => {
+                    const v = Number(d[s.key] ?? 0)
+                    return v > 0 ? <span key={s.key} className="block min-h-0.5" style={{ flexGrow: v, flexBasis: 0, background: colorOf(j) }} /> : null
+                  })}
+                </span>
+              </>
+            )}
           </button>
         ))}
       </div>
-      <MonthLabels labels={data.map((d) => String(d.label))} highlight={last} />
+      <MonthLabels labels={data.map((d) => String(d.label))} months={months} highlight={last} />
       {open !== null && (
         <BreakdownTooltip
           title={String(data[open].label)}

@@ -2,14 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
+import { monthsBetween, useMonthCounts, useStoredTransactions } from '../lib/storedMonths'
+import { MonthList, MonthPopover, MonthSheet, monthTitle } from '../components/MonthPicker'
 import type { CategoryKind, Transaction } from '../data/types'
-import { filterTransactions, type TransactionFilters, type TransactionQuery } from '../data/transactionFilter'
+import { filterTransactions, type TransactionFilters } from '../data/transactionFilter'
 
-export { filterTransactions, type TransactionFilters }
-import { formatDayHeading, formatMonth, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
+export { filterTransactions, monthsBetween, type TransactionFilters }
+import { formatDayHeading, formatMonth, formatShortDate, monthKey, toISO } from '../lib/dates'
 import { currentBill, inBill } from '../lib/bills'
 import { installmentPlans } from '../lib/installments'
-import { formatMoney } from '../lib/money'
+import { formatMoney, isMoneyMasked } from '../lib/money'
 import { totals } from '../lib/summary'
 import { Icon } from '../components/Icon'
 import { Amount, Button, EmptyState, PageHeader } from '../components/ui'
@@ -28,50 +30,6 @@ import { useIsDesktop } from '../lib/useIsDesktop'
  * (the server sorts same-day transactions by time, latest first).
  */
 export const newestFirst = (txs: Transaction[]): Transaction[] => [...txs].sort((a, b) => b.date.localeCompare(a.date))
-
-/** Every month from `first` to `latest` (YYYY-MM), oldest first; just `latest` when `first` is later or missing. */
-export function monthsBetween(first: string | undefined, latest: string): string[] {
-  if (!first || first > latest) return [latest]
-  const [y, m] = latest.split('-').map(Number)
-  const count = (y - Number(first.slice(0, 4))) * 12 + (m - Number(first.slice(5, 7))) + 1
-  return lastMonths(latest, count)
-}
-
-/**
- * Transações' older months: when "Todos os meses" or a month before the
- * loaded ones is chosen, fetches the stored transactions (with the other
- * filters) and adds them to the data. The search is debounced. Fetches each
- * query once per load.
- */
-function useStoredTransactions(query: TransactionQuery | null) {
-  const { fetchTransactions, dataVersion } = useData()
-  const [state, setState] = useState<{ key: string; status: 'loading' | 'done' | 'error' } | null>(null)
-  const [attempt, setAttempt] = useState(0)
-  const key = query ? `${dataVersion}|${JSON.stringify(query)}` : null
-  const [debounced, setDebounced] = useState(key)
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(key), 300)
-    return () => clearTimeout(timer)
-  }, [key])
-  useEffect(() => {
-    if (!debounced || !query || debounced !== key) return
-    let cancelled = false
-    setState({ key: debounced, status: 'loading' })
-    fetchTransactions(query).then(
-      () => !cancelled && setState({ key: debounced, status: 'done' }),
-      (e) => {
-        console.error(e)
-        if (!cancelled) setState({ key: debounced, status: 'error' })
-      },
-    )
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the query
-  }, [debounced, attempt])
-  const status = !key ? 'done' : state?.key === key ? state.status : 'loading'
-  return { status, retry: () => setAttempt((n) => n + 1) }
-}
 
 /**
  * A filter chip: looks like a 36px pill, but a transparent native <select>
@@ -115,7 +73,7 @@ function nextDay(iso: string): string {
 
 export function Transactions() {
   // Every stored transaction (since the first sync's start), not just the months the Overview shows.
-  const { allTransactions: transactions, accounts, institutionsById, categories, categoriesById, loadedFrom, storedMonths } = useData()
+  const { allTransactions: transactions, accounts, institutionsById, categories, categoriesById, loadedFrom } = useData()
   const [params, setParams] = useSearchParams()
   const [selected, setSelected] = useState<Transaction | null>(null)
   const { t, categoryName } = useI18n()
@@ -235,21 +193,39 @@ export function Transactions() {
   // A bill spans two months: no month in the count or the empty message.
   const shownMonth = bill ? undefined : filters.month
   const countText = t.transactions.count(filtered.length, shownMonth ? formatMonth(shownMonth) : null)
+  const shownMonthName = filters.month ? monthTitle(filters.month) : null
   const storedNote =
-    stored.status === 'loading' ? (
-      <p role="status" className="flex items-center gap-2 px-4 py-2 text-[13px] leading-[18px] text-muted lg:px-0">
-        <Icon name="refresh" className="size-4 animate-spin motion-reduce:animate-none" strokeWidth={2} />
-        {t.transactions.fetchingStored}
-      </p>
-    ) : stored.status === 'error' ? (
-      <p role="alert" className="flex flex-wrap items-center gap-x-2 px-4 py-1 text-[13px] leading-[18px] text-critical lg:px-0">
-        {t.transactions.fetchStoredFailed}
-        <button type="button" onClick={stored.retry} className="h-11 rounded-sm px-2 font-medium text-accent hover:bg-track">
-          {t.tryAgain}
+    stored.status === 'error' || stored.retrying ? (
+      <p role="alert" className="flex items-center gap-2.5 px-4 py-1 text-[13px] leading-[18px] text-ink lg:px-0">
+        <Icon name="alert" className="size-[18px] shrink-0 text-critical" />
+        <span className="min-w-0 flex-1">{t.transactions.fetchStoredFailed(shownMonthName)}</span>
+        <button
+          type="button"
+          onClick={stored.retry}
+          disabled={stored.retrying}
+          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-sm px-2 font-medium text-accent hover:bg-track disabled:text-muted disabled:hover:bg-transparent"
+        >
+          {stored.retrying && <Icon name="refresh" className="size-4 motion-safe:animate-spin" strokeWidth={2} />}
+          {stored.retrying ? t.transactions.retrying : t.tryAgain}
         </button>
       </p>
+    ) : stored.status === 'loading' ? (
+      <p role="status" className="flex items-center gap-2 px-4 py-2 text-[13px] leading-[18px] text-ink-2 lg:px-0">
+        <Icon name="refresh" className="size-4 text-accent motion-safe:animate-spin" strokeWidth={2} />
+        {t.transactions.fetchingStored}
+      </p>
     ) : null
-  const empty = stored.status === 'loading' ? null : (
+  const empty =
+    stored.status === 'error' || stored.retrying ? (
+      <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+        <span className="flex size-10 items-center justify-center rounded-full bg-track text-ink-2">
+          <Icon name="cloudCheck" className="size-5" />
+        </span>
+        <p className="max-w-[320px] text-[13px] leading-[18px] text-ink-2">{t.transactions.storedPending(shownMonthName)}</p>
+      </div>
+    ) : stored.status === 'loading' ? (
+      <ListSkeleton />
+    ) : (
     <EmptyState
       icon="search"
       title={t.transactions.emptyTitle}
@@ -304,16 +280,7 @@ export function Transactions() {
                 </span>
               </span>
             ) : (
-            <FilterChip label={monthLabel} applied value={monthValue} onChange={(v) => set('m', v)}>
-              {monthsBetween(storedMonths[0], latest)
-                .reverse()
-                .map((m) => (
-                  <option key={m} value={m}>
-                    {formatMonth(m)}
-                  </option>
-                ))}
-              <option value="all">{t.transactions.allMonths}</option>
-            </FilterChip>
+            <MonthChip value={monthValue} label={monthLabel} latest={latest} onChange={(v) => set('m', v)} />
             )}
             <FilterChip label={filters.kind ? kindLabel[filters.kind] : t.transactions.type} applied={!!filters.kind} value={filters.kind ?? ''} onChange={(v) => set('type', v)}>
               <option value="">{t.transactions.allTypes}</option>
@@ -607,7 +574,7 @@ export function HiddenTransactions() {
                 <div className="flex min-w-0 flex-1 items-center gap-3 opacity-60">
                   <TransactionBadge tx={tx} categoriesById={categoriesById} />
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span title={tx.description} className="private truncate text-[15px] leading-5 font-medium text-ink">{tx.description}</span>
+                    <span title={tx.description} className="truncate text-[15px] leading-5 font-medium text-ink">{tx.description}</span>
                     <CategoryLine tx={tx} compact />
                     <span className="truncate text-[13px] leading-[18px] text-muted">{accountLabel(tx.accountId)}</span>
                   </span>
@@ -632,7 +599,8 @@ export function HiddenTransactions() {
 }
 
 function DayTotal({ net }: { net: number }) {
-  if (net === 0) return null
+  // No day totals while values are hidden.
+  if (net === 0 || isMoneyMasked()) return null
   return (
     <span className={`tabular text-[13px] leading-[18px] font-medium ${net > 0 ? 'text-income' : 'text-ink-2'}`}>
       {formatMoney(net, 'BRL', { signed: true })}
@@ -816,7 +784,7 @@ function TransactionTable({
                 <span role="cell" className="flex min-w-0 items-center gap-3">
                   <TransactionBadge tx={tx} categoriesById={categoriesById} size={34} />
                   {/* The focusable part of the row: Enter opens the details (or toggles it while selecting). */}
-                  <button type="button" title={tx.description} className="private min-w-0 truncate text-left text-sm font-medium text-ink">
+                  <button type="button" title={tx.description} className="min-w-0 truncate text-left text-sm font-medium text-ink">
                     {tx.description}
                   </button>
                   {tx.installment && (
@@ -845,6 +813,73 @@ function TransactionTable({
               </div>
             )
           })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * The month filter: a chip like the others that opens the month list
+ * ("Todos os meses", then each stored month by year): a bottom sheet on
+ * phones, a 320px popover under the chip on desktop.
+ */
+function MonthChip({ value, label, latest, onChange }: { value: string; label: string; latest: string; onChange(m: string): void }) {
+  const { t } = useI18n()
+  const desktop = useIsDesktop()
+  const [open, setOpen] = useState(false)
+  const { months, counts } = useMonthCounts(latest)
+  const m = t.transactions.monthSheet
+  const pick = (v: string) => {
+    setOpen(false)
+    onChange(v)
+  }
+  const list = <MonthList month={value} months={months} latest={latest} counts={counts} onPick={pick} all={{ label: t.transactions.allMonths, note: m.allNote }} />
+  return (
+    <span className="relative flex h-12 shrink-0 items-center lg:h-11">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className="inline-flex h-9 items-center gap-1 rounded-full bg-accent-soft pr-2.5 pl-3.5 text-sm font-medium whitespace-nowrap text-accent before:absolute before:inset-x-0 before:inset-y-0 lg:h-11 lg:pr-3 lg:pl-4"
+      >
+        {label}
+        <Icon name="chevronDown" className="size-4" strokeWidth={2} />
+      </button>
+      {open && desktop && (
+        <MonthPopover align="left" onClose={() => setOpen(false)}>
+          {list}
+        </MonthPopover>
+      )}
+      {open && !desktop && (
+        <MonthSheet title={m.title} subtitle={m.subtitle} onClose={() => setOpen(false)}>
+          {list}
+        </MonthSheet>
+      )}
+    </span>
+  )
+}
+
+/** Placeholder rows while an older month is fetched: two days of grey bars. */
+function ListSkeleton() {
+  return (
+    <div aria-hidden className="flex flex-col gap-4 px-4 pt-4 lg:p-5">
+      {[3, 2].map((rows, d) => (
+        <div key={d} className="flex flex-col gap-2">
+          <div className="h-3 w-44 rounded-full bg-track" />
+          <div className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
+            {Array.from({ length: rows }, (_, i) => (
+              <div key={i} className="flex min-h-[72px] items-center gap-3 px-4">
+                <span className="size-10 shrink-0 rounded-full bg-track" />
+                <span className="flex min-w-0 flex-1 flex-col gap-2">
+                  <span className="h-3 w-3/5 rounded-full bg-track" />
+                  <span className="h-2.5 w-2/5 rounded-full bg-track" />
+                </span>
+                <span className="h-3 w-16 rounded-full bg-track" />
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>
