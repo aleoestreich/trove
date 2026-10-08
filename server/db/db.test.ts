@@ -102,27 +102,14 @@ suite('database', () => {
     expect((await row('n1')).category_id).toBe('restaurants')
   })
 
-  it('files Mercado Livre under shopping on sync, and migration 008 moves stored guesses but not hand-set ones', async () => {
-    await sync([
-      tx('ml-new', { category: 'Groceries', description: 'MERCADOLIVRE*LOJAEXEMPLO' }),
-      tx('ml-old', { category: 'Groceries', description: 'Compra', merchant: { name: 'Mercado Livre' } }),
-      tx('ml-edited', { category: 'Groceries', description: 'MERCADO LIVRE 04/10' }),
-      tx('super', { category: 'Groceries', description: 'SUPERMERCADO EXEMPLO' }),
-    ])
-    expect((await row('ml-new')).category_id).toBe('shopping')
-    // Stored before this rule existed, and one set to groceries by hand.
-    await pool.query(`UPDATE transactions SET category_id = 'groceries' WHERE id IN ('ml-old', 'ml-edited')`)
-    await pool.query(`UPDATE transactions SET category_edited_at = now() WHERE id = 'ml-edited'`)
-    const migration = readFileSync(new URL('../../db/migrations/008_mercado_livre_category.sql', import.meta.url), 'utf8')
-    await pool.query(migration)
-    await pool.query(migration)
-    const rows = (await pool.query(`SELECT id, category_id, subcategory_id FROM transactions ORDER BY id`)).rows
-    expect(rows.map((r) => [r.id, r.category_id])).toEqual([
-      ['ml-edited', 'groceries'],
-      ['ml-new', 'shopping'],
-      ['ml-old', 'shopping'],
-      ['super', 'groceries'],
-    ])
+  it('files a new Mercado Livre purchase under shopping, and never changes a stored category', async () => {
+    await sync([tx('ml', { category: 'Groceries', description: 'MERCADOLIVRE*LOJAEXEMPLO' }), tx('super', { category: 'Groceries', description: 'SUPERMERCADO EXEMPLO' })])
+    expect((await row('ml')).category_id).toBe('shopping')
+    expect((await row('super')).category_id).toBe('groceries')
+    // A category already stored stays as it is on later syncs.
+    await pool.query(`UPDATE transactions SET category_id = 'groceries' WHERE id = 'ml'`)
+    await sync([tx('ml', { category: 'Groceries', description: 'MERCADOLIVRE*LOJAEXEMPLO' })])
+    expect((await row('ml')).category_id).toBe('groceries')
   })
 
   describe('bulk categorize', () => {

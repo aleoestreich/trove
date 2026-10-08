@@ -233,8 +233,8 @@ const GENERIC_TRANSFER = /transfer|pix|ted\b|doc\b|transfer[eê]ncia/i
 
 /**
  * Mercado Livre is a marketplace, not a supermarket: "mercado" in its name
- * must not file it under groceries. Kept in step with
- * db/migrations/008_mercado_livre_category.sql.
+ * must not file it under groceries. Applies to new transactions only: the
+ * sync never changes a stored category.
  */
 export const MERCADO_LIVRE = /\bmercado\s*livre\b|\bmercadolivre/i
 
