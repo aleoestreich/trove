@@ -113,7 +113,10 @@ between accounts, and card bill payments.
 - **Bulk categorization:** many transactions can get one category and
   subcategory at once (Transações → Selecionar, or the checkbox column on
   desktop), all or nothing, with Undo. Transfers can't be selected, and a
-  selection must be all expenses or all income.
+  selection must be all expenses or all income to get a category. "Sem
+  categoria" clears the category and subcategory of any selection (also one
+  transaction at a time: "Remover categoria" in its details); a sync never
+  guesses a category for them again.
 - **Average income** (Overview) averages the last 6 complete months of
   income in the categories chosen on its card (all by default; the choice is
   saved in the database and shared between devices).

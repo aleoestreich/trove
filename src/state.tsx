@@ -50,7 +50,7 @@ interface AppData extends Snapshot {
    * Bulk change: saved first (all or nothing), then shown. Rejects with a
    * message for the UI; resolves with what it replaced, for undo.
    */
-  categorizeMany(transactionIds: string[], categoryId: string, subcategoryId: string): Promise<BulkResult>
+  categorizeMany(transactionIds: string[], categoryId: string | null, subcategoryId: string | null): Promise<BulkResult>
   /** Undo of categorizeMany. */
   restoreCategories(previous: PreviousCategory[]): Promise<void>
   /** Saves the average income's filter (server first); rejects with a message for the UI. */
@@ -186,7 +186,7 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [repository, load],
   )
   const categorizeMany = useCallback(
-    async (transactionIds: string[], categoryId: string, subcategoryId: string) => {
+    async (transactionIds: string[], categoryId: string | null, subcategoryId: string | null) => {
       const result = await save({ op: 'categorizeMany', transactionIds, categoryId, subcategoryId })
       return result ?? { updated: transactionIds.length, previous: [] }
     },

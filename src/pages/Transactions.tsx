@@ -495,7 +495,7 @@ export function Transactions() {
             <button
               ref={categorizeButton}
               type="button"
-              disabled={summary.count === 0 || mixed}
+              disabled={summary.count === 0}
               onClick={() => setBulkOpen(true)}
               className="flex h-12 items-center justify-center gap-2 rounded-md bg-accent text-[15px] font-medium text-surface disabled:opacity-40"
             >
