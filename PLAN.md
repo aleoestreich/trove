@@ -32,7 +32,7 @@ No backend, no auth. It runs in the browser on hardcoded data.
   income and expenses, so nothing is counted twice.
 - **Screens:**
   - **Overview (overall situation):**
-    - net worth now and a 6-month net worth chart;
+    - net worth now (accounts minus card bills, as the banks report them);
     - where the money is (by bank, and BRL vs USD);
     - income vs expenses per month and the share of income kept;
     - coming up (open card bills + installments next month);

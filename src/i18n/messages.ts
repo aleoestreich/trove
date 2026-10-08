@@ -37,9 +37,12 @@ export interface Messages {
   overview: {
     subtitle: (date: string) => string
     netWorth: string
-    vsLastMonth: string
-    netWorthChart: (months: number, from: string, to: string) => string
-    chartAccountsCards: (accounts: string, cards: string) => string
+    /** Net worth now: what it is made of. */
+    netWorthNote: string
+    inAccounts: string
+    cardBills: string
+    debtShare: (pct: string) => string
+    byBankNet: string
     /** Average income card. */
     avgIncome: {
       title: string
@@ -550,9 +553,11 @@ export const messages: Messages = {
   overview: {
     subtitle: (date) => `Posição em ${date}`,
     netWorth: 'Patrimônio líquido',
-    vsLastMonth: 'vs. mês passado',
-    netWorthChart: (months, from, to) => `Patrimônio líquido nos últimos ${months} meses, de ${from} para ${to}`,
-    chartAccountsCards: (accounts, cards) => `Contas ${accounts} · Cartões −${cards}`,
+    netWorthNote: 'Saldo das contas menos as faturas dos cartões, como os bancos informam',
+    inAccounts: 'Em contas',
+    cardBills: 'Faturas dos cartões',
+    debtShare: (pct) => `As faturas equivalem a ${pct} do saldo em contas`,
+    byBankNet: 'Por banco · contas menos cartões',
     avgIncome: {
       title: 'Renda média',
       sub: (months) => `Média mensal dos últimos ${months} ${months === 1 ? 'mês completo' : 'meses completos'}`,
