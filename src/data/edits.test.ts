@@ -205,7 +205,8 @@ describe('renaming an account', () => {
 
   it('refuses a missing account and a name over 40 characters; an empty name means the bank’s', () => {
     expect(() => applyEdit(withAccount(), { op: 'renameAccount', accountId: 'other', name: 'X' })).toThrow(EditError)
-    expect(() => validateEdit({ op: 'renameAccount', accountId: 'card-1', name: 'x'.repeat(41) })).toThrow(EditError)
+    expect(validateEdit({ op: 'renameAccount', accountId: 'card-1', name: 'x'.repeat(30) })).toMatchObject({ name: 'x'.repeat(30) })
+    expect(() => validateEdit({ op: 'renameAccount', accountId: 'card-1', name: 'x'.repeat(31) })).toThrow(EditError)
     expect(validateEdit({ op: 'renameAccount', accountId: 'card-1', name: '   ' })).toEqual({ op: 'renameAccount', accountId: 'card-1', name: null })
   })
 })

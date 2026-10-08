@@ -3,6 +3,21 @@ import { LOCALE } from '../i18n/locale.js'
 
 const formatters = new Map<string, Intl.NumberFormat>()
 
+/**
+ * Privacy mode ("Ocultar valores", src/lib/privacy.ts): every amount and
+ * percentage is shown as "R$ •••••" / "•• %", without sign. Set only in the
+ * app; the server never masks.
+ */
+let masked = false
+const DOTS = '•••••'
+export function setMoneyMasked(value: boolean) {
+  masked = value
+}
+export const isMoneyMasked = () => masked
+/** "+", "−" or nothing, for a figure written by hand; nothing while values are hidden. */
+export const signOf = (n: number) => (masked || n === 0 ? '' : n > 0 ? '+' : '−')
+const maskOf = (currency: CurrencyCode) => `${currency === 'BRL' ? 'R$' : currency === 'USD' ? 'US$' : currency} ${DOTS}`
+
 function formatter(currency: CurrencyCode, signed: boolean): Intl.NumberFormat {
   const key = `${currency}:${signed}`
   let f = formatters.get(key)
@@ -22,6 +37,7 @@ function formatter(currency: CurrencyCode, signed: boolean): Intl.NumberFormat {
  * "R$ 1.234,56" / "US$ 12,00".
  */
 export function formatMoney(cents: Cents, currency: CurrencyCode = 'BRL', opts: { signed?: boolean } = {}): string {
+  if (masked) return maskOf(currency)
   return formatter(currency, !!opts.signed).format(cents / 100)
 }
 
@@ -42,20 +58,24 @@ export function formatRate(rate: number): string {
 
 /** Axis ticks: "15 mil". */
 export function formatCompact(value: number): string {
+  if (masked) return DOTS
   return new Intl.NumberFormat(LOCALE, { notation: 'compact', maximumFractionDigits: 1 }).format(value)
 }
 
 /** Percentage: "6,0%". */
 export function formatPercent(value: number, decimals = 0): string {
+  if (masked) return '•• %'
   return new Intl.NumberFormat(LOCALE, { style: 'percent', minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value / 100)
 }
 
 /** Short money for chart labels: "R$ 14,5 mil". */
 export function formatCompactMoney(cents: Cents): string {
+  if (masked) return maskOf('BRL')
   return new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(cents / 100)
 }
 
 /** Money rounded to whole reais, for averages in lists: "R$ 13.783". */
 export function formatWholeMoney(cents: Cents): string {
+  if (masked) return maskOf('BRL')
   return new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(cents / 100))
 }

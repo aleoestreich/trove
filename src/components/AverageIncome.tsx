@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { IncomeAverage } from '../data/incomeAverage'
 import { formatMonthShort } from '../lib/dates'
-import { formatCompactMoney, formatMoney, formatPercent } from '../lib/money'
+import { formatCompactMoney, formatMoney, formatPercent, signOf } from '../lib/money'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { useI18n } from '../i18n/I18nProvider'
 import { CardTitle } from './ui'
@@ -25,7 +25,7 @@ export function AverageIncomeCard({ average }: { average: IncomeAverage }) {
   const scale = Math.max(1, average.average, ...perMonth.map((m) => m.income)) * 1.15
   const last = perMonth.length - 1
   const above = current.vsAverage >= 0
-  const pct = `${above ? '+' : '−'}${formatPercent(Math.abs(current.vsAverage), 1)}`
+  const pct = `${signOf(above ? 1 : -1)}${formatPercent(Math.abs(current.vsAverage), 1)}`
   const avgShare = average.average / scale
 
   return (
@@ -58,7 +58,7 @@ export function AverageIncomeCard({ average }: { average: IncomeAverage }) {
       </div>
 
       {/* Bars grow from the baseline; the dashed line is the average. */}
-      <div role="img" aria-label={a.chart(formatMoney(average.average))} className="relative h-[168px] lg:h-[270px] lg:min-w-0 lg:flex-1 lg:self-end">
+      <div role="img" data-chart aria-label={a.chart(formatMoney(average.average))} className="relative h-[168px] lg:h-[270px] lg:min-w-0 lg:flex-1 lg:self-end">
         <div className="absolute inset-x-0 bottom-6 h-px bg-line" />
         <div className="absolute inset-x-0 top-0 bottom-[25px] flex items-end lg:right-24">
           {perMonth.map((m, i) => (

@@ -6,7 +6,7 @@ import { useData } from '../state'
 import { formatMoney } from '../lib/money'
 import { bulkPick, summarize } from '../lib/selection'
 import { Icon } from './Icon'
-import { CategoryBadge, catInk, catVar } from './CategoryBadge'
+import { CategoryBadge, catInk } from './CategoryBadge'
 import { CategoryChip, SubcategoryPicker } from './TransactionSheet'
 import { useI18n } from '../i18n/I18nProvider'
 
@@ -20,9 +20,10 @@ export interface Applied {
 }
 
 /**
- * Bulk categorization: what the selection is filed under today, the category
- * (of the selection's type), an optional subcategory, a preview, and
- * Cancel / Apply. Saved all at once; on error the message shows under the buttons.
+ * Bulk categorization: "Sem categoria" or a category of the selection's type
+ * (a mixed selection can only be left without one), an optional subcategory,
+ * a preview ("Como vai ficar"), and Cancel / Apply. Saved all at once; on
+ * error nothing changed and a notice shows at the top.
  */
 function BulkContent({
   txs,
@@ -52,9 +53,12 @@ function BulkContent({
     categoryId ? categoriesById.get(categoryId) : undefined,
     subcategoryId ? subcategoriesById.get(subcategoryId) : undefined,
   )
-  const options = summary.kind ? categories.filter((c) => c.type === summary.kind) : []
+  // Income and expenses together: only "Sem categoria" can apply; the categories show, disabled.
+  const mixed = !summary.kind
+  const clear = clearing || mixed
+  const options = summary.kind ? categories.filter((c) => c.type === summary.kind) : categories
   // The subcategory is optional.
-  const ready = (clearing || (!!category && !!summary.kind)) && !saving
+  const ready = (clear || !!category) && !saving
 
   const apply = async () => {
     if (!ready) return
@@ -62,11 +66,12 @@ function BulkContent({
     setError(null)
     const ids = txs.map((x) => x.id)
     try {
-      const result = clearing ? await categorizeMany(ids, null, null) : await categorizeMany(ids, category!.id, sub?.id ?? null)
-      const label = clearing ? t.transactions.uncategorized : `${categoryName(category!)}${sub ? ` › ${sub.name}` : ''}`
+      const result = clear ? await categorizeMany(ids, null, null) : await categorizeMany(ids, category!.id, sub?.id ?? null)
+      const label = clear ? t.transactions.uncategorized : `${categoryName(category!)}${sub ? ` › ${sub.name}` : ''}`
       onApplied({ ids, count: result.updated, label, previous: result.previous })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      // Nothing was saved (the change is all or nothing); the selection stays.
+      setError(t.bulk.failed)
       setSaving(false)
     }
   }
@@ -92,111 +97,113 @@ function BulkContent({
         </button>
       </div>
 
-      <div className={`mt-2.5 flex flex-col gap-2 bg-page px-3 py-2.5 ${panel ? 'rounded-sm' : 'rounded-md'}`}>
-        <span className="text-xs leading-4 text-muted">{t.bulk.current}</span>
-        <div className="flex flex-wrap gap-1.5">
-          {summary.current.map((g) => {
-            const c = g.categoryId ? categoriesById.get(g.categoryId) : undefined
-            const s = g.subcategoryId ? subcategoriesById.get(g.subcategoryId) : undefined
-            return (
-              <span
-                key={`${g.categoryId}|${g.subcategoryId}`}
-                className={`inline-flex items-center gap-1.5 rounded-full border border-line bg-surface pr-2.5 pl-2 font-medium whitespace-nowrap ${panel ? 'h-[26px] text-xs' : 'h-7 text-[13px]'} ${c ? '' : 'text-ink-2'}`}
-                style={c ? { color: catInk(c.color, 70) } : undefined}
-              >
-                <span
-                  aria-hidden
-                  className={`size-2 shrink-0 rounded-full ${c ? '' : 'border-[1.5px] border-dashed border-muted'}`}
-                  style={c ? { background: catVar(c.color) } : undefined}
-                />
-                {c ? `${categoryName(c)}${s ? ` › ${s.name}` : ''}` : t.transactions.uncategorized}
-                <span className="tabular font-normal text-muted">· {g.count}</span>
-              </span>
-            )
-          })}
-        </div>
-      </div>
+      {error && (
+        <p role="alert" className="mt-2 flex items-start gap-2.5 rounded-md border border-critical/30 bg-critical-soft px-3 py-2.5 text-[13px] leading-[18px] text-ink">
+          <Icon name="alert" className="mt-px size-[18px] shrink-0 text-critical" />
+          {error}
+        </p>
+      )}
+      {mixed && (
+        <p className="mt-2 flex items-start gap-2.5 rounded-md bg-page px-3 py-2.5 text-[13px] leading-[18px] text-ink">
+          <Icon name="info" className="mt-px size-[18px] shrink-0 text-ink-2" />
+          {t.bulk.mixedNote}
+        </p>
+      )}
 
-      <h3 id={`bulk-${variant}-category`} className={`label-caps pb-2 ${panel ? 'pt-4' : 'pt-4'}`}>
+      <h3 id={`bulk-${variant}-category`} className="label-caps pt-3 pb-2">
         {t.category}
       </h3>
       <div role="radiogroup" aria-labelledby={`bulk-${variant}-category`} className={`flex flex-wrap ${panel ? 'gap-1.5' : 'gap-2'}`}>
         <button
           type="button"
           role="radio"
-          aria-checked={clearing}
+          aria-checked={clear}
           onClick={() => {
             setClearing(true)
             setCategoryId(null)
             setSubcategoryId(null)
           }}
-          className={`inline-flex items-center gap-2 rounded-full border pr-3.5 pl-1.5 text-sm font-medium whitespace-nowrap ${panel ? 'h-9' : 'h-10'} ${
-            clearing ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-surface text-ink-2 hover:bg-track'
+          className={`inline-flex items-center gap-1.5 rounded-full border border-dashed pr-3.5 pl-3 text-sm whitespace-nowrap ${panel ? 'h-9' : 'h-10'} ${
+            clear ? 'border-accent bg-accent-faint font-medium text-accent' : 'border-line bg-surface text-ink-2 hover:bg-track'
           }`}
         >
-          <CategoryBadge category={null} size={panel ? 24 : 28} />
+          <Icon name={clear ? 'check' : 'tagOff'} className="size-4" strokeWidth={clear ? 2.2 : 1.9} />
           {t.bulk.uncategorize}
         </button>
-        {summary.kind &&
-          options.map((c) => (
+        {options.map((c) => (
+          <span key={c.id} className={mixed ? 'pointer-events-none opacity-40' : ''} aria-disabled={mixed || undefined}>
             <CategoryChip
-              key={c.id}
               category={c}
               name={categoryName(c)}
               size={panel ? 36 : 40}
-              on={!clearing && c.id === category?.id}
+              on={!clear && c.id === category?.id}
               onClick={() => {
+                if (mixed) return
                 setClearing(false)
                 if (c.id === category?.id) return
                 setCategoryId(c.id)
                 setSubcategoryId(null)
               }}
             />
-          ))}
+          </span>
+        ))}
       </div>
-      {!summary.kind && <p className="mt-2 text-[13px] leading-[18px] text-muted">{t.bulk.mixedNote}</p>}
 
-      {category && !clearing && (
-        <SubcategoryPicker
-          variant={`bulk-${variant}`}
-          category={category}
-          current={subcategoryId}
-          small={panel}
-          options={subcategories.filter((x) => x.categoryId === category.id)}
-          // Tapping the chosen one again leaves them without a subcategory.
-          onPick={(id) => setSubcategoryId((current) => (current === id ? null : id))}
-          onAdd={(name) => {
-            const id = newId()
-            edit({ op: 'createSubcategory', subcategory: { id, categoryId: category.id, name } })
-            setSubcategoryId(id)
-          }}
-        />
+      {!clear &&
+        (category ? (
+          <>
+            <SubcategoryPicker
+              variant={`bulk-${variant}`}
+              category={category}
+              current={subcategoryId}
+              small={panel}
+              optional
+              options={subcategories.filter((x) => x.categoryId === category.id)}
+              // Tapping the chosen one again leaves them without a subcategory.
+              onPick={(id) => setSubcategoryId((current) => (current === id ? null : id))}
+              onAdd={(name) => {
+                const id = newId()
+                edit({ op: 'createSubcategory', subcategory: { id, categoryId: category.id, name } })
+                setSubcategoryId(id)
+              }}
+            />
+            {sub && <p className="mt-2 text-xs leading-4 text-muted">{t.bulk.tapAgain(sub.name)}</p>}
+          </>
+        ) : (
+          <>
+            <h3 className="label-caps pt-4 pb-1">
+              {t.transactions.subcategory}
+              <span className="tracking-normal normal-case"> · {t.bulk.optional}</span>
+            </h3>
+            <p className="text-[13px] leading-[18px] text-muted">{t.bulk.pickFirst}</p>
+          </>
+        ))}
+
+      {(clear || category) && (
+        <div className="mt-4 flex items-center gap-2.5 border-t border-line pt-3">
+          <CategoryBadge category={clear ? null : category} size={panel ? 28 : 36} />
+          <span className="flex min-w-0 flex-col gap-px">
+            <span className="text-xs leading-4 text-muted">{t.bulk.resultLabel}</span>
+            {clear ? (
+              <span className="text-sm leading-5 font-medium text-ink">{t.bulk.clearResult(n)}</span>
+            ) : (
+              category && (
+                <span className="truncate text-sm leading-5 font-medium" style={{ color: catInk(category.color, 70) }}>
+                  {categoryName(category)}
+                  {sub ? ` › ${sub.name}` : ` · ${t.bulk.noSubcategory}`}
+                </span>
+              )
+            )}
+          </span>
+        </div>
       )}
 
-      <div className="mt-4 flex items-center gap-2.5 border-t border-line pt-3">
-        <CategoryBadge category={clearing ? null : category} size={panel ? 28 : 36} />
-        <span className="flex min-w-0 flex-col gap-px">
-          <span className="text-xs leading-4 text-muted">{t.bulk.resultLabel(n)}</span>
-          {clearing ? (
-            <span className="text-sm leading-5 font-medium text-ink-2">
-              {t.bulk.uncategorize} <span className="font-normal text-muted">· {t.bulk.uncategorizeNote}</span>
-            </span>
-          ) : category ? (
-            <span className="truncate text-sm leading-5 font-medium" style={{ color: catInk(category.color, 70) }}>
-              {categoryName(category)}
-              {sub ? ` › ${sub.name}` : <span className="font-normal text-muted"> · {t.bulk.noSubcategory}</span>}
-            </span>
-          ) : (
-            <span className="text-sm leading-5 text-muted">{t.bulk.pickCategory}</span>
-          )}
-        </span>
-      </div>
-
-      <div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-2">
+      <div className={`mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-2 ${panel ? '' : '-mx-4 border-t border-line px-4 pt-3'}`}>
         <button
           type="button"
           onClick={onCancel}
-          className={`border border-line bg-surface font-medium text-ink hover:bg-track ${panel ? 'h-11 rounded-sm text-sm' : 'h-12 rounded-md text-[15px]'}`}
+          disabled={saving}
+          className={`border border-line bg-surface font-medium text-ink hover:bg-track disabled:opacity-60 ${panel ? 'h-11 rounded-sm text-sm' : 'h-12 rounded-md text-[15px]'}`}
         >
           {t.bulk.cancel}
         </button>
@@ -207,15 +214,10 @@ function BulkContent({
           aria-busy={saving}
           className={`inline-flex items-center justify-center gap-2 bg-accent font-medium text-surface disabled:opacity-40 ${panel ? 'h-11 rounded-sm text-sm' : 'h-12 rounded-md text-[15px]'}`}
         >
-          {saving && <Icon name="sync" className="size-[18px] animate-spin" strokeWidth={2} />}
-          {saving ? t.bulk.saving : t.bulk.apply(n)}
+          {saving && <Icon name="sync" className="size-[18px] motion-safe:animate-spin" strokeWidth={2} />}
+          {saving ? t.bulk.saving : clear ? t.bulk.remove(n) : t.bulk.apply(n)}
         </button>
       </div>
-      {error && (
-        <p role="alert" className="mt-2 text-[13px] leading-[18px] text-critical">
-          {error}
-        </p>
-      )}
       {panel && <p className="mt-3 text-xs leading-[17px] text-muted">{t.bulk.panelNote}</p>}
     </>
   )
@@ -257,7 +259,7 @@ export function BulkPanel({ txs, onClear, onApplied }: { txs: Transaction[]; onC
   return (
     <aside
       aria-labelledby="bulk-panel-title"
-      className="sticky top-8 flex max-h-[calc(100dvh-64px)] w-[300px] shrink-0 flex-col self-start overflow-y-auto rounded-lg border border-line bg-surface p-5 xl:w-[360px]"
+      className="sticky top-8 flex max-h-[calc(100dvh-64px)] w-[300px] shrink-0 flex-col self-start overflow-y-auto rounded-lg border border-line bg-surface p-5 xl:w-[380px]"
     >
       <BulkContent txs={txs} variant="panel" onCancel={onClear} onApplied={onApplied} />
     </aside>

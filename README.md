@@ -152,13 +152,17 @@ between accounts, and card bill payments.
   in the database (`accounts.nickname`), a column a sync never writes;
   "Usar o nome do banco" goes back to the bank's.
 - **Ocultar valores (privacy mode):** for opening Trove in public. The eye
-  in the phone header (the switch in the desktop sidebar) blurs amounts,
-  percentages, charts, progress bars, transaction descriptions and merchant
-  names (`:root[data-privacy]` in `src/index.css`; `.tabular` and `.private`
-  elements and `[role='img']` charts). Navigation, account and category names
-  stay readable. It is remembered on the device (`localStorage`) and applied
-  before the first render, so nothing shows unblurred on opening. It only
-  hides what is on screen: the data is still loaded.
+  in the phone header (the switch in the desktop sidebar) shows every amount
+  as "R$ •••••" and every percentage as "•• %" (the formatters in
+  `src/lib/money.ts`), without sign, green or red, or day totals. Charts
+  become one generic pattern labelled "Gráfico oculto", without legends, and
+  progress bars show no proportion (`:root[data-privacy]` in
+  `src/index.css`, on `[data-chart]`, `[data-legend]` and `[data-progress]`).
+  Comparisons by category ("Fora do padrão") are hidden too. Names,
+  descriptions and categories stay. A "Valores ocultos · Mostrar" banner tops
+  every screen. It is remembered on the device (`localStorage`) and applied
+  before the first render; the screens remount on a change so everything is
+  formatted again. It only hides what is on screen: the data is still loaded.
 - **Hidden transactions** are left out of every total, chart, average,
   category breakdown and installments total. Balances, net worth and card
   bills still include them, as they are the bank's figures.

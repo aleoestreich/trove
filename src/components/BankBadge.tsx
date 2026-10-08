@@ -3,7 +3,7 @@ import { Icon, type IconName } from './Icon'
 import type { Institution } from '../data/types'
 
 export type Bank = 'nubank' | 'itau' | 'santander' | 'wise'
-export type BankBadgeSize = 32 | 36 | 40
+export type BankBadgeSize = 24 | 32 | 36 | 40
 
 /** Each bank's colour token (src/index.css). */
 const TOKEN: Record<Bank, string> = {
@@ -48,7 +48,7 @@ function boxStyle(size: BankBadgeSize, token: string): CSSProperties {
   return {
     width: size,
     height: size,
-    borderRadius: 12,
+    borderRadius: size === 24 ? 7 : 12,
     boxSizing: 'border-box',
     border: `1.5px solid color-mix(in srgb, var(${token}) 45%, transparent)`,
     background: `color-mix(in srgb, var(${token}) 8%, transparent)`,
@@ -65,7 +65,7 @@ const inkOf = (token: string) => `color-mix(in srgb, var(${token}) 72%, var(--in
  */
 export function BankBadge({ bank, size = 40 }: { bank: Bank; size?: BankBadgeSize }) {
   const token = TOKEN[bank]
-  const glyph = size === 32 ? 'size-[18px]' : 'size-5'
+  const glyph = size === 24 ? 'size-3.5' : size === 32 ? 'size-[18px]' : 'size-5'
   return (
     <span aria-hidden="true" className="inline-flex shrink-0 items-center justify-center" style={{ ...boxStyle(size, token), color: inkOf(token) }}>
       <Icon name={GLYPH[bank]} className={glyph} strokeWidth={1.9} />
@@ -85,7 +85,7 @@ export function InstitutionBadge({ institution, size = 40 }: { institution: Inst
     <span
       aria-hidden="true"
       className="inline-flex shrink-0 items-center justify-center font-bold"
-      style={{ ...boxStyle(size, '--muted'), color: inkOf('--muted'), fontSize: size === 40 ? 14 : 13 }}
+      style={{ ...boxStyle(size, '--muted'), color: inkOf('--muted'), fontSize: size === 40 ? 14 : size === 24 ? 10 : 13 }}
     >
       {institution.name.slice(0, 2)}
     </span>

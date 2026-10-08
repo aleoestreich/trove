@@ -124,7 +124,7 @@ export function TransactionRow({
         <TransactionBadge tx={tx} categoriesById={categoriesById} />
       )}
       <span className={`flex min-w-0 flex-1 flex-col ${select?.disabled ? 'opacity-45' : ''}`}>
-        <span title={tx.description} className="private truncate text-[15px] leading-5 font-medium text-ink">{tx.description}</span>
+        <span title={tx.description} className="truncate text-[15px] leading-5 font-medium text-ink">{tx.description}</span>
         <CategoryLine tx={tx} />
         <span className="truncate text-[13px] leading-[18px] text-muted">
           {accountLabel(tx.accountId)}

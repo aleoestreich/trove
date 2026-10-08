@@ -73,6 +73,8 @@ export class EditError extends Error {
 }
 
 export const NAME_MAX = 40
+/** Longest name set in Trove for an account or card. */
+export const NICKNAME_MAX = 30
 const ID = /^[A-Za-z0-9_-]{1,64}$/
 
 /** A name as stored: trimmed, single spaces. */
@@ -195,7 +197,7 @@ export function validateEdit(e: unknown): Edit {
     }
     case 'renameAccount': {
       const n = typeof x.name === 'string' ? cleanName(x.name) : x.name === null ? null : bad('name')
-      if (n !== null && n.length > NAME_MAX) bad('name')
+      if (n !== null && n.length > NICKNAME_MAX) bad('name')
       return { op: 'renameAccount', accountId: id(x.accountId, 'account'), name: n || null }
     }
     default:

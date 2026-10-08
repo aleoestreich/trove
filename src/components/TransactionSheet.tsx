@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import type { Category, Transaction } from '../data/types'
 import { useData } from '../state'
 import { newId } from '../data/edits'
-import { addMonths, formatFullDate, formatMonthYear } from '../lib/dates'
+import { addMonths, formatDayHeading, formatMonthYear } from '../lib/dates'
 import { formatMoney, formatRate } from '../lib/money'
 import { kindOf } from '../lib/summary'
 import { Icon } from './Icon'
@@ -42,7 +43,7 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
   const lastMonth = inst && addMonths(current.date, inst.total - inst.number).slice(0, 7)
 
   const details: { label: string; value: string }[] = [
-    { label: t.transactions.date, value: formatFullDate(current.date) },
+    { label: t.transactions.date, value: formatDayHeading(current.date) },
     { label: t.transactions.account, value: accountLabel(current.accountId) },
   ]
   if (current.foreign && rate)
@@ -67,16 +68,23 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
     ? formatMoney(current.foreign.amount, current.foreign.currency, { signed: kind !== 'transfer' })
     : formatMoney(kind === 'transfer' ? Math.abs(current.amount) : current.amount, 'BRL', { signed: kind !== 'transfer' })
 
+  // After "Remover categoria": what it was, for Desfazer.
+  const [removed, setRemoved] = useState<{ categoryId: string | null; subcategoryId: string | null } | null>(null)
+  useEffect(() => {
+    if (!removed) return
+    const timer = setTimeout(() => setRemoved(null), 6000)
+    return () => clearTimeout(timer)
+  }, [removed])
+
   const setCategory = (c: Category) =>
     edit({ op: 'categorize', transactionId: current.id, categoryId: c.id === category?.id ? null : c.id, subcategoryId: null })
 
   return (
     <>
       {/* The full description wraps (banks' long ones included), so it can be read while editing. */}
-      <div className="flex items-start gap-3 pt-1 pb-3 lg:pt-0">
-        <TransactionBadge tx={current} categoriesById={categoriesById} size={44} />
+      <div className="flex items-start gap-3 pt-1 lg:pt-0">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
-          <h2 className="private text-lg leading-6 font-medium [overflow-wrap:anywhere] text-ink">{current.description}</h2>
+          <h2 className="text-lg leading-6 font-medium [overflow-wrap:anywhere] text-ink">{current.description}</h2>
           <span className="text-[13px] leading-[18px] text-muted">{accountLabel(current.accountId)}</span>
         </div>
         <button
@@ -90,13 +98,16 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
         </button>
       </div>
 
-      <div className={`flex flex-col gap-0.5 ${panel ? 'pt-4 pb-3' : 'pt-1 pb-3'}`}>
-        <span
-          className={`tabular font-bold tracking-[-0.02em] ${panel ? 'text-[30px] leading-[38px]' : 'text-[32px] leading-10'} ${kind === 'income' ? 'text-income' : kind === 'transfer' ? 'text-muted' : 'text-ink'} ${current.hidden ? 'opacity-60' : ''}`}
-        >
-          {amount}
-        </span>
-        <span className="text-[13px] leading-[18px] text-ink-2">{subtitle}</span>
+      <div className={`flex items-center gap-3 ${panel ? 'pt-3 pb-3' : 'pt-2 pb-3'}`}>
+        <TransactionBadge tx={current} categoriesById={categoriesById} size={44} />
+        <div className="flex min-w-0 flex-col">
+          <span
+            className={`tabular font-bold tracking-[-0.02em] ${panel ? 'text-[30px] leading-[38px]' : 'text-[32px] leading-10'} ${kind === 'income' ? 'text-income' : kind === 'transfer' ? 'text-muted' : 'text-ink'} ${current.hidden ? 'opacity-60' : ''}`}
+          >
+            {amount}
+          </span>
+          <span className="text-[13px] leading-[18px] text-ink-2">{subtitle}</span>
+        </div>
       </div>
 
       <dl className="border-t border-line">
@@ -143,7 +154,7 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
             <div
               role="radiogroup"
               aria-labelledby={`${variant}-category`}
-              className={`-mx-4 flex shrink-0 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:-mx-5 lg:px-5 ${panel ? 'lg:flex-wrap lg:overflow-visible' : ''}`}
+              className="flex flex-wrap gap-2"
             >
               {options.map((c) => (
                 <CategoryChip key={c.id} category={c} name={categoryName(c)} on={c.id === category?.id} onClick={() => setCategory(c)} />
@@ -165,16 +176,19 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
               }}
             />
           )}
-          {category && (
-            <button
-              type="button"
-              onClick={() => edit({ op: 'categorize', transactionId: current.id, categoryId: null, subcategoryId: null })}
-              className="mt-2 -ml-3 inline-flex h-12 items-center gap-2 self-start rounded-md px-3 text-sm font-medium text-accent hover:bg-accent-faint active:bg-track"
-            >
-              <Icon name="close" className="size-[18px]" strokeWidth={2} />
-              {t.transactions.removeCategory}
-            </button>
-          )}
+          {!category && <p className="mt-2.5 text-xs leading-4 text-muted">{t.transactions.uncategorizedNote}</p>}
+          <button
+            type="button"
+            disabled={!category}
+            onClick={() => {
+              setRemoved({ categoryId: current.categoryId, subcategoryId: current.subcategoryId ?? null })
+              edit({ op: 'categorize', transactionId: current.id, categoryId: null, subcategoryId: null })
+            }}
+            className="mt-3 inline-flex h-10 items-center gap-2 self-start rounded-md border border-line bg-surface px-3.5 text-sm text-ink hover:bg-track disabled:border-line/60 disabled:text-muted disabled:hover:bg-surface"
+          >
+            <Icon name="tagOff" className="size-[18px]" />
+            {t.transactions.removeCategory}
+          </button>
         </>
       )}
 
@@ -204,6 +218,29 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
       )}
 
       <HideSwitch hidden={!!current.hidden} onChange={(hidden) => edit({ op: 'hide', transactionId: current.id, hidden })} />
+      {removed &&
+        createPortal(
+          <div className="pointer-events-none fixed inset-x-0 top-[calc(12px+env(safe-area-inset-top))] z-50 mx-auto flex max-w-[480px] px-3 lg:top-auto lg:bottom-6 lg:left-[248px] lg:mx-0 lg:max-w-[440px] lg:px-6">
+            <div role="status" className="pointer-events-auto flex min-h-14 w-full items-center gap-2.5 rounded-md bg-ink py-1.5 pr-1 pl-4 text-page shadow-lg">
+              <Icon name="check" className="size-[18px] shrink-0" strokeWidth={2} />
+              <span className="flex min-w-0 flex-1 flex-col gap-px">
+                <span className="text-sm leading-[19px] font-medium">{t.transactions.categoryRemoved}</span>
+                <span className="truncate text-[13px] leading-[18px] opacity-80">{current.description}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  edit({ op: 'categorize', transactionId: current.id, categoryId: removed.categoryId, subcategoryId: removed.subcategoryId })
+                  setRemoved(null)
+                }}
+                className="h-11 shrink-0 rounded-sm px-3 text-sm font-bold"
+              >
+                {t.bulk.undo}
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   )
 }
@@ -258,6 +295,7 @@ export function SubcategoryPicker({
   onPick,
   onAdd,
   small = false,
+  optional = false,
 }: {
   variant: string
   category: Category
@@ -266,6 +304,8 @@ export function SubcategoryPicker({
   onPick(id: string): void
   onAdd(name: string): void
   small?: boolean
+  /** "Subcategoria · opcional" (bulk categorization). */
+  optional?: boolean
 }) {
   const { t } = useI18n()
   const [adding, setAdding] = useState(false)
@@ -287,6 +327,7 @@ export function SubcategoryPicker({
     <>
       <h3 id={`${variant}-subcategory`} className="label-caps pt-4 pb-2">
         {t.transactions.subcategory}
+        {optional && <span className="tracking-normal normal-case"> · {t.bulk.optional}</span>}
       </h3>
       <div role="radiogroup" aria-labelledby={`${variant}-subcategory`} className="flex flex-wrap gap-2">
         {options.map((o) => {

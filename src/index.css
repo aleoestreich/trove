@@ -196,19 +196,55 @@ body {
 }
 
 /*
- * Privacy mode ("Ocultar valores", src/lib/privacy.ts): amounts and
- * percentages (.tabular), anything marked .private (descriptions, amounts
- * inside sentences) and every chart ([role='img'], the logo excepted) are
- * blurred, and can't be selected. The blur scales with the text size, so
- * large figures are as unreadable as small ones.
+ * Privacy mode ("Ocultar valores", src/lib/privacy.ts). The formatters
+ * already show amounts as "R$ •••••"; here: no green or red on figures,
+ * every chart ([data-chart]) becomes the same generic pattern labelled
+ * "Gráfico oculto", legends go, and bars ([data-progress]) show no
+ * proportion.
  */
-:root[data-privacy] :is(.tabular, .private) {
-  filter: blur(0.42em);
+:root[data-privacy] .tabular:is(.text-income, .text-critical) {
+  color: var(--ink);
+}
+:root[data-privacy] [data-chart] {
+  position: relative;
+  overflow: hidden;
   user-select: none;
 }
-:root[data-privacy] [role='img']:not([data-public]) {
-  filter: blur(10px);
-  user-select: none;
+:root[data-privacy] [data-chart] > * {
+  visibility: hidden;
+}
+:root[data-privacy] [data-chart]::before {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: min(70%, 120px);
+  background: repeating-linear-gradient(90deg, var(--line) 0 28px, transparent 28px 40px);
+  border-bottom: 1px solid var(--line);
+  filter: blur(3px);
+}
+:root[data-privacy] [data-chart]::after {
+  content: var(--chart-hidden-label);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+:root[data-privacy] [data-legend] {
+  display: none;
+}
+:root[data-privacy] [data-progress] > * {
+  flex-grow: 1 !important;
+  width: 50% !important;
+  max-width: 50%;
+  background: var(--line) !important;
 }
 
 /* Overline: small caps label above a group ("By bank"). */

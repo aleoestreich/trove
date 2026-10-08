@@ -65,14 +65,14 @@ export function Accounts() {
           a.type === 'CREDIT' ? (
             <Fragment key={a.id}>
               <div className="relative">
-                <CreditCardBlock account={a} label={labels.get(a.id)!} bill={currentBill(a, transactions, plans)} futureInstallments={futureInstallments.get(a.id) ?? 0} />
+                <CreditCardBlock account={a} label={labels.get(a.id)!} sub={a.nickname ? bankLabels.get(a.id) : undefined} bill={currentBill(a, transactions, plans)} futureInstallments={futureInstallments.get(a.id) ?? 0} />
                 <RenameButton account={a} label={labels.get(a.id)!} bankLabel={bankLabels.get(a.id)!} className="absolute top-2 right-2 lg:right-3" />
               </div>
               <CardDaysEditor account={a} />
             </Fragment>
           ) : a.foreign ? (
             <div key={a.id} className="relative">
-              <ForeignBlock account={a} label={labels.get(a.id)!} />
+              <ForeignBlock account={a} label={labels.get(a.id)!} sub={a.nickname ? bankLabels.get(a.id) : undefined} />
               <RenameButton account={a} label={labels.get(a.id)!} bankLabel={bankLabels.get(a.id)!} className="absolute top-2 right-2 lg:top-1/2 lg:right-3 lg:-translate-y-1/2" />
             </div>
           ) : (
@@ -81,7 +81,7 @@ export function Accounts() {
                 to={`/transactions?m=all&a=${a.id}`}
                 className="flex min-h-14 min-w-0 flex-1 items-center justify-between gap-3 pl-4 active:bg-track lg:min-h-[52px] lg:pl-5 lg:hover:bg-page"
               >
-                <AccountTypeLabel type={accountType(a)} label={labels.get(a.id)!} />
+                <AccountTypeLabel type={accountType(a)} label={labels.get(a.id)!} sub={a.nickname ? bankLabels.get(a.id) : undefined} />
                 <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(a.balance)}</span>
               </Link>
               <RenameButton account={a} label={labels.get(a.id)!} bankLabel={bankLabels.get(a.id)!} />
@@ -134,7 +134,7 @@ export function Accounts() {
 }
 
 /** A balance held in another currency: the original amount large, BRL and the rate below. */
-function ForeignBlock({ account, label }: { account: Account; label: string }) {
+function ForeignBlock({ account, label, sub }: { account: Account; label: string; sub?: string }) {
   const { t } = useI18n()
   const foreign = account.foreign!
   return (
@@ -144,7 +144,7 @@ function ForeignBlock({ account, label }: { account: Account; label: string }) {
     >
       <span className="flex flex-col gap-1 lg:gap-0.5">
         <span className="mb-0.5">
-          <AccountTypeLabel type={accountType(account)} label={label} />
+          <AccountTypeLabel type={accountType(account)} label={label} sub={sub} />
         </span>
         <span className="tabular text-2xl leading-[30px] font-bold tracking-[-0.01em] text-ink lg:text-[26px] lg:leading-8">
           {formatMoney(foreign.balance, foreign.currency)}
@@ -158,7 +158,7 @@ function ForeignBlock({ account, label }: { account: Account; label: string }) {
   )
 }
 
-function CreditCardBlock({ account, label, bill, futureInstallments }: { account: Account; label: string; bill: CardBill | null; futureInstallments: number }) {
+function CreditCardBlock({ account, label, sub, bill, futureInstallments }: { account: Account; label: string; sub?: string; bill: CardBill | null; futureInstallments: number }) {
   const { t } = useI18n()
   const credit = account.creditData!
   // The bill from the billing cycle; the balance only when the bank gives no closing date.
@@ -176,7 +176,7 @@ function CreditCardBlock({ account, label, bill, futureInstallments }: { account
       className="flex flex-col gap-3 border-t border-line p-4 active:bg-track lg:px-5 lg:hover:bg-page"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 pr-10">
-        <AccountTypeLabel type="card" label={label} />
+        <AccountTypeLabel type="card" label={label} sub={sub} />
         {near && (
           <Badge tone="critical" icon="alert">
             {t.accounts.nearLimit}

@@ -5,9 +5,9 @@ import { Card } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { CategoryBadge, catVar } from '../components/CategoryBadge'
 import { addMonths, formatMonthName, formatMonthShort, lastMonths } from '../lib/dates'
-import { formatPercent, formatWholeMoney } from '../lib/money'
+import { formatPercent, formatWholeMoney, isMoneyMasked, signOf } from '../lib/money'
 import type { CategoryComparison, UnusualResult } from '../data/unusual'
-import { UnusualRow, useNormalList, useUnusualSubtitle } from '../components/insights/cards'
+import { ComparisonsHidden, UnusualRow, useNormalList, useUnusualSubtitle } from '../components/insights/cards'
 import { DetailHeader, DivergingLegend, Legend, LegendItem, capitalize, swatch } from '../components/insights/parts'
 
 const BAND = 0.15
@@ -32,6 +32,16 @@ export function UnusualCategory() {
     )
   const unusual = Math.abs(c.pct) > BAND
   const month = formatMonthName(u.month)
+  // While values are hidden, so is the comparison.
+  if (isMoneyMasked())
+    return (
+      <>
+        <DetailHeader title={categoryName(category)} />
+        <Card>
+          <ComparisonsHidden />
+        </Card>
+      </>
+    )
   return (
     <>
       <DetailHeader title={categoryName(category)} subtitle={unusual ? d.subUnusual(month) : d.subNormal(month)} />
@@ -87,10 +97,10 @@ function SummaryCard({ c, u }: { c: CategoryComparison; u: UnusualResult }) {
         <span className="text-[15px] leading-5 text-ink">{up ? d.above : d.below}</span>
       </div>
       <span className="tabular text-sm leading-5 text-ink-2">
-        {d.compare(formatWholeMoney(c.now), month, formatWholeMoney(c.avg), `${up ? '+' : '−'}${formatWholeMoney(Math.abs(c.delta))}`)}
+        {d.compare(formatWholeMoney(c.now), month, formatWholeMoney(c.avg), `${signOf(up ? 1 : -1)}${formatWholeMoney(Math.abs(c.delta))}`)}
       </span>
 
-      <div role="img" aria-label={aria} className="mt-4">
+      <div role="img" data-chart aria-label={aria} className="mt-4">
         <div className="relative" style={{ height: H + 24 }}>
           <div aria-hidden className="absolute inset-x-0 rounded-[4px] bg-track" style={{ bottom: c.avg * (1 - BAND) * k, height: c.avg * 2 * BAND * k }} />
           <div aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-line" />
@@ -229,6 +239,7 @@ export function UnusualAll() {
     <>
       <DetailHeader title={s.allTitle} subtitle={u ? <AllSubtitle u={u} /> : undefined} />
       <Card className="flex flex-col gap-4 lg:max-w-[720px]">
+        {isMoneyMasked() ? <ComparisonsHidden /> : <>
         {!u && <p className="text-sm leading-5 text-ink-2">{s.detail.notFound}</p>}
         {u && u.unusual.length === 0 && <p className="text-sm leading-5 font-medium text-ink">{s.allNormal}</p>}
         {u && (
@@ -247,6 +258,7 @@ export function UnusualAll() {
             <NormalNote u={u} />
           </>
         )}
+        </>}
       </Card>
     </>
   )
@@ -262,7 +274,7 @@ function NormalNote({ u }: { u: UnusualResult }) {
   if (!u.normal.length) return null
   return (
     <p className="rounded-sm bg-page px-3 py-2.5 text-[13px] leading-[18px] text-ink-2">
-      <span className="font-medium text-ink">{t.insights.unusual.normalLabel}</span> <span className="private">{list}</span>
+      <span className="font-medium text-ink">{t.insights.unusual.normalLabel}</span> {list}
     </p>
   )
 }

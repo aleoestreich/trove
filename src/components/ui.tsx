@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { Cents, CurrencyCode } from '../data/types'
 import { formatMoney } from '../lib/money'
-import { formatMonth, lastMonths } from '../lib/dates'
 import { Icon, type IconName } from './Icon'
 import { useI18n } from '../i18n/I18nProvider'
 
@@ -67,7 +66,8 @@ export function Progress({
       aria-valuemax={label ? 100 : undefined}
       aria-valuenow={label ? Math.round(pct) : undefined}
       aria-hidden={label ? undefined : true}
-      className="private rounded-full bg-track"
+      data-progress
+      className="rounded-full bg-track"
       style={{ height }}
     >
       <div className="rounded-full" style={{ height, width: `${pct}%`, background: fill }} />
@@ -159,41 +159,6 @@ export function Amount({
   )
 }
 
-/**
- * ‹ September 2026 › — steps through the months with data. `bar`: full width
- * on a page-coloured bar (phones); `compact`: a bordered box (desktop header).
- */
-export function MonthSwitcher({
-  month,
-  latest,
-  count,
-  onChange,
-  variant = 'bar',
-}: {
-  month: string
-  latest: string
-  count: number
-  onChange(m: string): void
-  variant?: 'bar' | 'compact'
-}) {
-  const { t } = useI18n()
-  const months = lastMonths(latest, count)
-  const i = months.indexOf(month)
-  const compact = variant === 'compact'
-  const btn = `flex items-center justify-center text-ink-2 active:bg-track disabled:text-line ${compact ? 'size-10 rounded-[10px] hover:bg-track disabled:hover:bg-transparent' : 'size-12 rounded-md'}`
-  return (
-    <div className={compact ? 'flex items-center gap-1 rounded-md border border-line bg-surface p-1' : '-mx-2 flex items-center justify-between rounded-md bg-page'}>
-      <button type="button" className={btn} disabled={i <= 0} onClick={() => onChange(months[i - 1])} aria-label={t.previousMonth}>
-        <Icon name="chevronLeft" className="size-[22px]" strokeWidth={2} />
-      </button>
-      <span className={compact ? 'min-w-[150px] text-center text-sm font-medium text-ink' : 'text-[15px] font-medium text-ink'}>{formatMonth(month)}</span>
-      <button type="button" className={btn} disabled={i >= months.length - 1} onClick={() => onChange(months[i + 1])} aria-label={t.nextMonth}>
-        <Icon name="chevronRight" className="size-[22px]" strokeWidth={2} />
-      </button>
-    </div>
-  )
-}
-
 /** Centred icon, title, text and optional action: empty lists and errors. */
 export function EmptyState({
   icon,
@@ -246,7 +211,7 @@ export function RangeSwitcher({ value, onChange }: { value: Range; onChange(r: R
   const { t } = useI18n()
   const r = t.overview.range
   return (
-    <div role="group" aria-label={r.label} className="flex rounded-md border border-line bg-surface p-1 lg:w-auto">
+    <div role="group" aria-label={r.label} className="flex rounded-md bg-track p-1">
       {RANGES.map((n) => {
         const on = n === value
         return (
@@ -255,8 +220,8 @@ export function RangeSwitcher({ value, onChange }: { value: Range; onChange(r: R
             type="button"
             aria-pressed={on}
             onClick={() => onChange(n)}
-            className={`h-10 flex-1 rounded-[10px] px-4 text-sm font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:outline-accent lg:flex-none ${
-              on ? 'bg-accent-soft text-accent' : 'text-ink-2 hover:bg-track'
+            className={`h-10 flex-1 rounded-[10px] px-3 text-sm whitespace-nowrap focus-visible:outline-2 focus-visible:outline-accent ${
+              on ? 'bg-surface font-medium text-ink shadow-sm' : 'text-ink-2 hover:text-ink'
             }`}
           >
             {n === 12 ? r.year : r.months(n)}

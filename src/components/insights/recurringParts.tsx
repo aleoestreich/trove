@@ -91,7 +91,7 @@ export function PriceBars({ item }: { item: RecurringItem }) {
     history.map((h) => `${formatMonthShort(h.month)} ${money(h.amount, currency)}`).join(', '),
   )
   return (
-    <div role="img" aria-label={label} className="flex flex-col gap-1">
+    <div role="img" data-chart aria-label={label} className="flex flex-col gap-1">
       <div aria-hidden className="flex h-[58px] items-end gap-1.5">
         {history.map((h, i) => {
           const last = i === history.length - 1
@@ -135,7 +135,6 @@ export function RecurringHistorySheet({ item, onClose }: { item: RecurringItem; 
   return (
     <Sheet
       title={item.merchant}
-      privateTitle
       onClose={onClose}
       footer={
         <button
