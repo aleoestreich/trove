@@ -548,13 +548,19 @@ describe('read window', () => {
 })
 
 describe('sync window', () => {
-  it('fetches back to January 2025 until a connection has been, then overlaps the last sync by 35 days', () => {
+  it('fetches back to January 2025 until a connection has been, then the last 3 months', () => {
+    const now = new Date('2026-10-08T15:00:00Z')
     expect(HISTORY_START).toBe('2025-01-01')
-    expect(syncFrom(null, null)).toBe('2025-01-01')
+    expect(syncFrom(null, null, now)).toBe('2025-01-01')
     // Synced before, but only back to October 2025: one full fetch.
-    expect(syncFrom(new Date('2026-10-01T00:00:00Z'), '2025-10-01')).toBe('2025-01-01')
-    expect(syncFrom(new Date('2026-10-01T00:00:00Z'), null)).toBe('2025-01-01')
-    expect(syncFrom(new Date('2026-10-01T00:00:00Z'), '2025-01-01')).toBe('2026-08-27')
+    expect(syncFrom(new Date('2026-10-01T00:00:00Z'), '2025-10-01', now)).toBe('2025-01-01')
+    expect(syncFrom(new Date('2026-10-01T00:00:00Z'), null, now)).toBe('2025-01-01')
+    // Every later sync: August, September and October.
+    expect(syncFrom(new Date('2026-10-07T00:00:00Z'), '2025-01-01', now)).toBe('2026-08-01')
+    // The month is Brazil's: 1 Nov 01:00 UTC is still 31 Oct there.
+    expect(syncFrom(new Date('2026-10-30T00:00:00Z'), '2025-01-01', new Date('2026-11-01T01:00:00Z'))).toBe('2026-08-01')
+    // After a long gap, the window reaches back to 35 days before the previous sync.
+    expect(syncFrom(new Date('2026-05-10T00:00:00Z'), '2025-01-01', now)).toBe('2026-04-05')
   })
 })
 

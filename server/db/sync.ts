@@ -30,7 +30,9 @@ import { inTransaction, type Db } from './connection.js'
  * one full fetch on its next sync.
  */
 export const HISTORY_START = '2025-01-01'
-/** Later syncs re-read this many days before the last one, to pick up late changes. */
+/** Later syncs re-read this many calendar months (the current one included), to pick up late changes. */
+export const SYNC_MONTHS = 3
+/** …and never less than this many days before the previous sync, so a long gap leaves nothing out. */
 const OVERLAP_DAYS = 35
 /** app_settings key holding how far back a connection has been fetched (YYYY-MM-DD). */
 const fetchedFromKey = (itemId: string) => `fetched_from:${itemId}`
@@ -41,12 +43,17 @@ const day = (v: unknown): string | null => (typeof v === 'string' && v ? brazilD
 
 /**
  * The first day of the window to fetch, as YYYY-MM-DD: HISTORY_START until
- * the connection has been fetched back to it (`fetchedFrom`), then 35 days
- * before its last sync.
+ * the connection has been fetched back to it (`fetchedFrom`). After that, the
+ * first day of the month SYNC_MONTHS − 1 months before `now` (in Brazil), so
+ * every sync updates the last 3 months; or 35 days before the previous sync,
+ * if that is earlier (a sync after a long gap still covers the gap).
  */
-export function syncFrom(lastSyncedAt: Date | null, fetchedFrom: string | null): string {
+export function syncFrom(lastSyncedAt: Date | null, fetchedFrom: string | null, now: Date = new Date()): string {
   if (!lastSyncedAt || !fetchedFrom || fetchedFrom > HISTORY_START) return HISTORY_START
-  return new Date(lastSyncedAt.getTime() - OVERLAP_DAYS * 86_400_000).toISOString().slice(0, 10)
+  const [y, m] = brazilDate(now.toISOString()).split('-').map(Number)
+  const first = new Date(Date.UTC(y, m - 1 - (SYNC_MONTHS - 1), 1)).toISOString().slice(0, 10)
+  const overlap = new Date(lastSyncedAt.getTime() - OVERLAP_DAYS * 86_400_000).toISOString().slice(0, 10)
+  return overlap < first ? overlap : first
 }
 
 /** A connection's name in Trove: the bank for Meu Pluggy items, else the connector. */
@@ -98,7 +105,7 @@ export async function syncConnection(
   const now = deps.now ?? new Date()
   const last = await pool.query<{ synced_at: Date }>(`SELECT synced_at FROM bank_connections WHERE id = $1`, [itemId])
   const fetchedFrom = await pool.query<{ day: string }>(`SELECT value #>> '{}' AS day FROM app_settings WHERE key = $1`, [fetchedFromKey(itemId)])
-  const from = syncFrom(last.rows[0]?.synced_at ?? null, fetchedFrom.rows[0]?.day ?? null)
+  const from = syncFrom(last.rows[0]?.synced_at ?? null, fetchedFrom.rows[0]?.day ?? null, now)
   const run = await pool.query<{ id: string }>(`INSERT INTO sync_runs (connection_id, trigger, started_at) VALUES (NULL, $1, $2) RETURNING id`, [
     deps.trigger ?? 'manual',
     now,
@@ -312,7 +319,7 @@ export async function save(db: Db, f: Fetched, now: Date): Promise<SyncResult> {
   // In the fetched window, what Pluggy no longer returns is marked removed. On a
   // full fetch (from HISTORY_START), the window starts at the earliest day Pluggy
   // returned: a bank that keeps less history than asked for must not remove the
-  // older transactions stored. A normal sync (35 days) uses its whole window, so
+  // older transactions stored. A normal sync (the last 3 months) uses its whole window, so
   // a pending transaction replaced by a later-dated one is still removed.
   const earliest = txRows.reduce((min, r) => (r.booked_on < min ? r.booked_on : min), '9999-12-31')
   const removeFrom = f.from <= HISTORY_START && txRows.length && earliest > f.from ? earliest : f.from

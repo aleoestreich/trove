@@ -167,8 +167,9 @@ database transaction:
   next sync of a connection fetched with a shorter window before. Pluggy
   returns what each bank provides from there (often about a year). How far
   back each connection has been fetched is kept in `app_settings`
-  (`fetched_from:<item ID>`). After that, syncs re-read from 35 days before
-  the previous sync;
+  (`fetched_from:<item ID>`). After that, every sync re-reads the last 3
+  months (from the 1st of the month two months back, in Brazil's time; or
+  from 35 days before the previous sync, if that is earlier);
 - transactions in that window that Pluggy no longer returns are marked
   removed (on a full fetch, only from the earliest day Pluggy returned, so a
   bank with a shorter history never removes older stored transactions);
