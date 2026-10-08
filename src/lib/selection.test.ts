@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { defaultCategories } from '../data/edits'
 import type { Transaction } from '../data/types'
 import { filterTransactions, newestFirst } from '../pages/Transactions'
-import { groupState, rangeIds, selectAllIds, summarize, toggleGroup } from './selection'
+import { bulkPick, groupState, rangeIds, selectAllIds, summarize, toggleGroup } from './selection'
 
 const { categories } = defaultCategories((c, i) => `${c}-${i}`)
 const categoriesById = new Map(categories.map((c) => [c.id, c]))
@@ -18,6 +18,16 @@ const list = [
 ]
 
 describe('bulk selection', () => {
+  it('drops a category pick that no longer fits the selection', () => {
+    const expense = { id: 'e', name: 'Mercado', type: 'expense' as const, color: 'green', icon: 'cart', sortOrder: 0 }
+    const sub = { id: 's', categoryId: 'e' }
+    expect(bulkPick('expense', expense, sub)).toEqual({ category: expense, sub })
+    // The selection became income (or mixed) after an expense category was picked.
+    expect(bulkPick('income', expense, sub)).toEqual({})
+    expect(bulkPick(null, expense, sub)).toEqual({})
+    // A subcategory of another category is not kept.
+    expect(bulkPick('expense', expense, { id: 'x', categoryId: 'other' })).toEqual({ category: expense, sub: undefined })
+  })
   it('"Selecionar tudo" selects every selectable row shown, respecting the search and filters', () => {
     expect(selectAllIds(list)).toEqual(['t1', 't2', 't3', 'pay'])
     const uncategorized = filterTransactions(list, categoriesById, { categoryId: 'none' })
