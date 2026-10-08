@@ -332,7 +332,7 @@ export function IncomeFilterSheet({ currentMonth, onClose, returnTo }: { current
         role="dialog"
         aria-modal
         aria-labelledby="income-filter-sheet"
-        className="flex max-h-[92dvh] w-full max-w-[480px] flex-col overflow-y-auto rounded-t-[28px] bg-surface px-4 pb-[calc(16px+env(safe-area-inset-bottom))] md:rounded-[28px] md:pt-4"
+        className="flex max-h-[92dvh] w-full max-w-[480px] flex-col overflow-y-auto [&>*]:shrink-0 rounded-t-[28px] bg-surface px-4 pb-[calc(16px+env(safe-area-inset-bottom))] md:rounded-[28px] md:pt-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-[22px] shrink-0 items-center justify-center md:hidden" aria-hidden>
