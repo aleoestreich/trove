@@ -381,21 +381,3 @@ export function BalanceChart({ entries, tint }: { entries: BalanceEntry[]; tint:
     </div>
   )
 }
-
-/** A dashed line under net worth's tiles, apart from what's added up: icon, name, note, amount, "Fora do total". */
-export function OutOfTotalLine({ icon, tint, label, sub, amount }: { icon: IconName; tint: Tint; label: string; sub: string; amount: number }) {
-  const { t } = useI18n()
-  return (
-    <div className="flex items-center gap-3 rounded-md border border-dashed border-line px-3 py-2.5">
-      <Disc icon={icon} tint={tint} size={32} />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-sm leading-5 text-ink">{label}</span>
-        <span className="text-xs leading-4 text-ink-2">{sub}</span>
-      </span>
-      <span className="flex shrink-0 flex-col items-end gap-1">
-        <span className="tabular text-[15px] leading-5 text-ink">{formatMoney(amount)}</span>
-        <Pill>{t.balance.outOfTotal}</Pill>
-      </span>
-    </div>
-  )
-}

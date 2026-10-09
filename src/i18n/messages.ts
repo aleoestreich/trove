@@ -54,9 +54,7 @@ export interface Messages {
     trackLabel: string
     trackNote: string
     keptNote: (count: number) => string
-    cardSub: string
     balanceOn: (date: string) => string
-    changeSince: (date: string) => string
     due: string
     emptyTitle: string
     emptyNote: string
@@ -79,10 +77,6 @@ export interface Messages {
       clearConfirm: string
       clearYes: string
       close: string
-    }
-    netWorth: {
-      label: string
-      sub: (date: string) => string
     }
     reminder: {
       title: string
@@ -122,15 +116,12 @@ export interface Messages {
     trackLabel: string
     trackNote: string
     keptNote: (count: number) => string
-    cardSub: string
     plans: (count: number) => string
     dueCount: (count: number) => string
-    totalNote: string
     add: string
     emptyTitle: string
     emptyNote: string
     balanceOn: (date: string) => string
-    noBalance: string
     changeSince: (date: string) => string
     badgeUpdate: string
     badgeNew: string
@@ -172,10 +163,6 @@ export interface Messages {
       balanceLabel: string
       balanceHint: string
     }
-    netWorth: {
-      label: string
-      sub: (count: number, date: string) => string
-    }
     reminder: {
       title: string
       oneLate: (name: string) => string
@@ -189,18 +176,19 @@ export interface Messages {
   }
   balancesReminder: {
     title: string
-    note: string
-    fgtsSub: (date: string) => string
-    planLate: string
+    balanceOf: (date: string) => string
     planNew: string
     plansLate: (count: number) => string
     plansLabel: string
     update: string
   }
-  netWorthNotes: {
-    both: string
-    fgts: string
-    pension: string
+  outOfTotal: {
+    title: string
+    manual: string
+    whyLabel: string
+    whyBoth: string
+    whyFgts: string
+    whyPension: string
   }
   privacy: {
     hide: string
@@ -239,13 +227,6 @@ export interface Messages {
     accountsLink: string
     inAccounts: string
     cardBills: string
-    accountsCount: (n: number) => string
-    cardsCount: (n: number) => string
-    netWorthNote: string
-    updated: (when: string) => string
-    today: (time: string) => string
-    yesterday: (time: string) => string
-    onDate: (date: string, time: string) => string
     bankStale: (bank: string, date: string) => string
     negativeNote: string
     /** Average income card. */
@@ -844,9 +825,7 @@ export const messages: Messages = {
     trackLabel: 'Acompanhar FGTS',
     trackNote: 'Saldo informado à mão, pelo app do FGTS. Fica fora do total.',
     keptNote: (count) => `Seu histórico de ${count === 1 ? '1 saldo' : `${count} saldos`} continua salvo.`,
-    cardSub: 'Informado à mão · fora do total',
     balanceOn: (date) => `Saldo em ${date}`,
-    changeSince: (date) => `desde ${date}`,
     due: 'Atualize o saldo deste mês',
     emptyTitle: 'Nenhum saldo informado ainda.',
     emptyNote: 'Abra o app do FGTS, veja o saldo total e informe aqui.',
@@ -869,10 +848,6 @@ export const messages: Messages = {
       clearConfirm: 'Apagar todos os saldos do FGTS? Não dá para desfazer.',
       clearYes: 'Apagar tudo',
       close: 'Fechar',
-    },
-    netWorth: {
-      label: 'FGTS',
-      sub: (date) => `saldo em ${date}`,
     },
     reminder: {
       title: 'Hora de atualizar o saldo do FGTS',
@@ -912,15 +887,12 @@ export const messages: Messages = {
     trackLabel: 'Acompanhar previdência privada',
     trackNote: 'Saldos informados à mão, plano a plano. Fica fora do total.',
     keptNote: (count) => (count === 1 ? 'Seu plano continua salvo.' : `Seus ${count} planos continuam salvos.`),
-    cardSub: 'Informado à mão · fora do total',
     plans: (count) => (count === 1 ? '1 plano' : `${count} planos`),
     dueCount: (count) => (count === 1 ? '1 plano precisa de atualização' : `${count} planos precisam de atualização`),
-    totalNote: 'O total soma o último saldo de cada plano. Fica fora do patrimônio líquido.',
     add: 'Adicionar plano',
     emptyTitle: 'Nenhum plano ainda.',
     emptyNote: 'Adicione cada plano com o nome que quiser.',
     balanceOn: (date) => `Saldo em ${date}`,
-    noBalance: 'Nenhum saldo informado',
     changeSince: (date) => `desde ${date}`,
     badgeUpdate: 'Atualizar saldo',
     badgeNew: 'Sem saldo ainda',
@@ -962,10 +934,6 @@ export const messages: Messages = {
       balanceLabel: 'Saldo',
       balanceHint: 'O saldo do plano, como aparece no extrato ou no app.',
     },
-    netWorth: {
-      label: 'Previdência privada',
-      sub: (count, date) => `${count === 1 ? '1 plano' : `${count} planos`} · saldos até ${date}`,
-    },
     reminder: {
       title: 'Hora de atualizar sua previdência',
       oneLate: (name) => `${name} está há mais de 1 mês sem atualização.`,
@@ -979,18 +947,19 @@ export const messages: Messages = {
   },
   balancesReminder: {
     title: 'Hora de atualizar seus saldos',
-    note: 'Valores informados à mão, fora do total.',
-    fgtsSub: (date) => `Última atualização em ${date}`,
-    planLate: 'Há mais de 1 mês sem atualização',
+    balanceOf: (date) => `Saldo de ${date}`,
     planNew: 'Sem saldo ainda',
     plansLate: (count) => `${count} planos sem atualização há mais de 1 mês`,
     plansLabel: 'Previdência privada',
     update: 'Atualizar',
   },
-  netWorthNotes: {
-    both: 'O total é dinheiro nas contas menos faturas. FGTS e previdência não entram.',
-    fgts: 'O total é dinheiro nas contas menos faturas. O FGTS não entra.',
-    pension: 'O total é dinheiro nas contas menos faturas. A previdência não entra.',
+  outOfTotal: {
+    title: 'Fora do total',
+    manual: 'Informados à mão',
+    whyLabel: 'Por que fica fora do total',
+    whyBoth: 'O total é dinheiro nas contas menos faturas. FGTS e previdência não entram.',
+    whyFgts: 'O total é dinheiro nas contas menos faturas. O FGTS não entra.',
+    whyPension: 'O total é dinheiro nas contas menos faturas. A previdência não entra.',
   },
   privacy: {
     hide: 'Ocultar valores',
@@ -1028,13 +997,6 @@ export const messages: Messages = {
     accountsLink: 'Contas',
     inAccounts: 'Dinheiro nas contas',
     cardBills: 'Faturas em aberto',
-    accountsCount: (n) => (n === 1 ? '1 conta' : `${n} contas`),
-    cardsCount: (n) => (n === 1 ? '1 cartão' : `${n} cartões`),
-    netWorthNote: 'Dinheiro nas contas menos faturas em aberto',
-    updated: (when) => `atualizado ${when}`,
-    today: (time) => `hoje às ${time}`,
-    yesterday: (time) => `ontem às ${time}`,
-    onDate: (date, time) => `em ${date} às ${time}`,
     bankStale: (bank, date) => `${bank} não atualizou hoje. O valor usa o saldo de ${date} desse banco.`,
     negativeNote: 'As faturas em aberto passam do dinheiro nas contas.',
     avgIncome: {
