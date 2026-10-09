@@ -9,6 +9,7 @@ import { applyRecurringAction } from '../../src/data/recurring.js'
 import type { Category, IncomeFilter, ProjectionSettings, RecurringOverride, Subcategory } from '../../src/data/types.js'
 import { inTransaction, type Db } from './connection.js'
 import { readSnapshot } from './read.js'
+import { sortFgts, type Fgts } from '../../src/data/fgts.js'
 
 /**
  * Seeds the default categories and subcategories (pt-BR names),
@@ -117,6 +118,21 @@ export async function readProjectionSettings(db: Db): Promise<ProjectionSettings
 export async function readRecurringOverrides(db: Db): Promise<Record<string, RecurringOverride>> {
   const r = await db.query<{ value: Record<string, RecurringOverride> }>(`SELECT value FROM app_settings WHERE key = $1`, [RECURRING_KEY])
   return r.rows[0]?.value ?? {}
+}
+
+/** Whether the FGTS balance is shown, in app_settings under `fgts`. */
+const FGTS_KEY = 'fgts'
+
+/** The FGTS balance tracked by hand: the setting, and every balance (manual_balances), newest first. */
+export async function readFgts(db: Db): Promise<Fgts> {
+  const setting = await db.query<{ value: { tracking?: unknown } }>(`SELECT value FROM app_settings WHERE key = $1`, [FGTS_KEY])
+  const rows = await db.query<{ id: string; as_of: string; balance_cents: string }>(
+    `SELECT id, to_char(as_of, 'YYYY-MM-DD') AS as_of, balance_cents FROM manual_balances WHERE kind = 'fgts'`,
+  )
+  return {
+    tracking: setting.rows[0]?.value?.tracking === true,
+    entries: sortFgts(rows.rows.map((r) => ({ id: r.id, date: r.as_of, balance: Number(r.balance_cents) }))),
+  }
 }
 
 async function writeSetting(db: Db, key: string, value: unknown): Promise<void> {
@@ -252,6 +268,23 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
     case 'renameAccount':
       // Its own column: syncs only write the bank's columns, so they never change it.
       await one(`UPDATE accounts SET nickname = $2 WHERE id = $1`, [e.accountId, e.name], 'account')
+      return null
+    case 'setFgtsTracking':
+      await writeSetting(db, FGTS_KEY, { tracking: e.tracking })
+      return null
+    case 'saveFgtsBalance':
+      await db.query(
+        `INSERT INTO manual_balances (id, kind, as_of, balance_cents) VALUES ($1, 'fgts', $2, $3)
+         ON CONFLICT (id) DO UPDATE SET as_of = excluded.as_of, balance_cents = excluded.balance_cents, updated_at = now()
+         WHERE manual_balances.kind = 'fgts'`,
+        [e.entry.id, e.entry.date, e.entry.balance],
+      )
+      return null
+    case 'deleteFgtsBalance':
+      await one(`DELETE FROM manual_balances WHERE id = $1 AND kind = 'fgts'`, [e.id], 'FGTS balance')
+      return null
+    case 'clearFgtsHistory':
+      await db.query(`DELETE FROM manual_balances WHERE kind = 'fgts'`)
       return null
     case 'setCardDays':
       // Their own columns too; cards only, as in the app.

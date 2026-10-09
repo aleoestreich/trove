@@ -48,6 +48,42 @@ export interface Messages {
     allNote: string
     download: string
   }
+  fgts: {
+    title: string
+    trackLabel: string
+    trackNote: string
+    explain: string
+    balanceOn: (date: string) => string
+    changeSince: (change: string, date: string) => string
+    noBalance: string
+    due: string
+    update: string
+    history: string
+    sheetTitle: string
+    editTitle: string
+    balanceLabel: string
+    balanceHint: string
+    balanceInvalid: string
+    dateLabel: string
+    dateFuture: string
+    save: string
+    saving: string
+    cancel: string
+    delete: string
+    failed: string
+    historyTitle: string
+    historyEmpty: string
+    clearHistory: string
+    clearConfirm: string
+    clearYes: string
+    netWorthLabel: string
+    netWorthNote: (date: string) => string
+    reminderTitle: string
+    reminderLast: (date: string) => string
+    reminderFirst: string
+    reminderAction: string
+    reminderLater: string
+  }
   privacy: {
     hide: string
     show: string
@@ -683,6 +719,42 @@ export const messages: Messages = {
     allNote:
       'Item, contas, todas as páginas de transações de cada conta e cartão (desde 2000, todo o histórico), faturas dos cartões e as transações deles também pelo endpoint antigo, identidade, investimentos e suas movimentações, e empréstimos. Um produto que o banco não compartilha aparece com o erro do Pluggy.',
     download: 'Baixar JSON',
+  },
+  fgts: {
+    title: 'FGTS',
+    trackLabel: 'Acompanhar FGTS',
+    trackNote: 'Saldo informado à mão, pelo app do FGTS. Fica fora do total.',
+    explain: 'Só pode ser sacado em casos previstos (como compra de imóvel), por isso fica fora do total.',
+    balanceOn: (date) => `Saldo em ${date}`,
+    changeSince: (change, date) => `${change} desde ${date}`,
+    noBalance: 'Nenhum saldo informado ainda.',
+    due: 'Atualize o saldo deste mês',
+    update: 'Atualizar saldo',
+    history: 'Histórico',
+    sheetTitle: 'Atualizar saldo do FGTS',
+    editTitle: 'Corrigir saldo do FGTS',
+    balanceLabel: 'Saldo total',
+    balanceHint: 'O total de todas as contas, como aparece no app do FGTS.',
+    balanceInvalid: 'Informe um valor, como 10.850,32.',
+    dateLabel: 'Data do saldo',
+    dateFuture: 'A data não pode ser depois de hoje.',
+    save: 'Salvar',
+    saving: 'Salvando…',
+    cancel: 'Cancelar',
+    delete: 'Excluir este saldo',
+    failed: 'Não foi possível salvar. Tente de novo.',
+    historyTitle: 'Histórico do FGTS',
+    historyEmpty: 'Nenhum saldo informado ainda.',
+    clearHistory: 'Apagar histórico',
+    clearConfirm: 'Apagar todos os saldos do FGTS? Não dá para desfazer.',
+    clearYes: 'Apagar tudo',
+    netWorthLabel: 'FGTS',
+    netWorthNote: (date) => `Fora do total · saldo em ${date}`,
+    reminderTitle: 'Hora de atualizar o saldo do FGTS',
+    reminderLast: (date) => `Última atualização em ${date}.`,
+    reminderFirst: 'Informe o saldo atual para começar o histórico.',
+    reminderAction: 'Atualizar saldo',
+    reminderLater: 'Agora não',
   },
   privacy: {
     hide: 'Ocultar valores',

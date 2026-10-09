@@ -46,7 +46,7 @@ suite('database', () => {
   })
   afterAll(() => pool.end())
   beforeEach(async () => {
-    await pool.query(`TRUNCATE app_settings, categories, subcategories, transactions, accounts, account_balances, card_bills, bank_connections, exchange_rates, sync_runs, sync_jobs, sync_job_items CASCADE`)
+    await pool.query(`TRUNCATE app_settings, manual_balances, categories, subcategories, transactions, accounts, account_balances, card_bills, bank_connections, exchange_rates, sync_runs, sync_jobs, sync_job_items CASCADE`)
     await ensureSeeded(pool)
   })
 
@@ -603,6 +603,34 @@ suite('database', () => {
     await pool.query(migration)
     await pool.query(migration)
     expect((await pool.query(`SELECT closing_date::text FROM card_bills`)).rows).toEqual([{ closing_date: '2026-10-02' }])
+  })
+
+  it('keeps the FGTS balance and its history, through syncs and with tracking off', async () => {
+    await sync([tx('t1')])
+    expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.fgts).toEqual({ tracking: false, entries: [] })
+    await applyEditSql(pool, { op: 'setFgtsTracking', tracking: true })
+    await applyEditSql(pool, { op: 'saveFgtsBalance', entry: { id: 'f1', date: '2026-08-21', balance: 9_000_00 } })
+    await applyEditSql(pool, { op: 'saveFgtsBalance', entry: { id: 'f2', date: '2026-09-22', balance: 10_000_00 } })
+    await applyEditSql(pool, { op: 'saveFgtsBalance', entry: { id: 'f1', date: '2026-08-21', balance: 9_500_00 } }) // corrected
+    await sync([tx('t1')])
+    await applyEditSql(pool, { op: 'setFgtsTracking', tracking: false })
+    expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.fgts).toEqual({
+      tracking: false,
+      entries: [
+        { id: 'f2', date: '2026-09-22', balance: 10_000_00 },
+        { id: 'f1', date: '2026-08-21', balance: 9_500_00 },
+      ],
+    })
+    await applyEditSql(pool, { op: 'deleteFgtsBalance', id: 'f2' })
+    await expect(applyEditSql(pool, { op: 'deleteFgtsBalance', id: 'f2' })).rejects.toThrow(EditError)
+    await applyEditSql(pool, { op: 'clearFgtsHistory' })
+    expect(await count('manual_balances')).toBe(0)
+  })
+
+  it('migration 010 can run again', async () => {
+    const migration = readFileSync(new URL('../../db/migrations/010_manual_balances.sql', import.meta.url), 'utf8')
+    await pool.query(migration)
+    await pool.query(migration)
   })
 
   it('GET /api/transactions fetches older months and every stored month, with the filters', async () => {

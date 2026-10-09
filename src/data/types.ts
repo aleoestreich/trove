@@ -1,6 +1,8 @@
 // Domain model. Shapes follow Pluggy's API (Item -> Account -> Transaction)
 // so the Phase 2 backend can map Pluggy responses onto them directly.
 
+import type { Fgts } from './fgts.js'
+
 /** ISO 4217 code (e.g. 'BRL', 'USD'). BRL is the home currency; everything is totalled in BRL. */
 export type CurrencyCode = string
 
@@ -165,6 +167,8 @@ export interface Snapshot {
   cardDays?: Record<string, { close: number; due: number }>
   /** Hand-set answers about detected recurring charges, by recurring charge ID. */
   recurringOverrides?: Record<string, RecurringOverride>
+  /** The FGTS balance tracked by hand (off, with no history, when absent). */
+  fgts?: Fgts
 }
 
 /** What the month-end projection counts. */
