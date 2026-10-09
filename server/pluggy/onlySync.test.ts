@@ -22,7 +22,8 @@ describe('only Sync calls Pluggy', () => {
       .filter((file) => /new PluggyClient\(/.test(readFileSync(join(root, file), 'utf8')))
       .map((file) => relative(root, join(root, file)))
       .sort()
-    expect(callers).toEqual(['server/db/handlers.ts', 'server/pluggy/connectToken.ts'])
+    // server/pluggy/debug.ts: TEMPORARY, the debug screen's read-only route; remove with it.
+    expect(callers).toEqual(['server/db/handlers.ts', 'server/pluggy/connectToken.ts', 'server/pluggy/debug.ts'])
   })
 
   it('in handlers.ts, only the sync worker does', () => {

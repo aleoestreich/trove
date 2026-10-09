@@ -128,6 +128,13 @@ export function Accounts() {
 
         {source === 'demo' && <p className="px-2 text-center text-xs leading-4 text-muted">{t.accounts.footer}</p>}
 
+        {/* TEMPORARY: the debug screen. */}
+        {isDeployed() && (
+          <Link to="/debug" className="flex h-11 items-center self-center px-3 text-xs leading-4 text-muted underline">
+            {t.debug.link}
+          </Link>
+        )}
+
       </div>
     </>
   )

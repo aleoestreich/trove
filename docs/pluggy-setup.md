@@ -145,6 +145,22 @@ When the sync can't start at all, the reason comes from the HTTP status of
 (invalid advanced sync options), `403` (a connection not in
 `PLUGGY_ITEM_IDS`, or an account not of one), or `5xx` (server or database).
 
+## Debug screen (temporary)
+
+**Contas → Depuração do Pluggy** (or `/#/debug`) on the deployed site shows
+Pluggy's raw answer for each call, as the server receives it: per item in
+`PLUGGY_ITEM_IDS`, the item, its accounts, each account's transactions (one
+page at a time, with "Próxima página") and a card's bills.
+
+- `GET /api/debug/pluggy` (rewritten to `api/sync.ts`, so no extra Vercel
+  Function) is behind the login, read-only, and only accepts configured items
+  and their own accounts (`403` otherwise).
+- Responses include values (amounts, descriptions) and are `no-store`, never
+  cached or logged; nothing is stored. Never paste them into an issue or PR.
+- It is the one exception to "only Sync reaches Pluggy" while it exists
+  (`server/pluggy/onlySync.test.ts` allows `server/pluggy/debug.ts`). Remove
+  it when it's no longer needed.
+
 ## Implementation
 
 - `api/finance.ts` → `server/db/handlers.ts`: `GET /api/finance` reads the

@@ -2,6 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     { "source": "/api/transactions", "destination": "/api/finance?view=transactions" },
+    { "source": "/api/debug/pluggy", "destination": "/api/sync?view=debug" },
     { "source": "/api/overview/income-average", "destination": "/api/insights?view=card" },
     { "source": "/api/overview/income-average/categories", "destination": "/api/insights?view=categories" },
     { "source": "/api/settings/income-average-filter", "destination": "/api/insights?view=filter" },

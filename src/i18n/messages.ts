@@ -17,6 +17,26 @@ export interface Messages {
   demoData: string
   demoNote: string
   /** Privacy mode: amounts, charts and descriptions blurred, for public places. */
+  /** TEMPORARY: the debug screen (#/debug), Pluggy's raw responses. */
+  debug: {
+    title: string
+    link: string
+    intro: string
+    loading: string
+    notConfigured: string
+    failed: (status: number) => string
+    item: (n: number) => string
+    accountsHint: string
+    itemCall: string
+    accountsCall: string
+    page: (n: number) => string
+    transactions: string
+    bills: string
+    nextPage: string
+    copy: string
+    copied: string
+    status: (status: number) => string
+  }
   privacy: {
     hide: string
     show: string
@@ -615,6 +635,25 @@ export const messages: Messages = {
   mainNav: 'Principal',
   demoData: 'Dados de exemplo',
   demoNote: 'Mostrando dados de exemplo até o Meu Pluggy ser conectado.',
+  debug: {
+    title: 'Depuração do Pluggy',
+    link: 'Depuração do Pluggy',
+    intro: 'A resposta do Pluggy para cada chamada, como o servidor recebe. Só quem está logado vê esta página. Temporária.',
+    loading: 'Carregando…',
+    notConfigured: 'O Pluggy não está configurado no servidor (PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET, PLUGGY_ITEM_IDS).',
+    failed: (status) => `A requisição falhou (HTTP ${status}).`,
+    item: (n) => `Item ${n}`,
+    accountsHint: 'Carregue as contas para ver cada conta.',
+    itemCall: 'Item',
+    accountsCall: 'Contas',
+    page: (n) => `Página ${n}`,
+    transactions: 'Transações',
+    bills: 'Faturas',
+    nextPage: 'Próxima página',
+    copy: 'Copiar JSON',
+    copied: 'Copiado',
+    status: (status) => `HTTP ${status}`,
+  },
   privacy: {
     hide: 'Ocultar valores',
     show: 'Mostrar valores',
