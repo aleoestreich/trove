@@ -92,11 +92,6 @@ export function formatMonth(key: string): string {
   return s[0].toUpperCase() + s.slice(1)
 }
 
-/** "set." */
-export function formatMonthShort(key: string): string {
-  return fmt({ month: 'short' }).format(parse(key))
-}
-
 /** "12 set." */
 export function formatDay(iso: string): string {
   const d = parse(iso)
@@ -120,6 +115,16 @@ export function formatDayHeading(iso: string): string {
 }
 
 /** "outubro" */
+/** "set." */
+export function formatMonthShort(key: string): string {
+  return fmt({ month: 'short' }).format(parse(key))
+}
+
+/** "22 set. 2026" */
+export function formatDayYear(iso: string): string {
+  return `${formatDay(iso)} ${iso.slice(0, 4)}`
+}
+
 export function formatMonthName(key: string): string {
   return fmt({ month: 'long' }).format(parse(key))
 }

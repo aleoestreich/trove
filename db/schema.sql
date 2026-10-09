@@ -241,3 +241,15 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value       jsonb NOT NULL,
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
+
+-- Balances typed in by hand (migration 010): one row per update. Today only
+-- the FGTS total; app_settings 'fgts' says whether it's shown.
+CREATE TABLE IF NOT EXISTS manual_balances (
+  id             text PRIMARY KEY,
+  kind           text NOT NULL CHECK (kind IN ('fgts')),
+  as_of          date NOT NULL,                  -- the day the balance refers to
+  balance_cents  bigint NOT NULL CHECK (balance_cents >= 0),
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS manual_balances_kind_idx ON manual_balances (kind, as_of DESC);

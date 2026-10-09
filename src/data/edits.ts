@@ -7,6 +7,7 @@ import { kindOf } from './categories.js'
 import { CATEGORY_COLORS, CATEGORY_ICONS, DEFAULT_CATEGORIES } from './categoryCatalog.js'
 import { hasSelection, normalizeIncomeFilter, pruneIncomeFilter } from './incomeAverage.js'
 import { RECURRING_ACTIONS, applyRecurringAction, type RecurringAction } from './recurring.js'
+import { FGTS_MAX, NO_FGTS, sortFgts, type FgtsEntry } from './fgts.js'
 import type { Category, CategoryType, IncomeFilter, ProjectionSettings, Snapshot, Subcategory, TransferOverride } from './types.js'
 
 export type Edit =
@@ -43,6 +44,13 @@ export type Edit =
   | { op: 'renameAccount'; accountId: string; name: string | null }
   /** Sets a card's closing and due days (1–31); null goes back to the bank's dates (or the bills'). */
   | { op: 'setCardDays'; accountId: string; days: { close: number; due: number } | null }
+  /** Shows or hides the FGTS balance (src/data/fgts.ts); hiding keeps its history. */
+  | { op: 'setFgtsTracking'; tracking: boolean }
+  /** Adds an FGTS balance, or corrects one with the same ID. */
+  | { op: 'saveFgtsBalance'; entry: FgtsEntry }
+  | { op: 'deleteFgtsBalance'; id: string }
+  /** Deletes every FGTS balance. */
+  | { op: 'clearFgtsHistory' }
 
 /** A transaction's category before a bulk change. `editedAt`: when it was last set by hand (server only). */
 export interface PreviousCategory {
@@ -78,6 +86,8 @@ export const NAME_MAX = 40
 /** Longest name set in Trove for an account or card. */
 export const NICKNAME_MAX = 30
 const ID = /^[A-Za-z0-9_-]{1,64}$/
+/** A real calendar day, YYYY-MM-DD. */
+const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && new Date(`${v}T12:00:00Z`).toISOString().slice(0, 10) === v
 
 /** A name as stored: trimmed, single spaces. */
 export const cleanName = (name: string) => name.trim().replace(/\s+/g, ' ')
@@ -202,6 +212,19 @@ export function validateEdit(e: unknown): Edit {
       if (n !== null && n.length > NICKNAME_MAX) bad('name')
       return { op: 'renameAccount', accountId: id(x.accountId, 'account'), name: n || null }
     }
+    case 'setFgtsTracking':
+      if (typeof x.tracking !== 'boolean') bad('tracking')
+      return { op: 'setFgtsTracking', tracking: x.tracking as boolean }
+    case 'saveFgtsBalance': {
+      const v = (x.entry ?? {}) as Record<string, unknown>
+      if (!isDay(v.date)) bad('date')
+      if (!Number.isSafeInteger(v.balance) || (v.balance as number) < 0 || (v.balance as number) > FGTS_MAX) bad('balance')
+      return { op: 'saveFgtsBalance', entry: { id: id(v.id, 'id'), date: v.date as string, balance: v.balance as number } }
+    }
+    case 'deleteFgtsBalance':
+      return { op: 'deleteFgtsBalance', id: id(x.id, 'id') }
+    case 'clearFgtsHistory':
+      return { op: 'clearFgtsHistory' }
     case 'setCardDays': {
       if (x.days === null) return { op: 'setCardDays', accountId: id(x.accountId, 'account'), days: null }
       const d = (x.days ?? {}) as Record<string, unknown>
@@ -315,6 +338,19 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
       const { [e.accountId]: _old, ...others } = s.accountNames ?? {}
       return withAccountNames({ ...s, accountNames: e.name ? { ...others, [e.accountId]: e.name } : others })
     }
+    case 'setFgtsTracking':
+      return { ...s, fgts: { ...(s.fgts ?? NO_FGTS), tracking: e.tracking } }
+    case 'saveFgtsBalance': {
+      const f = s.fgts ?? NO_FGTS
+      return { ...s, fgts: { ...f, entries: sortFgts([...f.entries.filter((x) => x.id !== e.entry.id), e.entry]) } }
+    }
+    case 'deleteFgtsBalance': {
+      const f = s.fgts ?? NO_FGTS
+      if (!f.entries.some((x) => x.id === e.id)) fail('not_found', 'FGTS balance')
+      return { ...s, fgts: { ...f, entries: f.entries.filter((x) => x.id !== e.id) } }
+    }
+    case 'clearFgtsHistory':
+      return { ...s, fgts: { ...(s.fgts ?? NO_FGTS), entries: [] } }
     case 'setCardDays': {
       if (!s.accounts.some((a) => a.id === e.accountId && a.type === 'CREDIT')) fail('not_found', 'card')
       const { [e.accountId]: _old, ...others } = s.cardDays ?? {}
@@ -413,7 +449,10 @@ export function defaultCategories(subId: (categoryId: string, index: number) => 
   }
 }
 
-/** A new ID for a category or subcategory. */
+/** A new ID for a category, subcategory or FGTS balance. */
 export function newId(): string {
-  return crypto.randomUUID()
+  // randomUUID needs a secure page; the dev server reached over Wi-Fi (plain http) isn't one.
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const b = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
 }

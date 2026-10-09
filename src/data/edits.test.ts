@@ -229,3 +229,34 @@ describe('a card’s closing and due days', () => {
     expect(() => applyEdit(withCards(), { op: 'setCardDays', accountId: 'acc-1', days: { close: 3, due: 10 } })).toThrow(EditError)
   })
 })
+
+describe('the FGTS balance', () => {
+  const entry = (id: string, date: string, balance: number) => ({ id, date, balance })
+
+  it('turns tracking on and off, keeping the history', () => {
+    const on = applyEdit(snapshot(), validateEdit({ op: 'setFgtsTracking', tracking: true }))
+    expect(on.fgts).toEqual({ tracking: true, entries: [] })
+    const saved = applyEdit(on, validateEdit({ op: 'saveFgtsBalance', entry: entry('f1', '2026-09-22', 10_000_00) }))
+    const off = applyEdit(saved, validateEdit({ op: 'setFgtsTracking', tracking: false }))
+    expect(off.fgts).toEqual({ tracking: false, entries: [entry('f1', '2026-09-22', 10_000_00)] })
+  })
+
+  it('adds balances newest first, corrects one by ID, deletes one or all', () => {
+    let s = applyEdit(snapshot(), { op: 'saveFgtsBalance', entry: entry('f1', '2026-08-21', 9_000_00) })
+    s = applyEdit(s, { op: 'saveFgtsBalance', entry: entry('f2', '2026-09-22', 10_000_00) })
+    expect(s.fgts?.entries.map((e) => e.id)).toEqual(['f2', 'f1'])
+    s = applyEdit(s, { op: 'saveFgtsBalance', entry: entry('f1', '2026-10-21', 11_000_00) })
+    expect(s.fgts?.entries).toEqual([entry('f1', '2026-10-21', 11_000_00), entry('f2', '2026-09-22', 10_000_00)])
+    s = applyEdit(s, { op: 'deleteFgtsBalance', id: 'f2' })
+    expect(s.fgts?.entries.map((e) => e.id)).toEqual(['f1'])
+    expect(() => applyEdit(s, { op: 'deleteFgtsBalance', id: 'f2' })).toThrow(EditError)
+    expect(applyEdit(s, validateEdit({ op: 'clearFgtsHistory' })).fgts?.entries).toEqual([])
+  })
+
+  it('refuses a negative, fractional or huge balance and a date that isn’t a real day', () => {
+    for (const bad of [entry('f1', '2026-09-22', -1), entry('f1', '2026-09-22', 1.5), entry('f1', '2026-09-22', 100_000_000_01), entry('f1', '2026-02-30', 1), entry('f1', '22/09/2026', 1), entry('', '2026-09-22', 1)])
+      expect(() => validateEdit({ op: 'saveFgtsBalance', entry: bad })).toThrow(EditError)
+    expect(() => validateEdit({ op: 'setFgtsTracking', tracking: 'yes' })).toThrow(EditError)
+  })
+})
+

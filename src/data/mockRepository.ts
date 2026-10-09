@@ -21,6 +21,8 @@ interface DemoOwner {
   accountNames?: Record<string, string>
   /** Closing and due days set for cards. */
   cardDays?: Snapshot['cardDays']
+  /** The FGTS balance tracked by hand. */
+  fgts?: Snapshot['fgts']
 }
 
 function read(): DemoOwner | null {
@@ -60,6 +62,7 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
     ...seed,
     accountNames: owner.accountNames,
     cardDays: owner.cardDays,
+    fgts: owner.fgts,
     categories: owner.categories,
     subcategories: owner.subcategories,
     incomeFilter: owner.incomeFilter,
@@ -114,6 +117,7 @@ export function createMockRepository(today: Date = new Date()): Repository {
         recurringOverrides: next.recurringOverrides,
         accountNames: next.accountNames,
         cardDays: next.cardDays,
+        fgts: next.fgts,
       })
       return previous && { updated: previous.length, previous }
     },
