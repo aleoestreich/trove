@@ -67,6 +67,10 @@ it adds the accounts' `card_close_day` and `card_due_day` and the bills'
 (see [Card closing days](#card-closing-days)). Until it runs, every page
 reports that the tables are out of date.
 
+Then run [`db/migrations/010_manual_balances.sql`](../db/migrations/010_manual_balances.sql):
+it adds `manual_balances`, for the [FGTS balance](#fgts-balance). Until it
+runs, every page reports that the tables are out of date.
+
 ## 3. Give Vercel the connection string
 
 1. In Neon, open **Connect**, choose the database and role, and turn
@@ -370,6 +374,26 @@ A card's bill needs its closing and due dates. In order, they come from:
    `billClosingDate`, stored by each sync), or, when the bank doesn't
    report it, an estimate from the purchases charged to each bill
    (`src/data/closingDay.ts`).
+
+## FGTS balance
+
+No bank connection reports the FGTS, so its total is typed in by hand on
+Accounts and kept as a history (`src/data/fgts.ts`):
+
+- Every update is a row of `manual_balances` (`kind = 'fgts'`, the day it
+  refers to and the balance in cents), migration 010. A correction rewrites
+  its row; deleting removes it.
+- Whether it's shown is `app_settings` `fgts` (`{ "tracking": true }`).
+  Turning it off keeps the rows.
+- Edits, through `POST /api/edits`: `setFgtsTracking`, `saveFgtsBalance`
+  (`entry: { id, date, balance }`), `deleteFgtsBalance` and
+  `clearFgtsHistory`. Both read with the snapshot (`fgts`).
+- It never counts in a total: net worth shows it as its own line, and it
+  stays out of income, spending, insights and the projection. Sync never
+  touches it.
+- Visão geral reminds to update it from the 20th of a month without a
+  balance for that month (employers deposit by the 20th), or when the
+  latest balance is more than a month old.
 
 ## Reads
 

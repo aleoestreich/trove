@@ -17,6 +17,7 @@ import { sortForDisplay } from '../lib/accountOrder'
 import { isDeployed } from '../lib/useIsDesktop'
 import { ConnectMeuPluggy } from '../components/ConnectMeuPluggy'
 import { CardDaysEditor } from '../components/CardDaysEditor'
+import { FgtsSection } from '../components/Fgts'
 import { RenameButton } from '../components/RenameAccount'
 import { SyncBar } from '../components/SyncBar'
 import { needsReconnect } from '../lib/syncProblems'
@@ -103,12 +104,16 @@ export function Accounts() {
           <span className="text-[13px] leading-[18px] text-muted">{t.accounts.totalNote}</span>
         </section>
 
-        {/* Phones: one list. Desktop: two columns, filled alternately. */}
-        <div className="flex flex-col gap-3 lg:hidden">{institutions.map(bankCard)}</div>
+        {/* Phones: one list, then the FGTS. Desktop: two columns, filled alternately; the FGTS at the end of the right one. */}
+        <div className="flex flex-col gap-3 lg:hidden">
+          {institutions.map(bankCard)}
+          <FgtsSection />
+        </div>
         <div className="hidden grid-cols-2 items-start gap-5 lg:grid">
           {[0, 1].map((col) => (
             <div key={col} className="flex flex-col gap-5">
               {institutions.filter((_, i) => i % 2 === col).map(bankCard)}
+              {col === 1 && <FgtsSection />}
             </div>
           ))}
         </div>

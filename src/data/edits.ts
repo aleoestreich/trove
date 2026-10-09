@@ -449,7 +449,10 @@ export function defaultCategories(subId: (categoryId: string, index: number) => 
   }
 }
 
-/** A new ID for a category or subcategory. */
+/** A new ID for a category, subcategory or FGTS balance. */
 export function newId(): string {
-  return crypto.randomUUID()
+  // randomUUID needs a secure page; the dev server reached over Wi-Fi (plain http) isn't one.
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const b = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
 }

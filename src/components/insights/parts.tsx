@@ -71,14 +71,19 @@ function useDialog(ref: RefObject<HTMLElement | null>, onClose: () => void) {
 /** A bottom sheet over a scrim (a centred dialog from tablets up). */
 export function Sheet({
   title,
+  subtitle,
   onClose,
   children,
   footer,
+  width = 'md:max-w-[480px]',
 }: {
   title: string
+  subtitle?: string
   onClose(): void
   children: ReactNode
   footer?: ReactNode
+  /** Its width from tablets up (Tailwind class). */
+  width?: string
 }) {
   const ref = useRef<HTMLElement>(null)
   const { t } = useI18n()
@@ -90,14 +95,17 @@ export function Sheet({
         role="dialog"
         aria-modal
         aria-label={title}
-        className="flex max-h-[92dvh] w-full max-w-[480px] flex-col overflow-y-auto rounded-t-xl bg-surface px-4 pb-[calc(16px+env(safe-area-inset-bottom))] md:rounded-xl md:px-6 md:pt-5 md:pb-5 [&>*]:shrink-0"
+        className={`flex max-h-[92dvh] w-full max-w-[480px] flex-col overflow-y-auto rounded-t-xl ${width} bg-surface px-4 pb-[calc(16px+env(safe-area-inset-bottom))] md:rounded-xl md:px-6 md:pt-5 md:pb-5 [&>*]:shrink-0`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-[22px] shrink-0 items-center justify-center md:hidden" aria-hidden>
           <span className="h-1 w-8 rounded-full bg-line" />
         </div>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-lg leading-6 font-medium text-ink">{title}</h2>
+          <span className="flex min-w-0 flex-col">
+            <h2 className="text-lg leading-6 font-medium text-ink">{title}</h2>
+            {subtitle && <span className="text-[13px] leading-[18px] text-ink-2">{subtitle}</span>}
+          </span>
           <button type="button" onClick={onClose} aria-label={t.close} className="-mr-2 flex size-11 items-center justify-center rounded-md text-ink-2 hover:bg-track">
             <Icon name="close" className="size-5" />
           </button>

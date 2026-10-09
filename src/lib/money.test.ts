@@ -31,7 +31,8 @@ describe('amounts typed in reais', () => {
     expect(parseMoney('10.850')).toBe(10_850_00)
     expect(parseMoney('1.234.567,8')).toBe(1_234_567_80)
     expect(parseMoney(',5')).toBe(50)
-    expect(moneyInput(10_850_05)).toBe('10850,05')
+    expect(moneyInput(10_850_05)).toBe('10.850,05')
+    expect(parseMoney(moneyInput(1_234_567_89))).toBe(1_234_567_89)
   })
 
   it('refuses what isn’t an amount', () => {

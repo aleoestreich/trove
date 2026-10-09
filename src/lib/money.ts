@@ -73,9 +73,9 @@ export function parseMoney(text: string): Cents | null {
   return Number(whole || '0') * 100 + Number(frac.padEnd(2, '0') || '0')
 }
 
-/** Cents as typed in a field: "10850,32" (no grouping, no symbol). */
+/** Cents as typed in a field: "10.850,32" (no symbol; never masked, it's what's being edited). */
 export function moneyInput(cents: Cents): string {
-  return `${Math.floor(cents / 100)},${String(cents % 100).padStart(2, '0')}`
+  return new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100)
 }
 
 /** Convert a foreign amount to BRL cents at `rate` BRL per unit. */

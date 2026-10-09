@@ -49,40 +49,71 @@ export interface Messages {
     download: string
   }
   fgts: {
-    title: string
+    section: string
+    outOfTotal: string
     trackLabel: string
     trackNote: string
-    explain: string
+    keptNote: (count: number) => string
+    cardSub: string
     balanceOn: (date: string) => string
-    changeSince: (change: string, date: string) => string
-    noBalance: string
+    changeSince: (date: string) => string
     due: string
+    emptyTitle: string
+    emptyNote: string
+    explain: string
     update: string
     history: string
-    sheetTitle: string
-    editTitle: string
-    balanceLabel: string
-    balanceHint: string
-    balanceInvalid: string
-    dateLabel: string
-    dateFuture: string
-    save: string
-    saving: string
-    cancel: string
-    delete: string
-    failed: string
-    historyTitle: string
-    historyEmpty: string
-    clearHistory: string
-    clearConfirm: string
-    clearYes: string
-    netWorthLabel: string
-    netWorthNote: (date: string) => string
-    reminderTitle: string
-    reminderLast: (date: string) => string
-    reminderFirst: string
-    reminderAction: string
-    reminderLater: string
+    sheet: {
+      title: string
+      editTitle: string
+      subtitle: string
+      correcting: (date: string) => string
+      balanceLabel: string
+      balanceHint: string
+      balanceInvalid: string
+      dateLabel: string
+      today: (date: string) => string
+      dateHint: string
+      dateFuture: string
+      save: string
+      saveCorrection: string
+      saving: string
+      cancel: string
+      failed: string
+      delete: string
+      deleteConfirm: (date: string) => string
+      deleteYes: string
+    }
+    list: {
+      title: string
+      subtitle: string
+      chartTitle: string
+      chartSince: (change: string, month: string) => string
+      chartCount: (count: number) => string
+      label: string
+      latest: string
+      withdrawal: string
+      first: string
+      edit: (date: string) => string
+      emptyTitle: string
+      emptyNote: string
+      clear: string
+      clearConfirm: string
+      clearYes: string
+      close: string
+    }
+    netWorth: {
+      label: string
+      sub: (date: string) => string
+      note: string
+    }
+    reminder: {
+      title: string
+      last: (date: string) => string
+      first: string
+      action: string
+      later: string
+    }
   }
   privacy: {
     hide: string
@@ -721,40 +752,71 @@ export const messages: Messages = {
     download: 'Baixar JSON',
   },
   fgts: {
-    title: 'FGTS',
+    section: 'FGTS',
+    outOfTotal: 'Fora do total',
     trackLabel: 'Acompanhar FGTS',
     trackNote: 'Saldo informado à mão, pelo app do FGTS. Fica fora do total.',
-    explain: 'Só pode ser sacado em casos previstos (como compra de imóvel), por isso fica fora do total.',
+    keptNote: (count) => `Seu histórico de ${count === 1 ? '1 saldo' : `${count} saldos`} continua salvo.`,
+    cardSub: 'Informado à mão · fora do total',
     balanceOn: (date) => `Saldo em ${date}`,
-    changeSince: (change, date) => `${change} desde ${date}`,
-    noBalance: 'Nenhum saldo informado ainda.',
+    changeSince: (date) => `desde ${date}`,
     due: 'Atualize o saldo deste mês',
+    emptyTitle: 'Nenhum saldo informado ainda.',
+    emptyNote: 'Abra o app do FGTS, veja o saldo total e informe aqui.',
+    explain: 'Só pode ser sacado em casos previstos (como compra de imóvel), por isso fica fora do total.',
     update: 'Atualizar saldo',
     history: 'Histórico',
-    sheetTitle: 'Atualizar saldo do FGTS',
-    editTitle: 'Corrigir saldo do FGTS',
-    balanceLabel: 'Saldo total',
-    balanceHint: 'O total de todas as contas, como aparece no app do FGTS.',
-    balanceInvalid: 'Informe um valor, como 10.850,32.',
-    dateLabel: 'Data do saldo',
-    dateFuture: 'A data não pode ser depois de hoje.',
-    save: 'Salvar',
-    saving: 'Salvando…',
-    cancel: 'Cancelar',
-    delete: 'Excluir este saldo',
-    failed: 'Não foi possível salvar. Tente de novo.',
-    historyTitle: 'Histórico do FGTS',
-    historyEmpty: 'Nenhum saldo informado ainda.',
-    clearHistory: 'Apagar histórico',
-    clearConfirm: 'Apagar todos os saldos do FGTS? Não dá para desfazer.',
-    clearYes: 'Apagar tudo',
-    netWorthLabel: 'FGTS',
-    netWorthNote: (date) => `Fora do total · saldo em ${date}`,
-    reminderTitle: 'Hora de atualizar o saldo do FGTS',
-    reminderLast: (date) => `Última atualização em ${date}.`,
-    reminderFirst: 'Informe o saldo atual para começar o histórico.',
-    reminderAction: 'Atualizar saldo',
-    reminderLater: 'Agora não',
+    sheet: {
+      title: 'Atualizar saldo do FGTS',
+      editTitle: 'Corrigir saldo do FGTS',
+      subtitle: 'Saldo total, como no app do FGTS',
+      correcting: (date) => `Você está corrigindo o saldo de ${date}.`,
+      balanceLabel: 'Saldo total',
+      balanceHint: 'O total de todas as contas, como aparece no app do FGTS.',
+      balanceInvalid: 'Informe um valor, como 10.850,32.',
+      dateLabel: 'Data do saldo',
+      today: (date) => `Hoje, ${date}`,
+      dateHint: 'Use a data que aparece junto do saldo no app.',
+      dateFuture: 'A data não pode ser depois de hoje.',
+      save: 'Salvar',
+      saveCorrection: 'Salvar correção',
+      saving: 'Salvando…',
+      cancel: 'Cancelar',
+      failed: 'Não foi possível salvar o saldo. Confira a conexão e tente de novo.',
+      delete: 'Excluir este saldo',
+      deleteConfirm: (date) => `Excluir o saldo de ${date}? A variação do mês seguinte é recalculada. Não dá para desfazer.`,
+      deleteYes: 'Excluir',
+    },
+    list: {
+      title: 'Histórico do FGTS',
+      subtitle: 'Fora do patrimônio líquido',
+      chartTitle: 'Saldo ao longo do tempo',
+      chartSince: (change, month) => `${change} desde ${month}`,
+      chartCount: (count) => (count === 1 ? '1 saldo' : `${count} saldos`),
+      label: 'Saldos informados · toque para corrigir',
+      latest: 'Mais recente',
+      withdrawal: 'saque',
+      first: 'Primeiro saldo',
+      edit: (date) => `Corrigir o saldo de ${date}`,
+      emptyTitle: 'Nenhum saldo no histórico',
+      emptyNote: 'Cada vez que você atualizar o saldo, ele aparece aqui.',
+      clear: 'Apagar histórico',
+      clearConfirm: 'Apagar todos os saldos do FGTS? Não dá para desfazer.',
+      clearYes: 'Apagar tudo',
+      close: 'Fechar',
+    },
+    netWorth: {
+      label: 'FGTS',
+      sub: (date) => `saldo em ${date}`,
+      note: 'O total é dinheiro nas contas menos faturas. O FGTS não entra.',
+    },
+    reminder: {
+      title: 'Hora de atualizar o saldo do FGTS',
+      last: (date) => `Última atualização em ${date}${date.endsWith('.') ? '' : '.'}`,
+      first: 'Informe o saldo atual para começar o histórico.',
+      action: 'Atualizar saldo',
+      later: 'Agora não',
+    },
   },
   privacy: {
     hide: 'Ocultar valores',

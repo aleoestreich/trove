@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Repository } from './data/repository'
 import { errorMessage, SyncStartError } from './data/apiRepository'
 import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/syncProblems'
+import { NO_FGTS, type Fgts } from './data/fgts'
 import { applyCardDays, deviceCardDays, forgetDeviceCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
 import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type SyncOptions, type Transaction } from './data/types'
@@ -59,7 +60,16 @@ interface AppData extends Snapshot {
   renameAccount(accountId: string, name: string | null): Promise<void>
   /** Set (or clear, with null) a card's closing and due days; saved in the database. */
   setCardDays(accountId: string, days: CardDays | null): void
+  /** The FGTS balance tracked by hand (src/data/fgts.ts). */
+  fgts: Fgts
+  /** Shows or hides it (the history stays). */
+  setFgtsTracking(tracking: boolean): void
+  /** Saves a balance, deletes one or clears the history, server first; rejects with a message for the UI. */
+  saveFgts(e: FgtsEdit): Promise<void>
 }
+
+/** The FGTS edits saved from its sheets. */
+export type FgtsEdit = Extract<Edit, { op: 'saveFgtsBalance' | 'deleteFgtsBalance' | 'clearFgtsHistory' }>
 
 const DataContext = createContext<AppData | null>(null)
 
@@ -222,6 +232,13 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [save],
   )
 
+  const setFgtsTracking = useCallback((tracking: boolean) => edit({ op: 'setFgtsTracking', tracking }), [edit])
+  const saveFgts = useCallback(
+    async (e: FgtsEdit) => {
+      await save(e)
+    },
+    [save],
+  )
   const setCardDays = useCallback((accountId: string, days: CardDays | null) => edit({ op: 'setCardDays', accountId, days }), [edit])
 
   // Days an older version kept on this device move to the database once (a
@@ -401,8 +418,11 @@ export function DataProvider({ repository, children }: { repository: Repository;
       saveIncomeFilter,
       renameAccount,
       setCardDays,
+      fgts: snapshot.fgts ?? NO_FGTS,
+      setFgtsTracking,
+      saveFgts,
     }
-  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
+  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, setFgtsTracking, saveFgts, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

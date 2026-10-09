@@ -99,6 +99,8 @@ No backend, no auth. It runs in the browser on hardcoded data.
   (the purchases charged to each), for banks that report no closing date.
 - ✅ Card closing days in the database (they were kept per device), and each
   bill's closing date stored.
+- ✅ FGTS balance tracked by hand (Accounts), with its history and a monthly
+  reminder; shown apart from net worth.
 - Next: use the stored card bills for the current bill (PR #23 reads them live).
 
 ## Phase 3 — Authentication & security
