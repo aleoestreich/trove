@@ -14,9 +14,9 @@ describe('previdência privada', () => {
     expect(planLatest(plan('a'))).toBeNull()
   })
 
-  it('adds up the plans’ latest balances, with the oldest date among them', () => {
+  it('adds up the plans’ latest balances, up to the newest of their dates', () => {
     const p: Pension = { tracking: true, plans: [plan('a', ['2026-08-10', 1_000_00], ['2026-09-10', 2_000_00]), plan('b', ['2026-09-02', 500_00]), plan('c')] }
-    expect(pensionTotal(p)).toEqual({ total: 2_500_00, oldest: '2026-09-02', plans: 2 })
+    expect(pensionTotal(p)).toEqual({ total: 2_500_00, upTo: '2026-09-10', plans: 2 })
     expect(pensionTotal({ tracking: true, plans: [plan('c')] })).toBeNull()
   })
 

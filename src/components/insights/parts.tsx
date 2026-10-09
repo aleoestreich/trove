@@ -72,13 +72,19 @@ function useDialog(ref: RefObject<HTMLElement | null>, onClose: () => void) {
 export function Sheet({
   title,
   subtitle,
+  lead,
+  actions,
   onClose,
   children,
   footer,
   width = 'md:max-w-[480px]',
 }: {
   title: string
-  subtitle?: string
+  subtitle?: ReactNode
+  /** Before the title (an icon disc). */
+  lead?: ReactNode
+  /** Before the close button (icon buttons). */
+  actions?: ReactNode
   onClose(): void
   children: ReactNode
   footer?: ReactNode
@@ -102,10 +108,12 @@ export function Sheet({
           <span className="h-1 w-8 rounded-full bg-line" />
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="flex min-w-0 flex-col">
+          {lead}
+          <span className="flex min-w-0 flex-1 flex-col">
             <h2 className="text-lg leading-6 font-medium text-ink">{title}</h2>
             {subtitle && <span className="text-[13px] leading-[18px] text-ink-2">{subtitle}</span>}
           </span>
+          {actions}
           <button type="button" onClick={onClose} aria-label={t.close} className="-mr-2 flex size-11 items-center justify-center rounded-md text-ink-2 hover:bg-track">
             <Icon name="close" className="size-5" />
           </button>

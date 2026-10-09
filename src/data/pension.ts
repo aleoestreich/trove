@@ -49,11 +49,11 @@ export function planLatest(plan: PensionPlan): { latest: PensionEntry; change: C
   return latest ? { latest, change: previous ? latest.balance - previous.balance : null } : null
 }
 
-/** The plans' latest balances added up, and the oldest of their dates (null without any balance). */
-export function pensionTotal(pension: Pension): { total: Cents; oldest: string; plans: number } | null {
+/** The plans' latest balances added up, how many plans have one, and the newest of their dates ("saldos até…"); null without any balance. */
+export function pensionTotal(pension: Pension): { total: Cents; upTo: string; plans: number } | null {
   const latest = pension.plans.map((p) => planLatest(p)?.latest).filter((e): e is PensionEntry => !!e)
   if (latest.length === 0) return null
-  return { total: latest.reduce((sum, e) => sum + e.balance, 0), oldest: latest.map((e) => e.date).sort()[0], plans: latest.length }
+  return { total: latest.reduce((sum, e) => sum + e.balance, 0), upTo: latest.map((e) => e.date).sort().reverse()[0], plans: latest.length }
 }
 
 /** Whether a plan's balance should be updated on `today`: none yet, or the latest is more than a month old. */

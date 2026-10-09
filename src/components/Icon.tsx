@@ -68,7 +68,7 @@ export const UI_ICONS = [
   'accounts', 'alert', 'bankItau', 'bankNubank', 'bankSantander', 'bankWise', 'card', 'catFreelance', 'catGroceries',
   'catHealth', 'catOther', 'catRent', 'catRestaurants', 'catSalary', 'catShopping', 'catSubscriptions', 'catTransfer',
   'catTransport', 'catTravel', 'check', 'checking', 'chevronDown', 'chevronLeft', 'chevronRight', 'close', 'cloudCheck',
-  'cloudOff', 'copy', 'edit', 'eyeOff', 'eye', 'globe', 'installments', 'link', 'lock', 'overview', 'plug', 'plus',
+  'cloudOff', 'copy', 'edit', 'eyeOff', 'eye', 'globe', 'installments', 'link', 'lock', 'overview', 'piggy', 'plug', 'plus',
   'refresh', 'savings', 'search', 'sync', 'tabCategories', 'transactions', 'transfer', 'trash', 'trendUp',
   'uncategorized', 'usdBalance',
 ] as const

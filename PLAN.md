@@ -101,6 +101,9 @@ No backend, no auth. It runs in the browser on hardcoded data.
   bill's closing date stored.
 - ✅ FGTS balance tracked by hand (Accounts), with its history and a monthly
   reminder; shown apart from net worth.
+- ✅ Previdência privada tracked by hand (Accounts): named plans (PGBL/VGBL),
+  each with its history, a reminder a month after the latest balance; shown
+  apart from net worth.
 - Next: use the stored card bills for the current bill (PR #23 reads them live).
 
 ## Phase 3 — Authentication & security

@@ -67,34 +67,12 @@ export interface Messages {
       title: string
       editTitle: string
       subtitle: string
-      correcting: (date: string) => string
       balanceLabel: string
       balanceHint: string
-      balanceInvalid: string
-      dateLabel: string
-      today: (date: string) => string
-      dateHint: string
-      dateFuture: string
-      save: string
-      saveCorrection: string
-      saving: string
-      cancel: string
-      failed: string
-      delete: string
-      deleteConfirm: (date: string) => string
-      deleteYes: string
     }
     list: {
       title: string
       subtitle: string
-      chartTitle: string
-      chartSince: (change: string, month: string) => string
-      chartCount: (count: number) => string
-      label: string
-      latest: string
-      withdrawal: string
-      first: string
-      edit: (date: string) => string
       emptyTitle: string
       emptyNote: string
       clear: string
@@ -105,7 +83,6 @@ export interface Messages {
     netWorth: {
       label: string
       sub: (date: string) => string
-      note: string
     }
     reminder: {
       title: string
@@ -114,6 +91,116 @@ export interface Messages {
       action: string
       later: string
     }
+  }
+  balance: {
+    correcting: (date: string) => string
+    balanceInvalid: string
+    dateLabel: string
+    today: (date: string) => string
+    dateHint: string
+    dateFuture: string
+    save: string
+    saveCorrection: string
+    saving: string
+    cancel: string
+    failed: string
+    delete: string
+    deleteConfirm: (date: string) => string
+    deleteYes: string
+    chartTitle: string
+    chartSince: (change: string, month: string) => string
+    chartCount: (count: number) => string
+    listLabel: string
+    latest: string
+    withdrawal: string
+    first: string
+    edit: (date: string) => string
+    outOfTotal: string
+  }
+  pension: {
+    section: string
+    trackLabel: string
+    trackNote: string
+    keptNote: (count: number) => string
+    cardSub: string
+    plans: (count: number) => string
+    dueCount: (count: number) => string
+    totalNote: string
+    add: string
+    emptyTitle: string
+    emptyNote: string
+    balanceOn: (date: string) => string
+    noBalance: string
+    changeSince: (date: string) => string
+    badgeUpdate: string
+    badgeNew: string
+    open: (name: string) => string
+    plan: {
+      addTitle: string
+      editTitle: string
+      subtitle: string
+      nameLabel: string
+      namePlaceholder: string
+      nameHint: string
+      nameEmpty: string
+      typeLabel: string
+      optional: string
+      typeNone: string
+      typeHint: string
+      firstBalance: string
+      balanceLabel: string
+      firstHint: string
+      keepHistory: (count: number) => string
+      add: string
+      save: string
+      delete: string
+      deleteConfirm: (name: string) => string
+      deleteYes: string
+      failed: string
+    }
+    detail: {
+      subtitle: string
+      edit: string
+      emptyTitle: string
+      emptyNote: string
+      inform: string
+      update: string
+    }
+    update: {
+      title: string
+      editTitle: string
+      balanceLabel: string
+      balanceHint: string
+    }
+    netWorth: {
+      label: string
+      sub: (count: number, date: string) => string
+    }
+    reminder: {
+      title: string
+      oneLate: (name: string) => string
+      oneNew: (name: string) => string
+      many: (count: number) => string
+      chooseTitle: string
+      chooseNote: string
+      lastOn: (date: string) => string
+      none: string
+    }
+  }
+  balancesReminder: {
+    title: string
+    note: string
+    fgtsSub: (date: string) => string
+    planLate: string
+    planNew: string
+    plansLate: (count: number) => string
+    plansLabel: string
+    update: string
+  }
+  netWorthNotes: {
+    both: string
+    fgts: string
+    pension: string
   }
   privacy: {
     hide: string
@@ -770,34 +857,12 @@ export const messages: Messages = {
       title: 'Atualizar saldo do FGTS',
       editTitle: 'Corrigir saldo do FGTS',
       subtitle: 'Saldo total, como no app do FGTS',
-      correcting: (date) => `Você está corrigindo o saldo de ${date}.`,
       balanceLabel: 'Saldo total',
       balanceHint: 'O total de todas as contas, como aparece no app do FGTS.',
-      balanceInvalid: 'Informe um valor, como 10.850,32.',
-      dateLabel: 'Data do saldo',
-      today: (date) => `Hoje, ${date}`,
-      dateHint: 'Use a data que aparece junto do saldo no app.',
-      dateFuture: 'A data não pode ser depois de hoje.',
-      save: 'Salvar',
-      saveCorrection: 'Salvar correção',
-      saving: 'Salvando…',
-      cancel: 'Cancelar',
-      failed: 'Não foi possível salvar o saldo. Confira a conexão e tente de novo.',
-      delete: 'Excluir este saldo',
-      deleteConfirm: (date) => `Excluir o saldo de ${date}? A variação do mês seguinte é recalculada. Não dá para desfazer.`,
-      deleteYes: 'Excluir',
     },
     list: {
       title: 'Histórico do FGTS',
       subtitle: 'Fora do patrimônio líquido',
-      chartTitle: 'Saldo ao longo do tempo',
-      chartSince: (change, month) => `${change} desde ${month}`,
-      chartCount: (count) => (count === 1 ? '1 saldo' : `${count} saldos`),
-      label: 'Saldos informados · toque para corrigir',
-      latest: 'Mais recente',
-      withdrawal: 'saque',
-      first: 'Primeiro saldo',
-      edit: (date) => `Corrigir o saldo de ${date}`,
       emptyTitle: 'Nenhum saldo no histórico',
       emptyNote: 'Cada vez que você atualizar o saldo, ele aparece aqui.',
       clear: 'Apagar histórico',
@@ -808,7 +873,6 @@ export const messages: Messages = {
     netWorth: {
       label: 'FGTS',
       sub: (date) => `saldo em ${date}`,
-      note: 'O total é dinheiro nas contas menos faturas. O FGTS não entra.',
     },
     reminder: {
       title: 'Hora de atualizar o saldo do FGTS',
@@ -817,6 +881,116 @@ export const messages: Messages = {
       action: 'Atualizar saldo',
       later: 'Agora não',
     },
+  },
+  balance: {
+    correcting: (date) => `Você está corrigindo o saldo de ${date}.`,
+    balanceInvalid: 'Informe um valor, como 10.850,32.',
+    dateLabel: 'Data do saldo',
+    today: (date) => `Hoje, ${date}`,
+    dateHint: 'Use a data que aparece junto do saldo no app.',
+    dateFuture: 'A data não pode ser depois de hoje.',
+    save: 'Salvar',
+    saveCorrection: 'Salvar correção',
+    saving: 'Salvando…',
+    cancel: 'Cancelar',
+    failed: 'Não foi possível salvar o saldo. Confira a conexão e tente de novo.',
+    delete: 'Excluir este saldo',
+    deleteConfirm: (date) => `Excluir o saldo de ${date}? A variação do mês seguinte é recalculada. Não dá para desfazer.`,
+    deleteYes: 'Excluir',
+    chartTitle: 'Saldo ao longo do tempo',
+    chartSince: (change, month) => `${change} desde ${month}`,
+    chartCount: (count) => (count === 1 ? '1 saldo' : `${count} saldos`),
+    listLabel: 'Saldos informados · toque para corrigir',
+    latest: 'Mais recente',
+    withdrawal: 'saque',
+    first: 'Primeiro saldo',
+    edit: (date) => `Corrigir o saldo de ${date}`,
+    outOfTotal: 'Fora do total',
+  },
+  pension: {
+    section: 'Previdência privada',
+    trackLabel: 'Acompanhar previdência privada',
+    trackNote: 'Saldos informados à mão, plano a plano. Fica fora do total.',
+    keptNote: (count) => (count === 1 ? 'Seu plano continua salvo.' : `Seus ${count} planos continuam salvos.`),
+    cardSub: 'Informado à mão · fora do total',
+    plans: (count) => (count === 1 ? '1 plano' : `${count} planos`),
+    dueCount: (count) => (count === 1 ? '1 plano precisa de atualização' : `${count} planos precisam de atualização`),
+    totalNote: 'O total soma o último saldo de cada plano. Fica fora do patrimônio líquido.',
+    add: 'Adicionar plano',
+    emptyTitle: 'Nenhum plano ainda.',
+    emptyNote: 'Adicione cada plano com o nome que quiser.',
+    balanceOn: (date) => `Saldo em ${date}`,
+    noBalance: 'Nenhum saldo informado',
+    changeSince: (date) => `desde ${date}`,
+    badgeUpdate: 'Atualizar saldo',
+    badgeNew: 'Sem saldo ainda',
+    open: (name) => `Abrir ${name}`,
+    plan: {
+      addTitle: 'Adicionar plano',
+      editTitle: 'Editar plano',
+      subtitle: 'Previdência privada · fora do total',
+      nameLabel: 'Nome do plano',
+      namePlaceholder: 'Ex.: Previdência Banco Exemplo',
+      nameHint: 'Use o nome que você reconhece.',
+      nameEmpty: 'Dê um nome ao plano.',
+      typeLabel: 'Tipo',
+      optional: 'opcional',
+      typeNone: 'Não informado',
+      typeHint: 'PGBL é dedutível na declaração completa do IR. VGBL paga imposto só sobre os rendimentos.',
+      firstBalance: 'Primeiro saldo',
+      balanceLabel: 'Saldo',
+      firstHint: 'Como aparece no extrato ou no app do plano. Dá para informar depois.',
+      keepHistory: (count) => `O histórico de ${count === 1 ? '1 saldo' : `${count} saldos`} continua igual ao editar o nome ou o tipo.`,
+      add: 'Adicionar',
+      save: 'Salvar',
+      delete: 'Excluir plano',
+      deleteConfirm: (name) => `Excluir ${name} e todo o histórico de saldos? Não dá para desfazer.`,
+      deleteYes: 'Excluir plano',
+      failed: 'Não foi possível salvar o plano. Confira a conexão e tente de novo.',
+    },
+    detail: {
+      subtitle: 'Fora do patrimônio líquido',
+      edit: 'Editar plano',
+      emptyTitle: 'Nenhum saldo informado ainda.',
+      emptyNote: 'Informe o saldo de hoje para começar o histórico deste plano.',
+      inform: 'Informar saldo',
+      update: 'Atualizar saldo',
+    },
+    update: {
+      title: 'Atualizar saldo',
+      editTitle: 'Corrigir saldo',
+      balanceLabel: 'Saldo',
+      balanceHint: 'O saldo do plano, como aparece no extrato ou no app.',
+    },
+    netWorth: {
+      label: 'Previdência privada',
+      sub: (count, date) => `${count === 1 ? '1 plano' : `${count} planos`} · saldos até ${date}`,
+    },
+    reminder: {
+      title: 'Hora de atualizar sua previdência',
+      oneLate: (name) => `${name} está há mais de 1 mês sem atualização.`,
+      oneNew: (name) => `${name} ainda não tem saldo.`,
+      many: (count) => `${count} planos estão há mais de 1 mês sem atualização ou sem saldo.`,
+      chooseTitle: 'Qual plano atualizar?',
+      chooseNote: 'Estes planos estão há mais de 1 mês sem atualização ou ainda não têm saldo.',
+      lastOn: (date) => `Último saldo em ${date}`,
+      none: 'Sem saldo ainda',
+    },
+  },
+  balancesReminder: {
+    title: 'Hora de atualizar seus saldos',
+    note: 'Valores informados à mão, fora do total.',
+    fgtsSub: (date) => `Última atualização em ${date}`,
+    planLate: 'Há mais de 1 mês sem atualização',
+    planNew: 'Sem saldo ainda',
+    plansLate: (count) => `${count} planos sem atualização há mais de 1 mês`,
+    plansLabel: 'Previdência privada',
+    update: 'Atualizar',
+  },
+  netWorthNotes: {
+    both: 'O total é dinheiro nas contas menos faturas. FGTS e previdência não entram.',
+    fgts: 'O total é dinheiro nas contas menos faturas. O FGTS não entra.',
+    pension: 'O total é dinheiro nas contas menos faturas. A previdência não entra.',
   },
   privacy: {
     hide: 'Ocultar valores',
