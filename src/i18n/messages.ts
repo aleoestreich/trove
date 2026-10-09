@@ -40,6 +40,7 @@ export interface Messages {
     investmentsCall: string
     loansCall: string
     investmentTransactions: string
+    transactionsV1: string
     loadAll: string
     loadAllBanks: string
     loadingAll: (done: number) => string
@@ -667,12 +668,13 @@ export const messages: Messages = {
     investmentsCall: 'Investimentos',
     loansCall: 'Empréstimos',
     investmentTransactions: 'Movimentações',
+    transactionsV1: 'Transações (endpoint antigo)',
     loadAll: 'Carregar tudo',
     loadAllBanks: 'Carregar tudo de todos os bancos',
     loadingAll: (done) => `Carregando… ${done} ${done === 1 ? 'chamada' : 'chamadas'}`,
     allTitle: 'Tudo o que o Meu Pluggy retorna',
     allNote:
-      'Item, contas, todas as páginas de transações de cada conta, faturas dos cartões, identidade, investimentos e suas movimentações, e empréstimos. Um produto que o banco não compartilha aparece com o erro do Pluggy.',
+      'Item, contas, todas as páginas de transações de cada conta e cartão (desde 2000, todo o histórico), faturas dos cartões e as transações deles também pelo endpoint antigo, identidade, investimentos e suas movimentações, e empréstimos. Um produto que o banco não compartilha aparece com o erro do Pluggy.',
     download: 'Baixar JSON',
   },
   privacy: {

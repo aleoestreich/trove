@@ -14,7 +14,7 @@ import { loadEverything, nextCursor, type Answer, type Dump } from '../lib/plugg
  * shown in full, values included.
  */
 
-type Endpoint = 'item' | 'accounts' | 'transactions' | 'bills' | 'identity' | 'investments' | 'investmentTransactions' | 'loans'
+type Endpoint = 'item' | 'accounts' | 'transactions' | 'transactionsV1' | 'bills' | 'identity' | 'investments' | 'investmentTransactions' | 'loans'
 
 interface Reply {
   /** HTTP status of our route. */
@@ -236,6 +236,12 @@ export function Debug() {
                           onClick={() => run(keyOf('bills', itemId, a.id), { endpoint: 'bills', itemId, accountId: a.id }, 1)}
                         />
                       )}
+                      {a.type === 'CREDIT' && (
+                        <CallButton
+                          label={t.debug.transactionsV1}
+                          onClick={() => run(keyOf('transactionsV1', itemId, a.id), { endpoint: 'transactionsV1', itemId, accountId: a.id, page: '1' }, 1)}
+                        />
+                      )}
                       {after && !txCall?.loading && (
                         <CallButton
                           label={t.debug.nextPage}
@@ -245,6 +251,7 @@ export function Debug() {
                     </div>
                     <Result call={txCall} showPage />
                     <Result call={calls[keyOf('bills', itemId, a.id)]} />
+                    {a.type === 'CREDIT' && <V1Result call={calls[keyOf('transactionsV1', itemId, a.id)]} onNext={(page) => run(keyOf('transactionsV1', itemId, a.id), { endpoint: 'transactionsV1', itemId, accountId: a.id, page: String(page) }, page)} />}
                   </div>
                 )
               })
@@ -343,6 +350,23 @@ function AllResult({ state, itemId }: { state?: AllState; itemId: string }) {
         </span>
       </div>
       <pre className="max-h-[520px] overflow-auto rounded-md bg-track p-3 text-[11px] leading-4 text-ink">{text}</pre>
+    </div>
+  )
+}
+
+/** A card's transactions from the older endpoint (page-numbered), with "Próxima página". */
+function V1Result({ call, onNext }: { call?: Call; onNext(page: number): void }) {
+  const { t } = useI18n()
+  if (!call) return null
+  const totalPages = (call.reply?.json?.body as { totalPages?: number } | undefined)?.totalPages ?? 1
+  return (
+    <div className="flex flex-col gap-2">
+      <Result call={call} showPage />
+      {!call.loading && call.page < totalPages && (
+        <div>
+          <CallButton label={t.debug.nextPage} onClick={() => onNext(call.page + 1)} />
+        </div>
+      )}
     </div>
   )
 }

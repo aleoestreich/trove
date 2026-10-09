@@ -14,6 +14,7 @@ function fakePluggy() {
     if (url.pathname === '/accounts') return Response.json({ results: [{ id: 'acc-1', type: 'CREDIT' }] })
     if (url.pathname === '/items/item-1') return Response.json({ id: 'item-1', status: 'UPDATED' })
     if (url.pathname === '/v2/transactions') return Response.json({ results: [{ id: 'tx-1', amount: 150, description: 'LOJA EXEMPLO' }], next: null })
+    if (url.pathname === '/transactions') return Response.json({ results: [{ id: 'tx-1' }], page: 1, totalPages: 1 })
     if (url.pathname === '/bills') return Response.json({ results: [] })
     if (url.pathname === '/identity') return Response.json({ id: 'id-1', fullName: 'PESSOA EXEMPLO' })
     if (url.pathname === '/investments') return Response.json({ results: [{ id: 'inv-1', type: 'FIXED_INCOME' }] })
@@ -60,7 +61,7 @@ describe('pluggy debug route', () => {
 
     const res = await pluggyDebug(get('?endpoint=transactions&itemId=item-1&accountId=acc-1&after=abc'), config, fetchFn)
     expect(res.status).toBe(200)
-    expect(calls).toContain('/v2/transactions?accountId=acc-1&after=abc')
+    expect(calls).toContain('/v2/transactions?accountId=acc-1&dateFrom=2000-01-01&after=abc')
 
     expect((await pluggyDebug(get('?endpoint=bills&itemId=item-1&accountId=acc-1'), config, fetchFn)).status).toBe(200)
     expect(calls).toContain('/bills?accountId=acc-1')
@@ -93,6 +94,21 @@ describe('pluggy debug route: the other products', () => {
     const res = await pluggyDebug(get('?endpoint=investmentTransactions&itemId=item-1&investmentId=inv-1&page=2'), config, fetchFn)
     expect(await res.json()).toMatchObject({ request: 'GET /investments/inv-1/transactions?page=2', status: 200 })
     expect(calls).toContain('/investments/inv-1/transactions?pageSize=500&page=2')
+  })
+})
+
+describe('pluggy debug route: card transactions', () => {
+  it('reads transactions from a start date (all history by default), and the older endpoint to compare', async () => {
+    const { calls, fetchFn } = fakePluggy()
+    await pluggyDebug(get('?endpoint=transactions&itemId=item-1&accountId=acc-1'), config, fetchFn)
+    expect(calls).toContain('/v2/transactions?accountId=acc-1&dateFrom=2000-01-01')
+    await pluggyDebug(get('?endpoint=transactions&itemId=item-1&accountId=acc-1&dateFrom=2026-01-01'), config, fetchFn)
+    expect(calls).toContain('/v2/transactions?accountId=acc-1&dateFrom=2026-01-01')
+    const res = await pluggyDebug(get('?endpoint=transactionsV1&itemId=item-1&accountId=acc-1&page=2'), config, fetchFn)
+    expect(await res.json()).toMatchObject({ request: 'GET /transactions?accountId=acc-1&from=2000-01-01&page=2', status: 200 })
+    expect(calls).toContain('/transactions?accountId=acc-1&from=2000-01-01&pageSize=500&page=2')
+    expect((await pluggyDebug(get('?endpoint=transactionsV1&itemId=item-1&accountId=acc-other'), config, fetchFn)).status).toBe(403)
+    expect((await pluggyDebug(get('?endpoint=transactions&itemId=item-1&accountId=acc-1&dateFrom=ontem'), config, fetchFn)).status).toBe(400)
   })
 })
 
