@@ -260,3 +260,41 @@ describe('the FGTS balance', () => {
   })
 })
 
+describe('previdência privada', () => {
+  const entry = (id: string, date: string, balance: number) => ({ id, date, balance })
+  const withPlan = () => applyEdit(snapshot(), validateEdit({ op: 'savePensionPlan', plan: { id: 'p1', name: '  Previdência   Exemplo ', type: 'PGBL' } }))
+
+  it('adds, renames and deletes plans; tracking keeps them', () => {
+    let s = withPlan()
+    expect(s.pension).toEqual({ tracking: false, plans: [{ id: 'p1', name: 'Previdência Exemplo', type: 'PGBL', entries: [] }] })
+    s = applyEdit(s, validateEdit({ op: 'savePensionPlan', plan: { id: 'p2', name: 'Plano Modelo', type: null } }))
+    s = applyEdit(s, validateEdit({ op: 'savePensionPlan', plan: { id: 'p1', name: 'Plano Exemplo', type: 'VGBL' } }))
+    expect(s.pension?.plans.map((p) => [p.id, p.name, p.type])).toEqual([['p1', 'Plano Exemplo', 'VGBL'], ['p2', 'Plano Modelo', null]])
+    s = applyEdit(s, validateEdit({ op: 'setPensionTracking', tracking: true }))
+    s = applyEdit(s, validateEdit({ op: 'deletePensionPlan', id: 'p2' }))
+    expect(s.pension?.tracking).toBe(true)
+    expect(s.pension?.plans.map((p) => p.id)).toEqual(['p1'])
+    expect(() => applyEdit(s, { op: 'deletePensionPlan', id: 'p2' })).toThrow(EditError)
+  })
+
+  it('keeps each plan’s balances newest first, corrected by ID, deleted one by one', () => {
+    let s = withPlan()
+    s = applyEdit(s, validateEdit({ op: 'savePensionBalance', planId: 'p1', entry: entry('b1', '2026-08-10', 20_000_00) }))
+    s = applyEdit(s, validateEdit({ op: 'savePensionBalance', planId: 'p1', entry: entry('b2', '2026-09-10', 20_300_00) }))
+    s = applyEdit(s, validateEdit({ op: 'savePensionBalance', planId: 'p1', entry: entry('b1', '2026-08-10', 20_100_00) }))
+    expect(s.pension?.plans[0].entries).toEqual([entry('b2', '2026-09-10', 20_300_00), entry('b1', '2026-08-10', 20_100_00)])
+    s = applyEdit(s, validateEdit({ op: 'deletePensionBalance', planId: 'p1', id: 'b2' }))
+    expect(s.pension?.plans[0].entries.map((e) => e.id)).toEqual(['b1'])
+    expect(() => applyEdit(s, { op: 'deletePensionBalance', planId: 'p1', id: 'b2' })).toThrow(EditError)
+    expect(() => applyEdit(s, { op: 'savePensionBalance', planId: 'nope', entry: entry('b3', '2026-09-10', 1) })).toThrow(EditError)
+  })
+
+  it('refuses an empty or long name, an unknown type and a bad balance', () => {
+    for (const plan of [{ id: 'p1', name: '   ', type: null }, { id: 'p1', name: 'x'.repeat(41), type: null }, { id: 'p1', name: 'Plano', type: 'IRPF' }, { id: '', name: 'Plano', type: null }])
+      expect(() => validateEdit({ op: 'savePensionPlan', plan })).toThrow(EditError)
+    expect(validateEdit({ op: 'savePensionPlan', plan: { id: 'p1', name: 'x'.repeat(40), type: null } })).toMatchObject({ plan: { name: 'x'.repeat(40) } })
+    for (const e of [entry('b1', '2026-09-10', -1), entry('b1', '2026-02-30', 1), entry('b1', '2026-09-10', 100_000_000_01)])
+      expect(() => validateEdit({ op: 'savePensionBalance', planId: 'p1', entry: e })).toThrow(EditError)
+  })
+})
+

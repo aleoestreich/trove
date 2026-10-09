@@ -23,6 +23,8 @@ interface DemoOwner {
   cardDays?: Snapshot['cardDays']
   /** The FGTS balance tracked by hand. */
   fgts?: Snapshot['fgts']
+  /** The previdência privada plans tracked by hand. */
+  pension?: Snapshot['pension']
 }
 
 function read(): DemoOwner | null {
@@ -63,6 +65,7 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
     accountNames: owner.accountNames,
     cardDays: owner.cardDays,
     fgts: owner.fgts,
+    pension: owner.pension,
     categories: owner.categories,
     subcategories: owner.subcategories,
     incomeFilter: owner.incomeFilter,
@@ -118,6 +121,7 @@ export function createMockRepository(today: Date = new Date()): Repository {
         accountNames: next.accountNames,
         cardDays: next.cardDays,
         fgts: next.fgts,
+        pension: next.pension,
       })
       return previous && { updated: previous.length, previous }
     },

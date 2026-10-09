@@ -2,6 +2,7 @@
 // so the Phase 2 backend can map Pluggy responses onto them directly.
 
 import type { Fgts } from './fgts.js'
+import type { Pension } from './pension.js'
 
 /** ISO 4217 code (e.g. 'BRL', 'USD'). BRL is the home currency; everything is totalled in BRL. */
 export type CurrencyCode = string
@@ -169,6 +170,8 @@ export interface Snapshot {
   recurringOverrides?: Record<string, RecurringOverride>
   /** The FGTS balance tracked by hand (off, with no history, when absent). */
   fgts?: Fgts
+  /** The previdência privada plans tracked by hand (off, with none, when absent). */
+  pension?: Pension
 }
 
 /** What the month-end projection counts. */

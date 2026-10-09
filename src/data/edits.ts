@@ -8,6 +8,7 @@ import { CATEGORY_COLORS, CATEGORY_ICONS, DEFAULT_CATEGORIES } from './categoryC
 import { hasSelection, normalizeIncomeFilter, pruneIncomeFilter } from './incomeAverage.js'
 import { RECURRING_ACTIONS, applyRecurringAction, type RecurringAction } from './recurring.js'
 import { FGTS_MAX, NO_FGTS, sortFgts, type FgtsEntry } from './fgts.js'
+import { NO_PENSION, PENSION_MAX, PLAN_NAME_MAX, PLAN_TYPES, sortPensionEntries, type Pension, type PlanType } from './pension.js'
 import type { Category, CategoryType, IncomeFilter, ProjectionSettings, Snapshot, Subcategory, TransferOverride } from './types.js'
 
 export type Edit =
@@ -51,6 +52,15 @@ export type Edit =
   | { op: 'deleteFgtsBalance'; id: string }
   /** Deletes every FGTS balance. */
   | { op: 'clearFgtsHistory' }
+  /** Shows or hides the previdência privada plans (src/data/pension.ts); hiding keeps them. */
+  | { op: 'setPensionTracking'; tracking: boolean }
+  /** Adds a plan, or renames one / changes its type, by ID. */
+  | { op: 'savePensionPlan'; plan: { id: string; name: string; type: PlanType | null } }
+  /** Deletes a plan with its whole history. */
+  | { op: 'deletePensionPlan'; id: string }
+  /** Adds a plan's balance, or corrects one with the same ID. */
+  | { op: 'savePensionBalance'; planId: string; entry: FgtsEntry }
+  | { op: 'deletePensionBalance'; planId: string; id: string }
 
 /** A transaction's category before a bulk change. `editedAt`: when it was last set by hand (server only). */
 export interface PreviousCategory {
@@ -225,6 +235,26 @@ export function validateEdit(e: unknown): Edit {
       return { op: 'deleteFgtsBalance', id: id(x.id, 'id') }
     case 'clearFgtsHistory':
       return { op: 'clearFgtsHistory' }
+    case 'setPensionTracking':
+      if (typeof x.tracking !== 'boolean') bad('tracking')
+      return { op: 'setPensionTracking', tracking: x.tracking as boolean }
+    case 'savePensionPlan': {
+      const v = (x.plan ?? {}) as Record<string, unknown>
+      const n = typeof v.name === 'string' ? cleanName(v.name) : ''
+      if (!n || n.length > PLAN_NAME_MAX) bad('name')
+      if (v.type !== null && !(PLAN_TYPES as readonly unknown[]).includes(v.type)) bad('type')
+      return { op: 'savePensionPlan', plan: { id: id(v.id, 'id'), name: n, type: v.type as PlanType | null } }
+    }
+    case 'deletePensionPlan':
+      return { op: 'deletePensionPlan', id: id(x.id, 'id') }
+    case 'savePensionBalance': {
+      const v = (x.entry ?? {}) as Record<string, unknown>
+      if (!isDay(v.date)) bad('date')
+      if (!Number.isSafeInteger(v.balance) || (v.balance as number) < 0 || (v.balance as number) > PENSION_MAX) bad('balance')
+      return { op: 'savePensionBalance', planId: id(x.planId, 'plan'), entry: { id: id(v.id, 'id'), date: v.date as string, balance: v.balance as number } }
+    }
+    case 'deletePensionBalance':
+      return { op: 'deletePensionBalance', planId: id(x.planId, 'plan'), id: id(x.id, 'id') }
     case 'setCardDays': {
       if (x.days === null) return { op: 'setCardDays', accountId: id(x.accountId, 'account'), days: null }
       const d = (x.days ?? {}) as Record<string, unknown>
@@ -351,6 +381,28 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
     }
     case 'clearFgtsHistory':
       return { ...s, fgts: { ...(s.fgts ?? NO_FGTS), entries: [] } }
+    case 'setPensionTracking':
+      return { ...s, pension: { ...(s.pension ?? NO_PENSION), tracking: e.tracking } }
+    case 'savePensionPlan': {
+      const p = s.pension ?? NO_PENSION
+      const known = p.plans.some((x) => x.id === e.plan.id)
+      const plans = known
+        ? p.plans.map((x) => (x.id === e.plan.id ? { ...x, name: e.plan.name, type: e.plan.type } : x))
+        : [...p.plans, { ...e.plan, entries: [] }]
+      return { ...s, pension: { ...p, plans } }
+    }
+    case 'deletePensionPlan': {
+      const p = s.pension ?? NO_PENSION
+      if (!p.plans.some((x) => x.id === e.id)) fail('not_found', 'plan')
+      return { ...s, pension: { ...p, plans: p.plans.filter((x) => x.id !== e.id) } }
+    }
+    case 'savePensionBalance':
+      return withPlan(s, e.planId, (entries) => sortPensionEntries([...entries.filter((x) => x.id !== e.entry.id), e.entry]))
+    case 'deletePensionBalance':
+      return withPlan(s, e.planId, (entries) => {
+        if (!entries.some((x) => x.id === e.id)) fail('not_found', 'balance')
+        return entries.filter((x) => x.id !== e.id)
+      })
     case 'setCardDays': {
       if (!s.accounts.some((a) => a.id === e.accountId && a.type === 'CREDIT')) fail('not_found', 'card')
       const { [e.accountId]: _old, ...others } = s.cardDays ?? {}
@@ -375,6 +427,13 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
       }
     }
   }
+}
+
+/** A plan's balances changed by `change`; refused for a plan that doesn't exist. */
+function withPlan(s: Snapshot, planId: string, change: (entries: Pension['plans'][number]['entries']) => Pension['plans'][number]['entries']): Snapshot {
+  const p = s.pension ?? NO_PENSION
+  if (!p.plans.some((x) => x.id === planId)) fail('not_found', 'plan')
+  return { ...s, pension: { ...p, plans: p.plans.map((x) => (x.id === planId ? { ...x, entries: change(x.entries) } : x)) } }
 }
 
 /** The accounts with the names set in Trove (the bank's name when none is). */
