@@ -71,6 +71,11 @@ Then run [`db/migrations/010_manual_balances.sql`](../db/migrations/010_manual_b
 it adds `manual_balances`, for the [FGTS balance](#fgts-balance). Until it
 runs, every page reports that the tables are out of date.
 
+Then run [`db/migrations/011_pension_plans.sql`](../db/migrations/011_pension_plans.sql):
+it adds `manual_accounts` and the balances' `account_id`, for the
+[previdência privada plans](#previdência-privada). Until it runs, every
+page reports that the tables are out of date.
+
 ## 3. Give Vercel the connection string
 
 1. In Neon, open **Connect**, choose the database and role, and turn
@@ -394,6 +399,26 @@ Accounts and kept as a history (`src/data/fgts.ts`):
 - Visão geral reminds to update it from the 20th of a month without a
   balance for that month (employers deposit by the 20th), or when the
   latest balance is more than a month old.
+
+## Previdência privada
+
+Previdência privada plans are tracked by hand too (`src/data/pension.ts`):
+
+- Each plan is a row of `manual_accounts` (`kind = 'pension'`): a name set
+  in Trove (up to 40 characters) and, optionally, `PGBL` or `VGBL`.
+- Its balances are rows of `manual_balances` (`kind = 'pension'`,
+  `account_id` = the plan), one per update. Deleting a plan deletes them
+  (`ON DELETE CASCADE`). The FGTS's rows have no `account_id`.
+- Whether they're shown is `app_settings` `pension` (`{ "tracking": true }`).
+  Turning it off keeps the plans.
+- Edits, through `POST /api/edits`: `setPensionTracking`,
+  `savePensionPlan` (`plan: { id, name, type }`, adds or renames),
+  `deletePensionPlan`, `savePensionBalance` (`planId`, `entry`) and
+  `deletePensionBalance`. Read with the snapshot (`pension`).
+- Like the FGTS, it never counts in a total: net worth shows the plans'
+  latest balances added up as a line of their own.
+- A plan's balance is due for an update when it has none, or its latest is
+  more than a month old; Visão geral reminds about those plans.
 
 ## Reads
 

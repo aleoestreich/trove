@@ -3,6 +3,7 @@ import type { Repository } from './data/repository'
 import { errorMessage, SyncStartError } from './data/apiRepository'
 import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/syncProblems'
 import { NO_FGTS, type Fgts } from './data/fgts'
+import { NO_PENSION, type Pension } from './data/pension'
 import { applyCardDays, deviceCardDays, forgetDeviceCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
 import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type SyncOptions, type Transaction } from './data/types'
@@ -66,7 +67,16 @@ interface AppData extends Snapshot {
   setFgtsTracking(tracking: boolean): void
   /** Saves a balance, deletes one or clears the history, server first; rejects with a message for the UI. */
   saveFgts(e: FgtsEdit): Promise<void>
+  /** The previdência privada plans tracked by hand (src/data/pension.ts). */
+  pension: Pension
+  /** Shows or hides them (the plans stay). */
+  setPensionTracking(tracking: boolean): void
+  /** Saves or deletes a plan or one of its balances, server first; rejects with a message for the UI. */
+  savePension(e: PensionEdit): Promise<void>
 }
+
+/** The previdência privada edits saved from its sheets. */
+export type PensionEdit = Extract<Edit, { op: 'savePensionPlan' | 'deletePensionPlan' | 'savePensionBalance' | 'deletePensionBalance' }>
 
 /** The FGTS edits saved from its sheets. */
 export type FgtsEdit = Extract<Edit, { op: 'saveFgtsBalance' | 'deleteFgtsBalance' | 'clearFgtsHistory' }>
@@ -235,6 +245,13 @@ export function DataProvider({ repository, children }: { repository: Repository;
   const setFgtsTracking = useCallback((tracking: boolean) => edit({ op: 'setFgtsTracking', tracking }), [edit])
   const saveFgts = useCallback(
     async (e: FgtsEdit) => {
+      await save(e)
+    },
+    [save],
+  )
+  const setPensionTracking = useCallback((tracking: boolean) => edit({ op: 'setPensionTracking', tracking }), [edit])
+  const savePension = useCallback(
+    async (e: PensionEdit) => {
       await save(e)
     },
     [save],
@@ -421,8 +438,11 @@ export function DataProvider({ repository, children }: { repository: Repository;
       fgts: snapshot.fgts ?? NO_FGTS,
       setFgtsTracking,
       saveFgts,
+      pension: snapshot.pension ?? NO_PENSION,
+      setPensionTracking,
+      savePension,
     }
-  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, setFgtsTracking, saveFgts, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
+  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, setFgtsTracking, saveFgts, setPensionTracking, savePension, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

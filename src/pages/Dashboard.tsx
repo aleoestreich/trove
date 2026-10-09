@@ -6,7 +6,9 @@ import { balances, expensesByCategory, inMonth, totals, visible } from '../lib/s
 import { incomeAverage, NO_FILTER } from '../data/incomeAverage'
 import { CategoryBadge, catVar } from '../components/CategoryBadge'
 import { SyncBar } from '../components/SyncBar'
-import { FgtsNetWorthLine, FgtsReminder, showsFgtsLine } from '../components/Fgts'
+import { FgtsNetWorthLine, showsFgtsLine } from '../components/Fgts'
+import { PensionNetWorthLine, showsPensionLine } from '../components/Pension'
+import { BalancesReminder } from '../components/BalancesReminder'
 import { cashByCurrency, cashByInstitution } from '../lib/history'
 import { installmentPlans, upcomingByMonth } from '../lib/installments'
 import { currentBill, isIdleCard } from '../lib/bills'
@@ -132,7 +134,7 @@ export function Dashboard() {
     <>
       <PageHeader title={t.nav.overview} subtitle={t.overview.subtitle(formatFullDate(toISO(new Date())))} />
       <SyncBar className="mb-3" />
-      <FgtsReminder className="mb-3 lg:mb-5" />
+      <BalancesReminder className="mb-3 lg:mb-5" />
 
       {/* Phones: one column in reading order. Desktop: a 12-column grid, reordered. */}
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-12 lg:gap-5">
@@ -429,11 +431,11 @@ function Tile({ label, value, tone }: { label: string; value: string; tone: stri
  * Net worth today: money in the accounts minus the open card bills, as the
  * banks report them (no history, no chart). A bank that failed the latest
  * sync is named, with the day of the balance used and "Tentar de novo";
- * a negative total gets a neutral note. A tracked FGTS balance is a line of
- * its own below the tiles, not in the total.
+ * a negative total gets a neutral note. The FGTS and previdência balances
+ * tracked by hand are lines of their own below the tiles, not in the total.
  */
 function NetWorthCard({ className }: { className: string }) {
-  const { accounts, fgts } = useData()
+  const { accounts, fgts, pension } = useData()
   const { info, failed, sync } = useSync()
   const { t } = useI18n()
   const o = t.overview
@@ -459,8 +461,9 @@ function NetWorthCard({ className }: { className: string }) {
         <NetWorthTile icon="checking" label={o.inAccounts} value={formatMoney(bal.cash)} sub={o.accountsCount(cashAccounts)} />
         <NetWorthTile icon="card" label={o.cardBills} value={`${signOf(-bal.cardDebt)}${formatMoney(bal.cardDebt)}`} sub={o.cardsCount(cards)} />
       </div>
-      {/* The FGTS, apart from what's added up. */}
+      {/* The FGTS and the previdência, apart from what's added up. */}
       <FgtsNetWorthLine />
+      <PensionNetWorthLine />
       {stale ? (
         <>
           <p role="status" className="flex items-start gap-2.5 rounded-md border border-critical/30 bg-critical-soft px-3 py-2.5 text-[13px] leading-[18px] text-ink">
@@ -488,8 +491,14 @@ function NetWorthCard({ className }: { className: string }) {
         <p className="flex items-start gap-2 text-xs leading-4 text-ink-2">
           <Icon name="info" className="size-3.5 shrink-0 text-muted" />
           <span>
-            {showsFgtsLine(fgts) ? (
-              t.fgts.netWorth.note
+            {showsFgtsLine(fgts) || showsPensionLine(pension) ? (
+              showsFgtsLine(fgts) && showsPensionLine(pension) ? (
+                t.netWorthNotes.both
+              ) : showsFgtsLine(fgts) ? (
+                t.netWorthNotes.fgts
+              ) : (
+                t.netWorthNotes.pension
+              )
             ) : (
               <>
                 {o.netWorthNote}

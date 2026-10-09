@@ -10,6 +10,7 @@ import type { Category, IncomeFilter, ProjectionSettings, RecurringOverride, Sub
 import { inTransaction, type Db } from './connection.js'
 import { readSnapshot } from './read.js'
 import { sortFgts, type Fgts } from '../../src/data/fgts.js'
+import { sortPensionEntries, type Pension, type PlanType } from '../../src/data/pension.js'
 
 /**
  * Seeds the default categories and subcategories (pt-BR names),
@@ -132,6 +133,29 @@ export async function readFgts(db: Db): Promise<Fgts> {
   return {
     tracking: setting.rows[0]?.value?.tracking === true,
     entries: sortFgts(rows.rows.map((r) => ({ id: r.id, date: r.as_of, balance: Number(r.balance_cents) }))),
+  }
+}
+
+/** Whether the previdência privada plans are shown, in app_settings under `pension`. */
+const PENSION_KEY = 'pension'
+
+/** The previdência privada plans (manual_accounts) in the order they were added, each with its balances, newest first. */
+export async function readPension(db: Db): Promise<Pension> {
+  const setting = await db.query<{ value: { tracking?: unknown } }>(`SELECT value FROM app_settings WHERE key = $1`, [PENSION_KEY])
+  const plans = await db.query<{ id: string; name: string; plan_type: PlanType | null }>(
+    `SELECT id, name, plan_type FROM manual_accounts WHERE kind = 'pension' ORDER BY sort_order, created_at, id`,
+  )
+  const rows = await db.query<{ id: string; account_id: string; as_of: string; balance_cents: string }>(
+    `SELECT id, account_id, to_char(as_of, 'YYYY-MM-DD') AS as_of, balance_cents FROM manual_balances WHERE kind = 'pension'`,
+  )
+  return {
+    tracking: setting.rows[0]?.value?.tracking === true,
+    plans: plans.rows.map((p) => ({
+      id: p.id,
+      name: p.name,
+      type: p.plan_type,
+      entries: sortPensionEntries(rows.rows.filter((r) => r.account_id === p.id).map((r) => ({ id: r.id, date: r.as_of, balance: Number(r.balance_cents) }))),
+    })),
   }
 }
 
@@ -285,6 +309,37 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
       return null
     case 'clearFgtsHistory':
       await db.query(`DELETE FROM manual_balances WHERE kind = 'fgts'`)
+      return null
+    case 'setPensionTracking':
+      await writeSetting(db, PENSION_KEY, { tracking: e.tracking })
+      return null
+    case 'savePensionPlan':
+      // New plans go last; an ID of something else isn't taken over.
+      await one(
+        `INSERT INTO manual_accounts (id, kind, name, plan_type, sort_order)
+         VALUES ($1, 'pension', $2, $3, (SELECT coalesce(max(sort_order) + 1, 0) FROM manual_accounts WHERE kind = 'pension'))
+         ON CONFLICT (id) DO UPDATE SET name = excluded.name, plan_type = excluded.plan_type WHERE manual_accounts.kind = 'pension'`,
+        [e.plan.id, e.plan.name, e.plan.type],
+        'plan',
+      )
+      return null
+    case 'deletePensionPlan':
+      // Its balances go with it (ON DELETE CASCADE).
+      await one(`DELETE FROM manual_accounts WHERE id = $1 AND kind = 'pension'`, [e.id], 'plan')
+      return null
+    case 'savePensionBalance':
+      // Only into a plan that exists; a correction stays in its plan.
+      await one(
+        `INSERT INTO manual_balances (id, kind, account_id, as_of, balance_cents)
+         SELECT $1, 'pension', a.id, $3, $4 FROM manual_accounts a WHERE a.id = $2 AND a.kind = 'pension'
+         ON CONFLICT (id) DO UPDATE SET as_of = excluded.as_of, balance_cents = excluded.balance_cents, updated_at = now()
+         WHERE manual_balances.kind = 'pension' AND manual_balances.account_id = excluded.account_id`,
+        [e.entry.id, e.planId, e.entry.date, e.entry.balance],
+        'plan',
+      )
+      return null
+    case 'deletePensionBalance':
+      await one(`DELETE FROM manual_balances WHERE id = $1 AND account_id = $2 AND kind = 'pension'`, [e.id, e.planId], 'balance')
       return null
     case 'setCardDays':
       // Their own columns too; cards only, as in the app.

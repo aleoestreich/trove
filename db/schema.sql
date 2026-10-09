@@ -242,14 +242,29 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
--- Balances typed in by hand (migration 010): one row per update. Today only
--- the FGTS total; app_settings 'fgts' says whether it's shown.
+-- Accounts and balances typed in by hand (migrations 010 and 011). The FGTS
+-- is one total (kind 'fgts', no account); each previdência privada plan is a
+-- manual_accounts row with its balances (kind 'pension'). app_settings 'fgts'
+-- and 'pension' say whether they're shown.
+CREATE TABLE IF NOT EXISTS manual_accounts (
+  id          text PRIMARY KEY,
+  kind        text NOT NULL CHECK (kind IN ('pension')),
+  name        text NOT NULL CHECK (length(name) BETWEEN 1 AND 40),
+  plan_type   text CHECK (plan_type IN ('PGBL', 'VGBL')),
+  sort_order  integer NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS manual_balances (
   id             text PRIMARY KEY,
-  kind           text NOT NULL CHECK (kind IN ('fgts')),
+  kind           text NOT NULL,
+  account_id     text REFERENCES manual_accounts(id) ON DELETE CASCADE,
   as_of          date NOT NULL,                  -- the day the balance refers to
   balance_cents  bigint NOT NULL CHECK (balance_cents >= 0),
   created_at     timestamptz NOT NULL DEFAULT now(),
-  updated_at     timestamptz NOT NULL DEFAULT now()
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT manual_balances_kind_check CHECK (kind IN ('fgts', 'pension')),
+  CONSTRAINT manual_balances_account_check CHECK ((kind = 'fgts') = (account_id IS NULL))
 );
 CREATE INDEX IF NOT EXISTS manual_balances_kind_idx ON manual_balances (kind, as_of DESC);
+CREATE INDEX IF NOT EXISTS manual_balances_account_idx ON manual_balances (account_id, as_of DESC);

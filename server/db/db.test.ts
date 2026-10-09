@@ -46,7 +46,7 @@ suite('database', () => {
   })
   afterAll(() => pool.end())
   beforeEach(async () => {
-    await pool.query(`TRUNCATE app_settings, manual_balances, categories, subcategories, transactions, accounts, account_balances, card_bills, bank_connections, exchange_rates, sync_runs, sync_jobs, sync_job_items CASCADE`)
+    await pool.query(`TRUNCATE app_settings, manual_balances, manual_accounts, categories, subcategories, transactions, accounts, account_balances, card_bills, bank_connections, exchange_rates, sync_runs, sync_jobs, sync_job_items CASCADE`)
     await ensureSeeded(pool)
   })
 
@@ -631,6 +631,51 @@ suite('database', () => {
     const migration = readFileSync(new URL('../../db/migrations/010_manual_balances.sql', import.meta.url), 'utf8')
     await pool.query(migration)
     await pool.query(migration)
+  })
+
+  it('keeps previdência privada plans and their balances, through syncs; deleting a plan takes its history', async () => {
+    await sync([tx('t1')])
+    expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.pension).toEqual({ tracking: false, plans: [] })
+    await applyEditSql(pool, { op: 'setPensionTracking', tracking: true })
+    await applyEditSql(pool, { op: 'savePensionPlan', plan: { id: 'p1', name: 'Previdência Exemplo', type: 'PGBL' } })
+    await applyEditSql(pool, { op: 'savePensionPlan', plan: { id: 'p2', name: 'Plano Modelo', type: null } })
+    await applyEditSql(pool, { op: 'savePensionPlan', plan: { id: 'p1', name: 'Plano Exemplo', type: 'VGBL' } }) // renamed, stays first
+    await applyEditSql(pool, { op: 'savePensionBalance', planId: 'p1', entry: { id: 'b1', date: '2026-08-10', balance: 20_000_00 } })
+    await applyEditSql(pool, { op: 'savePensionBalance', planId: 'p1', entry: { id: 'b2', date: '2026-09-10', balance: 20_300_00 } })
+    await applyEditSql(pool, { op: 'savePensionBalance', planId: 'p2', entry: { id: 'b3', date: '2026-09-02', balance: 5_000_00 } })
+    await applyEditSql(pool, { op: 'savePensionBalance', planId: 'p1', entry: { id: 'b1', date: '2026-08-10', balance: 20_100_00 } }) // corrected
+    // An FGTS balance alongside: each read keeps its own.
+    await applyEditSql(pool, { op: 'saveFgtsBalance', entry: { id: 'f1', date: '2026-09-22', balance: 10_000_00 } })
+    await sync([tx('t1')])
+    const s = (await readSnapshot(pool, ['item-1'], '2026-09-01'))!
+    expect(s.fgts?.entries.map((e) => e.id)).toEqual(['f1'])
+    expect(s.pension).toEqual({
+      tracking: true,
+      plans: [
+        { id: 'p1', name: 'Plano Exemplo', type: 'VGBL', entries: [{ id: 'b2', date: '2026-09-10', balance: 20_300_00 }, { id: 'b1', date: '2026-08-10', balance: 20_100_00 }] },
+        { id: 'p2', name: 'Plano Modelo', type: null, entries: [{ id: 'b3', date: '2026-09-02', balance: 5_000_00 }] },
+      ],
+    })
+    // A balance can't move to another plan, go into a missing one, or take over an FGTS balance's ID.
+    await expect(applyEditSql(pool, { op: 'savePensionBalance', planId: 'p2', entry: { id: 'b1', date: '2026-08-10', balance: 1 } })).rejects.toThrow(EditError)
+    await expect(applyEditSql(pool, { op: 'savePensionBalance', planId: 'nope', entry: { id: 'b9', date: '2026-08-10', balance: 1 } })).rejects.toThrow(EditError)
+    await expect(applyEditSql(pool, { op: 'savePensionBalance', planId: 'p1', entry: { id: 'f1', date: '2026-08-10', balance: 1 } })).rejects.toThrow(EditError)
+    await applyEditSql(pool, { op: 'deletePensionBalance', planId: 'p1', id: 'b2' })
+    await expect(applyEditSql(pool, { op: 'deletePensionBalance', planId: 'p1', id: 'b2' })).rejects.toThrow(EditError)
+    await applyEditSql(pool, { op: 'deletePensionPlan', id: 'p1' })
+    expect((await pool.query(`SELECT id FROM manual_balances ORDER BY id`)).rows.map((r) => r.id)).toEqual(['b3', 'f1'])
+    await expect(applyEditSql(pool, { op: 'deletePensionPlan', id: 'p1' })).rejects.toThrow(EditError)
+  })
+
+  it('migration 011 runs on a database from migration 010, keeping its FGTS balances, and can run again', async () => {
+    await pool.query(`DROP TABLE manual_balances, manual_accounts`)
+    await pool.query(readFileSync(new URL('../../db/migrations/010_manual_balances.sql', import.meta.url), 'utf8'))
+    await pool.query(`INSERT INTO manual_balances (id, kind, as_of, balance_cents) VALUES ('f1', 'fgts', '2026-09-22', 100)`)
+    const migration = readFileSync(new URL('../../db/migrations/011_pension_plans.sql', import.meta.url), 'utf8')
+    await pool.query(migration)
+    await pool.query(migration)
+    expect((await pool.query(`SELECT id, account_id FROM manual_balances`)).rows).toEqual([{ id: 'f1', account_id: null }])
+    await expect(pool.query(`INSERT INTO manual_balances (id, kind, as_of, balance_cents) VALUES ('x', 'pension', '2026-09-22', 1)`)).rejects.toThrow()
   })
 
   it('GET /api/transactions fetches older months and every stored month, with the filters', async () => {
