@@ -12,6 +12,7 @@ import { HiddenTransactions } from './pages/Transactions'
 import { Projection } from './pages/Projection'
 import { UnusualAll, UnusualCategory } from './pages/UnusualCategory'
 import { Recurring } from './pages/Recurring'
+import { Debug } from './pages/Debug'
 import { Snackbar, SyncBar } from './components/SyncBar'
 import { Icon, type IconName } from './components/Icon'
 import { Wordmark } from './components/Logo'
@@ -126,6 +127,8 @@ function Shell() {
                     <Route path="/insights/unusual" element={<UnusualAll />} />
                     <Route path="/insights/unusual/:categoryId" element={<UnusualCategory />} />
                     <Route path="/recurring" element={<Recurring />} />
+                    {/* TEMPORARY: Pluggy's raw responses. */}
+                    <Route path="/debug" element={<Debug />} />
                   </Routes>
                 </DataGate>
               }

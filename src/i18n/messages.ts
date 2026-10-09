@@ -17,6 +17,36 @@ export interface Messages {
   demoData: string
   demoNote: string
   /** Privacy mode: amounts, charts and descriptions blurred, for public places. */
+  /** TEMPORARY: the debug screen (#/debug), Pluggy's raw responses. */
+  debug: {
+    title: string
+    link: string
+    intro: string
+    loading: string
+    notConfigured: string
+    failed: (status: number) => string
+    item: (n: number) => string
+    accountsHint: string
+    itemCall: string
+    accountsCall: string
+    page: (n: number) => string
+    transactions: string
+    bills: string
+    nextPage: string
+    copy: string
+    copied: string
+    status: (status: number) => string
+    identityCall: string
+    investmentsCall: string
+    loansCall: string
+    investmentTransactions: string
+    loadAll: string
+    loadAllBanks: string
+    loadingAll: (done: number) => string
+    allTitle: string
+    allNote: string
+    download: string
+  }
   privacy: {
     hide: string
     show: string
@@ -615,6 +645,36 @@ export const messages: Messages = {
   mainNav: 'Principal',
   demoData: 'Dados de exemplo',
   demoNote: 'Mostrando dados de exemplo até o Meu Pluggy ser conectado.',
+  debug: {
+    title: 'Depuração do Pluggy',
+    link: 'Depuração do Pluggy',
+    intro: 'A resposta do Pluggy para cada chamada, como o servidor recebe. Só quem está logado vê esta página. Temporária.',
+    loading: 'Carregando…',
+    notConfigured: 'O Pluggy não está configurado no servidor (PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET, PLUGGY_ITEM_IDS).',
+    failed: (status) => `A requisição falhou (HTTP ${status}).`,
+    item: (n) => `Item ${n}`,
+    accountsHint: 'Carregue as contas para ver cada conta.',
+    itemCall: 'Item',
+    accountsCall: 'Contas',
+    page: (n) => `Página ${n}`,
+    transactions: 'Transações',
+    bills: 'Faturas',
+    nextPage: 'Próxima página',
+    copy: 'Copiar JSON',
+    copied: 'Copiado',
+    status: (status) => `HTTP ${status}`,
+    identityCall: 'Identidade',
+    investmentsCall: 'Investimentos',
+    loansCall: 'Empréstimos',
+    investmentTransactions: 'Movimentações',
+    loadAll: 'Carregar tudo',
+    loadAllBanks: 'Carregar tudo de todos os bancos',
+    loadingAll: (done) => `Carregando… ${done} ${done === 1 ? 'chamada' : 'chamadas'}`,
+    allTitle: 'Tudo o que o Meu Pluggy retorna',
+    allNote:
+      'Item, contas, todas as páginas de transações de cada conta, faturas dos cartões, identidade, investimentos e suas movimentações, e empréstimos. Um produto que o banco não compartilha aparece com o erro do Pluggy.',
+    download: 'Baixar JSON',
+  },
   privacy: {
     hide: 'Ocultar valores',
     show: 'Mostrar valores',

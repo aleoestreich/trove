@@ -100,4 +100,7 @@ Run `npm test` and `npm run build` before pushing.
   The one other Pluggy call is the Connect token (`/api/connect-token`), which
   opens Pluggy Connect to link the account and returns no data. A test
   (`server/pluggy/onlySync.test.ts`) fails if another file creates a Pluggy
-  client.
+  client. **Temporary exception:** the debug screen (`#/debug`,
+  `GET /api/debug/pluggy`, served by `api/sync.ts`) returns Pluggy's raw
+  responses, read-only and behind the login; remove it, and its allowance in
+  that test, when it's no longer needed.
