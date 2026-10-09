@@ -36,6 +36,16 @@ export interface Messages {
     copy: string
     copied: string
     status: (status: number) => string
+    identityCall: string
+    investmentsCall: string
+    loansCall: string
+    investmentTransactions: string
+    loadAll: string
+    loadAllBanks: string
+    loadingAll: (done: number) => string
+    allTitle: string
+    allNote: string
+    download: string
   }
   privacy: {
     hide: string
@@ -653,6 +663,17 @@ export const messages: Messages = {
     copy: 'Copiar JSON',
     copied: 'Copiado',
     status: (status) => `HTTP ${status}`,
+    identityCall: 'Identidade',
+    investmentsCall: 'Investimentos',
+    loansCall: 'Empréstimos',
+    investmentTransactions: 'Movimentações',
+    loadAll: 'Carregar tudo',
+    loadAllBanks: 'Carregar tudo de todos os bancos',
+    loadingAll: (done) => `Carregando… ${done} ${done === 1 ? 'chamada' : 'chamadas'}`,
+    allTitle: 'Tudo o que o Meu Pluggy retorna',
+    allNote:
+      'Item, contas, todas as páginas de transações de cada conta, faturas dos cartões, identidade, investimentos e suas movimentações, e empréstimos. Um produto que o banco não compartilha aparece com o erro do Pluggy.',
+    download: 'Baixar JSON',
   },
   privacy: {
     hide: 'Ocultar valores',

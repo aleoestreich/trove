@@ -10,6 +10,11 @@
 //   endpoint=accounts&itemId=             -> GET /accounts?itemId=
 //   endpoint=transactions&itemId=&accountId=[&after=]  -> GET /v2/transactions (one page)
 //   endpoint=bills&itemId=&accountId=     -> GET /bills?accountId=
+//   endpoint=identity&itemId=             -> GET /identity?itemId=
+//   endpoint=investments&itemId=          -> GET /investments?itemId=
+//   endpoint=investmentTransactions&itemId=&investmentId=[&page=]  -> GET /investments/{id}/transactions
+//   endpoint=loans&itemId=                -> GET /loans?itemId=
+// (A product the bank doesn't share answers with Pluggy's own error status.)
 // Only the configured items, and only accounts that belong to them. This is
 // the one place that returns amounts and descriptions (to the signed-in
 // user only): responses are no-store, never cached on the server and never
@@ -24,7 +29,7 @@ function json(status: number, body: unknown): Response {
   })
 }
 
-const ENDPOINTS = ['item', 'accounts', 'transactions', 'bills'] as const
+const ENDPOINTS = ['item', 'accounts', 'transactions', 'bills', 'identity', 'investments', 'investmentTransactions', 'loans'] as const
 type Endpoint = (typeof ENDPOINTS)[number]
 
 export async function pluggyDebug(request: Request, config: PluggyConfig | null, fetchFn: typeof fetch = fetch): Promise<Response> {
@@ -43,6 +48,21 @@ export async function pluggyDebug(request: Request, config: PluggyConfig | null,
   try {
     if (endpoint === 'item') return reply(`GET /items/${itemId}`, await client.raw(`items/${encodeURIComponent(itemId)}`))
     if (endpoint === 'accounts') return reply(`GET /accounts?itemId=${itemId}`, await client.raw('accounts', { itemId, pageSize: '500' }))
+    if (endpoint === 'identity') return reply(`GET /identity?itemId=${itemId}`, await client.raw('identity', { itemId }))
+    if (endpoint === 'investments') return reply(`GET /investments?itemId=${itemId}`, await client.raw('investments', { itemId, pageSize: '500' }))
+    if (endpoint === 'loans') return reply(`GET /loans?itemId=${itemId}`, await client.raw('loans', { itemId, pageSize: '500' }))
+    if (endpoint === 'investmentTransactions') {
+      // Only for an investment of this item.
+      const investmentId = params.get('investmentId') ?? ''
+      const investments = await client.raw('investments', { itemId, pageSize: '500' })
+      const ids = ((investments.body as { results?: { id?: string }[] })?.results ?? []).map((x) => x.id)
+      if (!investmentId || !ids.includes(investmentId)) return json(403, { error: 'investment_not_in_item' })
+      const page = params.get('page') ?? undefined
+      return reply(
+        `GET /investments/${investmentId}/transactions${page ? `?page=${page}` : ''}`,
+        await client.raw(`investments/${encodeURIComponent(investmentId)}/transactions`, { pageSize: '500', page }),
+      )
+    }
 
     // Transactions and bills: only for an account of this item.
     const accounts = await client.raw('accounts', { itemId, pageSize: '500' })

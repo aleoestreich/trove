@@ -148,9 +148,16 @@ When the sync can't start at all, the reason comes from the HTTP status of
 ## Debug screen (temporary)
 
 **Contas → Depuração do Pluggy** (or `/#/debug`) on the deployed site shows
-Pluggy's raw answer for each call, as the server receives it: per item in
-`PLUGGY_ITEM_IDS`, the item, its accounts, each account's transactions (one
-page at a time, with "Próxima página") and a card's bills.
+Pluggy's raw answer for each call, as the server receives it. Per item in
+`PLUGGY_ITEM_IDS`: the item, its accounts, each account's transactions (one
+page at a time, with "Próxima página"), a card's bills, identity
+(`GET /identity`), investments (`GET /investments`) and each investment's
+movements (`GET /investments/{id}/transactions`), and loans (`GET /loans`).
+A product the bank doesn't share shows Pluggy's own error status.
+
+"Carregar tudo" reads all of it for one bank, every page included, as one
+JSON to copy or download; "Carregar tudo de todos os bancos" downloads every
+bank's in one file (`src/lib/pluggyDump.ts`, one call to the route at a time).
 
 - `GET /api/debug/pluggy` (rewritten to `api/sync.ts`, so no extra Vercel
   Function) is behind the login, read-only, and only accepts configured items

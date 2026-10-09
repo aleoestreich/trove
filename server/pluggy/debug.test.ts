@@ -15,6 +15,10 @@ function fakePluggy() {
     if (url.pathname === '/items/item-1') return Response.json({ id: 'item-1', status: 'UPDATED' })
     if (url.pathname === '/v2/transactions') return Response.json({ results: [{ id: 'tx-1', amount: 150, description: 'LOJA EXEMPLO' }], next: null })
     if (url.pathname === '/bills') return Response.json({ results: [] })
+    if (url.pathname === '/identity') return Response.json({ id: 'id-1', fullName: 'PESSOA EXEMPLO' })
+    if (url.pathname === '/investments') return Response.json({ results: [{ id: 'inv-1', type: 'FIXED_INCOME' }] })
+    if (url.pathname === '/investments/inv-1/transactions') return Response.json({ results: [{ id: 'itx-1' }], page: 1, totalPages: 1 })
+    if (url.pathname === '/loans') return new Response('{"message":"product not available"}', { status: 400 })
     return new Response('{"message":"not found"}', { status: 404 })
   }) as typeof fetch
   return { calls, fetchFn }
@@ -69,6 +73,26 @@ describe('pluggy debug route', () => {
     const text = await res.text()
     expect(JSON.parse(text)).toMatchObject({ status: 404, body: { message: 'gone' } })
     expect(text).not.toContain('super-secret')
+  })
+})
+
+describe('pluggy debug route: the other products', () => {
+  it('returns identity, investments and loans for a configured item, Pluggy’s error status included', async () => {
+    const { fetchFn } = fakePluggy()
+    expect(await (await pluggyDebug(get('?endpoint=identity&itemId=item-1'), config, fetchFn)).json()).toMatchObject({ request: 'GET /identity?itemId=item-1', status: 200 })
+    expect(await (await pluggyDebug(get('?endpoint=investments&itemId=item-1'), config, fetchFn)).json()).toMatchObject({ status: 200 })
+    // A product the bank doesn't share: Pluggy's own status, shown as is.
+    expect(await (await pluggyDebug(get('?endpoint=loans&itemId=item-1'), config, fetchFn)).json()).toMatchObject({ status: 400 })
+    expect((await pluggyDebug(get('?endpoint=identity&itemId=other'), config, fetchFn)).status).toBe(403)
+  })
+
+  it('only reads transactions of an investment that belongs to the item', async () => {
+    const { calls, fetchFn } = fakePluggy()
+    expect((await pluggyDebug(get('?endpoint=investmentTransactions&itemId=item-1&investmentId=inv-other'), config, fetchFn)).status).toBe(403)
+    expect(calls.some((c) => c.startsWith('/investments/inv-other'))).toBe(false)
+    const res = await pluggyDebug(get('?endpoint=investmentTransactions&itemId=item-1&investmentId=inv-1&page=2'), config, fetchFn)
+    expect(await res.json()).toMatchObject({ request: 'GET /investments/inv-1/transactions?page=2', status: 200 })
+    expect(calls).toContain('/investments/inv-1/transactions?pageSize=500&page=2')
   })
 })
 

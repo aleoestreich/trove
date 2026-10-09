@@ -3,15 +3,18 @@ import { Link } from 'react-router-dom'
 import { Card } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n/I18nProvider'
+import { loadEverything, nextCursor, type Answer, type Dump } from '../lib/pluggyDump'
 
 /**
  * TEMPORARY. Pluggy's raw responses (GET /api/debug/pluggy), to check
  * what Pluggy really sends in production: per configured item, the item, its
- * accounts, and each account's transactions (page by page) and bills.
- * Nothing here is stored. Responses are shown in full, values included.
+ * accounts, each account's transactions (page by page) and bills, identity,
+ * investments and their movements, and loans; or all of it at once ("Carregar
+ * tudo"), to copy or download as JSON. Nothing here is stored. Responses are
+ * shown in full, values included.
  */
 
-type Endpoint = 'item' | 'accounts' | 'transactions' | 'bills'
+type Endpoint = 'item' | 'accounts' | 'transactions' | 'bills' | 'identity' | 'investments' | 'investmentTransactions' | 'loans'
 
 interface Reply {
   /** HTTP status of our route. */
@@ -44,11 +47,27 @@ async function callDebug(params: Record<string, string | undefined>): Promise<Re
   return { httpStatus: res.status, json }
 }
 
-/** The `after` cursor from a v2 transactions page's `next` link. */
-function nextCursor(body: unknown): string | undefined {
-  const next = (body as { next?: unknown } | null)?.next
-  if (typeof next !== 'string' || !next) return undefined
-  return new URL(next, 'https://api.pluggy.ai').searchParams.get('after') ?? undefined
+/** One call, as "Carregar tudo" keeps it: Pluggy's request, status and body (or the route's refusal). */
+async function answer(params: Record<string, string | undefined>): Promise<Answer> {
+  const r = await callDebug(params)
+  const ok = r.httpStatus === 200 && r.json && r.json.error === undefined
+  return ok ? { request: r.json!.request ?? null, status: r.json!.status ?? 0, body: r.json!.body } : { request: null, status: r.httpStatus, body: r.json }
+}
+
+interface AllState {
+  loading: boolean
+  calls: number
+  dump?: Dump
+}
+
+/** Saves `data` as a JSON file on this device. */
+function download(name: string, data: unknown) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 export function Debug() {
@@ -56,6 +75,26 @@ export function Debug() {
   const [itemIds, setItemIds] = useState<string[] | null>(null)
   const [listError, setListError] = useState<string | null>(null)
   const [calls, setCalls] = useState<Record<string, Call>>({})
+  const [all, setAll] = useState<Record<string, AllState>>({})
+  const [allBanks, setAllBanks] = useState<{ loading: boolean; calls: number } | null>(null)
+
+  const loadAll = async (itemId: string): Promise<Dump> => {
+    setAll((a) => ({ ...a, [itemId]: { loading: true, calls: 0 } }))
+    const dump = await loadEverything(itemId, answer, () => {
+      setAll((a) => ({ ...a, [itemId]: { ...a[itemId], calls: (a[itemId]?.calls ?? 0) + 1 } }))
+      setAllBanks((b) => b && { ...b, calls: b.calls + 1 })
+    })
+    setAll((a) => ({ ...a, [itemId]: { loading: false, calls: a[itemId]?.calls ?? 0, dump } }))
+    return dump
+  }
+  const loadAllBanks = async () => {
+    if (!itemIds) return
+    setAllBanks({ loading: true, calls: 0 })
+    const dumps: Dump[] = []
+    for (const id of itemIds) dumps.push(await loadAll(id))
+    setAllBanks((b) => b && { ...b, loading: false })
+    download(`meu-pluggy-${new Date().toISOString().slice(0, 10)}.json`, dumps)
+  }
 
   useEffect(() => {
     let live = true
@@ -95,6 +134,22 @@ export function Debug() {
       </div>
       <p className="text-sm leading-5 text-muted">{t.debug.intro}</p>
 
+      {itemIds && itemIds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={loadAllBanks}
+            disabled={!!allBanks?.loading}
+            className="inline-flex h-11 items-center gap-2 rounded-md bg-accent px-4 text-sm font-medium text-surface disabled:opacity-60"
+          >
+            <Icon name="download" className="size-[18px]" />
+            {t.debug.loadAllBanks}
+          </button>
+          {allBanks?.loading && <span className="text-xs leading-4 text-muted">{t.debug.loadingAll(allBanks.calls)}</span>}
+        </div>
+      )}
+      <p className="text-xs leading-4 text-muted">{t.debug.allNote}</p>
+
       {listError && <p className="rounded-md bg-critical-soft p-3 text-sm leading-5 text-critical">{listError}</p>}
       {!itemIds && !listError && <p className="text-sm text-muted">{t.debug.loading}</p>}
 
@@ -109,11 +164,50 @@ export function Debug() {
               <code className="text-xs leading-4 break-all text-muted">{itemId}</code>
             </div>
             <div className="flex flex-wrap gap-2">
+              <CallButton label={t.debug.loadAll} onClick={() => loadAll(itemId)} strong />
               <CallButton label={t.debug.itemCall} onClick={() => run(keyOf('item', itemId), { endpoint: 'item', itemId }, 1)} />
               <CallButton label={t.debug.accountsCall} onClick={() => run(keyOf('accounts', itemId), { endpoint: 'accounts', itemId }, 1)} />
+              <CallButton label={t.debug.identityCall} onClick={() => run(keyOf('identity', itemId), { endpoint: 'identity', itemId }, 1)} />
+              <CallButton label={t.debug.investmentsCall} onClick={() => run(keyOf('investments', itemId), { endpoint: 'investments', itemId }, 1)} />
+              <CallButton label={t.debug.loansCall} onClick={() => run(keyOf('loans', itemId), { endpoint: 'loans', itemId }, 1)} />
             </div>
+            <AllResult state={all[itemId]} itemId={itemId} />
             <Result call={calls[keyOf('item', itemId)]} />
             <Result call={accountsCall} />
+            <Result call={calls[keyOf('identity', itemId)]} />
+            <Result call={calls[keyOf('investments', itemId)]} />
+            {(
+              (calls[keyOf('investments', itemId)]?.reply?.json?.body as { results?: { id: string; name?: string; type?: string }[] } | undefined)?.results ?? []
+            ).map((inv) => {
+              const key = keyOf('investmentTransactions', itemId, inv.id)
+              const c = calls[key]
+              const totalPages = (c?.reply?.json?.body as { totalPages?: number } | undefined)?.totalPages ?? 1
+              return (
+                <div key={inv.id} className="flex flex-col gap-2 border-t border-line pt-3">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm leading-5 font-medium text-ink">
+                      {inv.type ?? '?'}
+                      {inv.name ? ` · ${inv.name}` : ''}
+                    </span>
+                    <code className="text-xs leading-4 break-all text-muted">{inv.id}</code>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <CallButton
+                      label={t.debug.investmentTransactions}
+                      onClick={() => run(key, { endpoint: 'investmentTransactions', itemId, investmentId: inv.id, page: '1' }, 1)}
+                    />
+                    {c && !c.loading && c.page < totalPages && (
+                      <CallButton
+                        label={t.debug.nextPage}
+                        onClick={() => run(key, { endpoint: 'investmentTransactions', itemId, investmentId: inv.id, page: String(c.page + 1) }, c.page + 1)}
+                      />
+                    )}
+                  </div>
+                  <Result call={c} showPage />
+                </div>
+              )
+            })}
+            <Result call={calls[keyOf('loans', itemId)]} />
 
             {accounts === null ? (
               <p className="text-xs leading-4 text-muted">{t.debug.accountsHint}</p>
@@ -162,12 +256,12 @@ export function Debug() {
   )
 }
 
-function CallButton({ label, onClick }: { label: string; onClick: () => void }) {
+function CallButton({ label, onClick, strong = false }: { label: string; onClick: () => void; strong?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-9 items-center rounded-full border border-line bg-surface px-3.5 text-sm font-medium text-ink active:bg-track"
+      className={`inline-flex h-9 items-center rounded-full border px-3.5 text-sm font-medium active:bg-track ${strong ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-surface text-ink'}`}
     >
       {label}
     </button>
@@ -215,6 +309,40 @@ function Result({ call, showPage = false }: { call?: Call; showPage?: boolean })
         </button>
       </div>
       <pre className="max-h-[420px] overflow-auto rounded-md bg-track p-3 text-[11px] leading-4 text-ink">{text}</pre>
+    </div>
+  )
+}
+
+/** "Carregar tudo" for one bank: progress, then the whole JSON with Copiar and Baixar. */
+function AllResult({ state, itemId }: { state?: AllState; itemId: string }) {
+  const { t } = useI18n()
+  const [copied, setCopied] = useState(false)
+  if (!state) return null
+  if (state.loading) return <p className="text-xs leading-4 text-muted">{t.debug.loadingAll(state.calls)}</p>
+  const text = JSON.stringify(state.dump, null, 2) ?? ''
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // clipboard unavailable
+    }
+  }
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm leading-5 font-medium text-ink">{t.debug.allTitle}</span>
+        <span className="flex shrink-0 gap-3">
+          <button type="button" onClick={copy} className="text-xs leading-4 font-medium text-accent">
+            {copied ? t.debug.copied : t.debug.copy}
+          </button>
+          <button type="button" onClick={() => download(`meu-pluggy-${itemId}.json`, state.dump)} className="text-xs leading-4 font-medium text-accent">
+            {t.debug.download}
+          </button>
+        </span>
+      </div>
+      <pre className="max-h-[520px] overflow-auto rounded-md bg-track p-3 text-[11px] leading-4 text-ink">{text}</pre>
     </div>
   )
 }
