@@ -4,7 +4,7 @@
 // "hidden" flags are applied.
 
 import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Snapshot, type SyncInfo, type Transaction, type TransferOverride } from '../../src/data/types.js'
-import { brazilDate, toSnapshot } from '../pluggy/map.js'
+import { toSnapshot } from '../pluggy/map.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
 import { readCategories, readIncomeFilter, readProjectionSettings, readRecurringOverrides } from './categories.js'
 import { withAccountNames } from '../../src/data/edits.js'
@@ -43,8 +43,8 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string, to: 
   if (sync.connections.every((c) => !c.lastSyncedAt)) return null
 
   const items = await db.query<{ raw: PluggyItem }>(`SELECT raw FROM bank_connections WHERE id = ANY($1::text[])`, [itemIds])
-  const accounts = await db.query<{ id: string; raw: PluggyAccount; nickname: string | null }>(
-    `SELECT id, raw, nickname FROM accounts WHERE connection_id = ANY($1::text[])`,
+  const accounts = await db.query<{ id: string; raw: PluggyAccount; nickname: string | null; card_close_day: number | null; card_due_day: number | null }>(
+    `SELECT id, raw, nickname, card_close_day, card_due_day FROM accounts WHERE connection_id = ANY($1::text[])`,
     [itemIds],
   )
   const txs = await db.query<{ raw: PluggyTransaction; category_id: string | null; subcategory_id: string | null; is_hidden: boolean; edited: boolean; transfer_override: TransferOverride | null }>(
@@ -88,6 +88,7 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string, to: 
     accounts: snapshot.accounts.map((a) => (a.creditData && estimates.has(a.id) ? { ...a, creditData: { ...a.creditData, estimatedDays: estimates.get(a.id) } } : a)),
     transactions: snapshot.transactions.filter((t) => t.date >= from && (!to || t.date <= to)),
     accountNames: Object.fromEntries(accounts.rows.filter((r) => r.nickname).map((r) => [r.id, r.nickname!])),
+    cardDays: Object.fromEntries(accounts.rows.filter((r) => r.card_close_day && r.card_due_day).map((r) => [r.id, { close: r.card_close_day!, due: r.card_due_day! }])),
     storedMonths: months.rows.map((r) => r.month),
     sync,
     incomeFilter: await readIncomeFilter(db),
@@ -96,15 +97,9 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string, to: 
   })
 }
 
-/** A bill's closing date (Pluggy's billClosingDate) as a day in Brazil, or null if missing or malformed. */
-function closingDay(value: string | null): string | null {
-  if (!value || Number.isNaN(Date.parse(value))) return null
-  return brazilDate(value)
-}
-
 /**
  * Each card's closing and due days from its last stored bills: their own
- * closing dates, or estimated from the purchases charged to them (and the
+ * closing dates (`closing_date`), or estimated from the purchases charged to them (and the
  * ones after them). Only for cards whose bank reports no closing date; cards
  * without enough data are left out.
  */
@@ -113,8 +108,8 @@ export async function readEstimatedCardDays(db: Db, cardIds: string[]): Promise<
   if (cardIds.length === 0) return out
   // The last bills of each card (one more than used: its purchases sit after the one before).
   const bills = await db.query<{ id: string; account_id: string; due_date: string; closing: string | null }>(
-    `SELECT id, account_id, to_char(due_date, 'YYYY-MM-DD') AS due_date, closing FROM (
-       SELECT id, account_id, due_date, raw->>'billClosingDate' AS closing, row_number() OVER (PARTITION BY account_id ORDER BY due_date DESC) AS n
+    `SELECT id, account_id, to_char(due_date, 'YYYY-MM-DD') AS due_date, to_char(closing_date, 'YYYY-MM-DD') AS closing FROM (
+       SELECT id, account_id, due_date, closing_date, row_number() OVER (PARTITION BY account_id ORDER BY due_date DESC) AS n
        FROM card_bills WHERE account_id = ANY($1::text[])
      ) b WHERE n <= $2`,
     [cardIds, BILLS_USED + 1],
@@ -130,7 +125,7 @@ export async function readEstimatedCardDays(db: Db, cardIds: string[]): Promise<
   )
   for (const id of cardIds) {
     const estimate = estimateCardDays(
-      bills.rows.filter((b) => b.account_id === id).map((b) => ({ id: b.id, dueDate: b.due_date, closingDate: closingDay(b.closing) })),
+      bills.rows.filter((b) => b.account_id === id).map((b) => ({ id: b.id, dueDate: b.due_date, closingDate: b.closing })),
       purchases.rows.filter((p) => p.account_id === id).map((p) => ({ date: p.booked_on, billId: p.card_bill_id })),
     )
     if (estimate) out.set(id, estimate)

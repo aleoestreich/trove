@@ -19,6 +19,8 @@ interface DemoOwner {
   recurringOverrides?: Record<string, RecurringOverride>
   /** Names set in Trove for accounts and cards (app_settings too). */
   accountNames?: Record<string, string>
+  /** Closing and due days set for cards. */
+  cardDays?: Snapshot['cardDays']
 }
 
 function read(): DemoOwner | null {
@@ -57,6 +59,7 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
   return withAccountNames({
     ...seed,
     accountNames: owner.accountNames,
+    cardDays: owner.cardDays,
     categories: owner.categories,
     subcategories: owner.subcategories,
     incomeFilter: owner.incomeFilter,
@@ -110,6 +113,7 @@ export function createMockRepository(today: Date = new Date()): Repository {
         projectionSettings: next.projectionSettings,
         recurringOverrides: next.recurringOverrides,
         accountNames: next.accountNames,
+        cardDays: next.cardDays,
       })
       return previous && { updated: previous.length, previous }
     },

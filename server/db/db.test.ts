@@ -568,6 +568,43 @@ suite('database', () => {
     await expect(applyEditSql(pool, { op: 'renameAccount', accountId: 'nope', name: 'X' })).rejects.toThrow(EditError)
   })
 
+  it('a card’s closing and due days are stored, survive every sync and apply on any device', async () => {
+    const card: PluggyAccount = { id: 'card-1', itemId: 'item-1', type: 'CREDIT', subtype: 'CREDIT_CARD', name: 'Cartão Exemplo', balance: 100, currencyCode: 'BRL', creditData: { creditLimit: 1000 } }
+    const syncCard = () => inTransaction(pool, (db) => save(db, { ...fetched([tx('t1')]), accounts: [checking, card] }, now))
+    await syncCard()
+    await applyEditSql(pool, { op: 'setCardDays', accountId: 'card-1', days: { close: 3, due: 10 } })
+    await syncCard()
+    expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.cardDays).toEqual({ 'card-1': { close: 3, due: 10 } })
+    await applyEditSql(pool, { op: 'setCardDays', accountId: 'card-1', days: null })
+    expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.cardDays).toEqual({})
+    // Cards only.
+    await expect(applyEditSql(pool, { op: 'setCardDays', accountId: 'acc-1', days: { close: 3, due: 10 } })).rejects.toThrow(EditError)
+    await expect(applyEditSql(pool, { op: 'setCardDays', accountId: 'nope', days: { close: 3, due: 10 } })).rejects.toThrow(EditError)
+  })
+
+  it('stores each bill’s closing date, in Brazil time', async () => {
+    const bills = [
+      { accountId: 'acc-1', bill: { id: 'b1', dueDate: '2026-10-10T03:00:00.000Z', billClosingDate: '2026-10-03T02:00:00.000Z', totalAmount: 150 } },
+      { accountId: 'acc-1', bill: { id: 'b2', dueDate: '2026-11-10T03:00:00.000Z', totalAmount: 150 } },
+      { accountId: 'acc-1', bill: { id: 'b3', dueDate: '2026-12-10T03:00:00.000Z', billClosingDate: 'not a date', totalAmount: 150 } },
+    ]
+    await sync([], bills)
+    expect((await pool.query(`SELECT id, closing_date::text FROM card_bills ORDER BY id`)).rows).toEqual([
+      { id: 'b1', closing_date: '2026-10-02' },
+      { id: 'b2', closing_date: null },
+      { id: 'b3', closing_date: null },
+    ])
+  })
+
+  it('migration 009 fills in the closing date of bills already stored, and can run again', async () => {
+    await sync([], [{ accountId: 'acc-1', bill: { id: 'b1', dueDate: '2026-10-10T03:00:00.000Z', billClosingDate: '2026-10-03T02:00:00.000Z', totalAmount: 150 } }])
+    await pool.query(`UPDATE card_bills SET closing_date = NULL`)
+    const migration = readFileSync(new URL('../../db/migrations/009_card_days.sql', import.meta.url), 'utf8')
+    await pool.query(migration)
+    await pool.query(migration)
+    expect((await pool.query(`SELECT closing_date::text FROM card_bills`)).rows).toEqual([{ closing_date: '2026-10-02' }])
+  })
+
   it('GET /api/transactions fetches older months and every stored month, with the filters', async () => {
     await sync([
       tx('old-1', { date: '2025-02-10T12:00:00.000Z', description: 'LOJA ANTIGA' }),

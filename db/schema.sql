@@ -42,9 +42,16 @@ CREATE TABLE IF NOT EXISTS accounts (
   card_brand              text,
   card_level              text,
   nickname                text,                  -- set in Trove; syncs never change it
+  card_close_day          smallint,              -- closing and due days set in Trove for a card; syncs never change them
+  card_due_day            smallint,
   transactions_synced_at  timestamptz,           -- when its transactions were last read (an advanced sync can skip it)
   raw                     jsonb NOT NULL,
   synced_at               timestamptz NOT NULL DEFAULT now()
+,
+  CONSTRAINT accounts_card_days_check CHECK (
+    (card_close_day IS NULL AND card_due_day IS NULL)
+    OR (card_close_day BETWEEN 1 AND 31 AND card_due_day BETWEEN 1 AND 31)
+  )
 );
 CREATE INDEX IF NOT EXISTS accounts_connection_idx ON accounts (connection_id);
 
@@ -64,6 +71,7 @@ CREATE TABLE IF NOT EXISTS card_bills (
   id                     text PRIMARY KEY,       -- Pluggy bill.id
   account_id             text NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   due_date               date NOT NULL,
+  closing_date           date,                   -- when the bank reports it (billClosingDate)
   total_cents            bigint NOT NULL,
   currency_code          char(3) NOT NULL,
   minimum_payment_cents  bigint,

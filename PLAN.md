@@ -97,8 +97,9 @@ No backend, no auth. It runs in the browser on hardcoded data.
 - ✅ Background, idempotent sync (also stores card bills).
 - ✅ Closing and due days estimated from each card's last 3 stored bills
   (the purchases charged to each), for banks that report no closing date.
-- Next: card closing days in the database (today per device); use the stored
-  card bills for the current bill (PR #23 reads them live).
+- ✅ Card closing days in the database (they were kept per device), and each
+  bill's closing date stored.
+- Next: use the stored card bills for the current bill (PR #23 reads them live).
 
 ## Phase 3 — Authentication & security
 

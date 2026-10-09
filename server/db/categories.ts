@@ -253,6 +253,10 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
       // Its own column: syncs only write the bank's columns, so they never change it.
       await one(`UPDATE accounts SET nickname = $2 WHERE id = $1`, [e.accountId, e.name], 'account')
       return null
+    case 'setCardDays':
+      // Their own columns too; cards only, as in the app.
+      await one(`UPDATE accounts SET card_close_day = $2, card_due_day = $3 WHERE id = $1 AND type = 'CREDIT'`, [e.accountId, e.days?.close ?? null, e.days?.due ?? null], 'card')
+      return null
     case 'recurringAction': {
       // The row is locked so two answers given at once both stay.
       await db.query(`INSERT INTO app_settings (key, value) VALUES ($1, '{}'::jsonb) ON CONFLICT (key) DO NOTHING`, [RECURRING_KEY])

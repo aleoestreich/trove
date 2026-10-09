@@ -42,6 +42,8 @@ const fetchedFromKey = (itemId: string) => `fetched_from:${itemId}`
 const cents = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? Math.round(n * 100) : null)
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null)
 const day = (v: unknown): string | null => (typeof v === 'string' && v ? brazilDate(v) : null)
+/** Like `day`, but null for a value that isn't a date. */
+const validDay = (v: unknown): string | null => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? brazilDate(v) : null)
 
 /**
  * The first day of the window to fetch, as YYYY-MM-DD: HISTORY_START until
@@ -239,11 +241,11 @@ export async function save(db: Db, f: Fetched, now: Date): Promise<SyncResult> {
   // Card bills (the card itself is a row in accounts).
   if (bills.length > 0) {
     await db.query(
-      `INSERT INTO card_bills (id, account_id, due_date, total_cents, currency_code, minimum_payment_cents, allows_installments, finance_charges, raw, synced_at)
-       SELECT r.id, r.account_id, r.due_date, r.total_cents, r.currency_code, r.minimum_payment_cents, r.allows_installments, r.finance_charges, r.raw, $2
-       FROM jsonb_to_recordset($1::jsonb) AS r(id text, account_id text, due_date date, total_cents bigint, currency_code text,
+      `INSERT INTO card_bills (id, account_id, due_date, closing_date, total_cents, currency_code, minimum_payment_cents, allows_installments, finance_charges, raw, synced_at)
+       SELECT r.id, r.account_id, r.due_date, r.closing_date, r.total_cents, r.currency_code, r.minimum_payment_cents, r.allows_installments, r.finance_charges, r.raw, $2
+       FROM jsonb_to_recordset($1::jsonb) AS r(id text, account_id text, due_date date, closing_date date, total_cents bigint, currency_code text,
          minimum_payment_cents bigint, allows_installments boolean, finance_charges jsonb, raw jsonb)
-       ON CONFLICT (id) DO UPDATE SET account_id = excluded.account_id, due_date = excluded.due_date, total_cents = excluded.total_cents,
+       ON CONFLICT (id) DO UPDATE SET account_id = excluded.account_id, due_date = excluded.due_date, closing_date = excluded.closing_date, total_cents = excluded.total_cents,
          currency_code = excluded.currency_code, minimum_payment_cents = excluded.minimum_payment_cents,
          allows_installments = excluded.allows_installments, finance_charges = excluded.finance_charges, raw = excluded.raw,
          synced_at = excluded.synced_at`,
@@ -253,6 +255,7 @@ export async function save(db: Db, f: Fetched, now: Date): Promise<SyncResult> {
             id: bill.id,
             account_id: accountId,
             due_date: brazilDate(bill.dueDate),
+            closing_date: validDay(bill.billClosingDate),
             total_cents: cents(bill.totalAmount) ?? 0,
             currency_code: (bill.totalAmountCurrencyCode || accounts.find((a) => a.id === accountId)?.currencyCode || 'BRL').toUpperCase(),
             minimum_payment_cents: cents(bill.minimumPaymentAmount),

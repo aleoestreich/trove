@@ -161,6 +161,8 @@ export interface Snapshot {
   storedMonths?: string[]
   /** Names set in Trove for accounts and cards, by account ID (applied to `accounts`). */
   accountNames?: Record<string, string>
+  /** Closing and due days set in Trove for cards, by account ID (applied to the cards' dates). */
+  cardDays?: Record<string, { close: number; due: number }>
   /** Hand-set answers about detected recurring charges, by recurring charge ID. */
   recurringOverrides?: Record<string, RecurringOverride>
 }
