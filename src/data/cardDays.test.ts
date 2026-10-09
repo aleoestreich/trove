@@ -50,4 +50,15 @@ describe('applying the days to cards', () => {
     const [withDays] = applyCardDays([card], { card: { close: 20, due: 27 } }, oct1)
     expect(currentBill(withDays, [tx], [], oct1)).toMatchObject({ amount: 150_00, closeDate: '2026-10-20', dueDate: '2026-10-27' })
   })
+
+  it('uses the days estimated from past bills when the bank reports no closing date and none was set by hand', () => {
+    const guessed: Account = { ...card, creditData: { ...card.creditData!, estimatedDays: { close: 3, due: 10, bills: 3 } } }
+    const [c] = applyCardDays([guessed], {}, oct1)
+    expect(c.creditData).toMatchObject({ balanceCloseDate: '2026-10-03', balanceDueDate: '2026-10-10', estimated: true })
+    // Set by hand wins; so do the bank's own dates.
+    expect(applyCardDays([guessed], { card: { close: 20, due: 27 } }, oct1)[0].creditData).toMatchObject({ balanceCloseDate: '2026-10-20', userDays: { close: 20, due: 27 } })
+    expect(applyCardDays([guessed], { card: { close: 20, due: 27 } }, oct1)[0].creditData?.estimated).toBeUndefined()
+    const reported: Account = { ...guessed, creditData: { ...guessed.creditData!, balanceCloseDate: '2026-10-15', balanceDueDate: '2026-10-22' } }
+    expect(applyCardDays([reported], {}, oct1)[0]).toBe(reported)
+  })
 })

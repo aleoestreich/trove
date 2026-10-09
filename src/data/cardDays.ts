@@ -54,12 +54,21 @@ export function billDates(days: CardDays, today: Date): { close: string; due: st
   return { close, due: addMonths(close, 1) }
 }
 
-/** Accounts with the closing and due days set by hand in place of the bank's dates. */
+/**
+ * Accounts with the closing and due days set by hand in place of the bank's
+ * dates. A card with neither uses the days estimated from its last bills.
+ */
 export function applyCardDays(accounts: Account[], days: Record<string, CardDays>, today: Date = new Date()): Account[] {
   return accounts.map((a) => {
+    if (a.type !== 'CREDIT' || !a.creditData) return a
     const d = days[a.id]
-    if (a.type !== 'CREDIT' || !a.creditData || !d) return a
-    const { close, due } = billDates(d, today)
-    return { ...a, creditData: { ...a.creditData, balanceCloseDate: close, balanceDueDate: due, userDays: d } }
+    if (d) {
+      const { close, due } = billDates(d, today)
+      return { ...a, creditData: { ...a.creditData, balanceCloseDate: close, balanceDueDate: due, userDays: d } }
+    }
+    const guess = a.creditData.estimatedDays
+    if (a.creditData.balanceCloseDate || !guess) return a
+    const { close, due } = billDates(guess, today)
+    return { ...a, creditData: { ...a.creditData, balanceCloseDate: close, balanceDueDate: due, estimated: true } }
   })
 }

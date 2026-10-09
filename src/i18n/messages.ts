@@ -327,7 +327,11 @@ export interface Messages {
       save: string
       cancel: string
       useBank: string
+      useEstimate: string
       note: string
+      estimated: (close: number, due: number) => string
+      estimatedFrom: (bills: number) => string
+      adjust: string
     }
     limitUsed: string
     used: string
@@ -938,7 +942,11 @@ export const messages: Messages = {
       save: 'Salvar',
       cancel: 'Cancelar',
       useBank: 'Usar as datas do banco',
+      useEstimate: 'Usar a estimativa',
       note: 'Salvo neste aparelho.',
+      estimated: (close, due) => `Fecha por volta do dia ${close} · vence no dia ${due}`,
+      estimatedFrom: (bills) => (bills === 1 ? 'Estimado pela última fatura, já que o banco não informa a data de fechamento.' : `Estimado pelas últimas ${bills} faturas, já que o banco não informa a data de fechamento.`),
+      adjust: 'Ajustar',
     },
     limitUsed: 'Limite usado',
     used: 'Usado',
