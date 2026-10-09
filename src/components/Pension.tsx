@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { PLAN_NAME_MAX, PLAN_TYPES, pensionDue, pensionTotal, planDue, planLatest, sortPensionEntries, type Pension, type PensionEntry, type PensionPlan, type PlanType } from '../data/pension'
+import { PLAN_NAME_MAX, PLAN_TYPES, pensionDue, pensionTotal, planDue, planLatest, sortPensionEntries, type PensionEntry, type PensionPlan, type PlanType } from '../data/pension'
 import { cleanName, newId } from '../data/edits'
 import { useData } from '../state'
 import { useI18n } from '../i18n/I18nProvider'
@@ -7,13 +7,12 @@ import { formatDay } from '../lib/dates'
 import { formatMoney } from '../lib/money'
 import { Icon } from './Icon'
 import { Sheet } from './insights/parts'
-import { BalanceChart, BalanceList, BalanceSheet, Confirm, Disc, FailedNote, FieldNote, OutOfTotalLine, Pill, Switch, btn, fieldClass, signed, useBalanceFields } from './ManualBalance'
-import { SectionHead } from './Fgts'
+import { BalanceChart, BalanceList, BalanceSheet, Confirm, Disc, FailedNote, FieldNote, Pill, Switch, btn, fieldClass, signed, useBalanceFields } from './ManualBalance'
 
-// Previdência privada tracked by hand (src/data/pension.ts): the section on
-// Accounts (one row per plan), the line under net worth, and the sheets to
-// add, edit and review a plan and to update or correct its balance. The
-// reminder on Visão geral is in BalancesReminder.tsx.
+// Previdência privada tracked by hand (src/data/pension.ts): its card on
+// Accounts (one row per plan), and the sheets to add, edit and review a plan
+// and to update or correct its balance. The "Fora do total" group and section
+// are in OutOfTotal.tsx; the reminder in BalancesReminder.tsx.
 
 export const PlanMark = ({ size = 40 }: { size?: number }) => <Disc icon="piggy" tint="indigo" size={size} />
 
@@ -54,148 +53,122 @@ export function usePensionSheets(): [(v: View) => void, ReactNode] {
 }
 
 /**
- * Accounts: "Previdência privada · Fora do total" below the FGTS. Off: the
+ * Accounts, in "Fora do total", below the FGTS: the previdência card. Off: the
  * switch (and how many plans are kept). On: the plans' latest balances added
- * up, one row per plan (its type, balance, date and change, or that it needs
- * an update) and "Adicionar plano"; outlined in accent when a plan is due.
+ * up, one row per plan ("PGBL · 10 out.", or that it needs an update) and
+ * "Adicionar plano"; outlined in accent when a plan is due.
  */
-export function PensionSection() {
+export function PensionCard() {
   const { pension, setPensionTracking, today } = useData()
   const { t } = useI18n()
   const v = t.pension
   const [open, sheet] = usePensionSheets()
-  const head = useId()
   const total = pensionTotal(pension)
   const due = pensionDue(pension, today)
 
-  return (
-    <section aria-labelledby={head} className="flex flex-col gap-2">
-      <SectionHead id={head} title={v.section} />
+  if (!pension.tracking)
+    return (
+      <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 lg:px-5">
+        <div className="flex items-center gap-3">
+          <PlanMark />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-base leading-[22px] text-ink">{v.trackLabel}</span>
+            <span className="text-[13px] leading-[18px] text-ink-2">{v.trackNote}</span>
+          </span>
+          <Switch checked={false} label={v.trackLabel} onChange={setPensionTracking} />
+        </div>
+        {pension.plans.length > 0 && (
+          <p className="flex items-center gap-1.5 text-xs leading-4 text-ink-2">
+            <Icon name="info" className="size-3.5 shrink-0 text-muted" />
+            {v.keptNote(pension.plans.length)}
+          </p>
+        )}
+        {sheet}
+      </div>
+    )
 
-      {!pension.tracking ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 lg:px-5">
-          <div className="flex items-center gap-3">
-            <PlanMark />
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-base leading-[22px] text-ink">{v.trackLabel}</span>
-              <span className="text-[13px] leading-[18px] text-ink-2">{v.trackNote}</span>
-            </span>
-            <Switch checked={false} label={v.trackLabel} onChange={setPensionTracking} />
-          </div>
-          {pension.plans.length > 0 && (
-            <p className="flex items-center gap-1.5 text-xs leading-4 text-ink-2">
-              <Icon name="info" className="size-3.5 shrink-0 text-muted" />
-              {v.keptNote(pension.plans.length)}
-            </p>
-          )}
+  return (
+    <div className={`flex flex-col gap-3 rounded-lg border bg-surface p-4 lg:px-5 ${due.length ? 'border-accent/60' : 'border-line'}`}>
+      <div className="flex items-center gap-3">
+        <PlanMark />
+        <span className="min-w-0 flex-1 text-base leading-[22px] text-ink">{v.section}</span>
+        <Switch checked label={v.trackLabel} onChange={setPensionTracking} />
+      </div>
+
+      {pension.plans.length === 0 ? (
+        <div className="flex flex-col items-center gap-1 pt-1 text-center">
+          <span aria-hidden className="mb-1 flex size-10 items-center justify-center rounded-full bg-track text-ink-2">
+            <Icon name="piggy" className="size-5" />
+          </span>
+          <p className="text-base leading-[22px] text-ink">{v.emptyTitle}</p>
+          <p className="text-[13px] leading-[18px] text-ink-2">{v.emptyNote}</p>
+          <button type="button" onClick={() => open({ kind: 'plan' })} className={`${btn.primary} mt-3 w-full`}>
+            <Icon name="plus" className="size-[18px]" strokeWidth={2} />
+            {v.add}
+          </button>
         </div>
       ) : (
-        <div className={`flex flex-col gap-3 rounded-lg border bg-surface p-4 lg:px-5 ${due.length ? 'border-accent/60' : 'border-line'}`}>
-          <div className="flex items-center gap-3">
-            <PlanMark />
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-base leading-[22px] text-ink">{v.section}</span>
-              <span className="text-[13px] leading-[18px] text-ink-2">{v.cardSub}</span>
-            </span>
-            <Switch checked label={v.trackLabel} onChange={setPensionTracking} />
+        <>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="tabular text-[32px] leading-10 font-bold tracking-[-0.02em] text-ink">{total ? formatMoney(total.total) : '—'}</span>
+            <span className="shrink-0 text-[13px] leading-[18px] text-ink-2">{v.plans(pension.plans.length)}</span>
           </div>
-
-          {pension.plans.length === 0 ? (
-            <div className="flex flex-col items-center gap-1 pt-1 text-center">
-              <span aria-hidden className="mb-1 flex size-10 items-center justify-center rounded-full bg-track text-ink-2">
-                <Icon name="piggy" className="size-5" />
-              </span>
-              <p className="text-base leading-[22px] text-ink">{v.emptyTitle}</p>
-              <p className="text-[13px] leading-[18px] text-ink-2">{v.emptyNote}</p>
-              <button type="button" onClick={() => open({ kind: 'plan' })} className={`${btn.primary} mt-3 w-full`}>
-                <Icon name="plus" className="size-[18px]" strokeWidth={2} />
-                {v.add}
-              </button>
-              <p className="mt-2 text-xs leading-4 text-ink-2">{v.trackNote}</p>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="tabular text-[32px] leading-10 font-bold tracking-[-0.02em] text-ink">{total ? formatMoney(total.total) : '—'}</span>
-                <span className="shrink-0 text-[13px] leading-[18px] text-ink-2">{v.plans(pension.plans.length)}</span>
-              </div>
-              {due.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-accent-faint px-2.5 py-1 text-xs leading-4 font-medium text-accent">
-                  <Icon name="calendar" className="size-3.5" />
-                  {v.dueCount(due.length)}
-                </span>
-              )}
-              <ul className="flex flex-col divide-y divide-line border-t border-line">
-                {pension.plans.map((p) => (
-                  <li key={p.id}>
-                    <PlanRow plan={p} today={today} onOpen={() => open({ kind: 'detail', planId: p.id })} />
-                  </li>
-                ))}
-              </ul>
-              <button type="button" onClick={() => open({ kind: 'plan' })} className={`${btn.outlineBase} w-full text-accent`}>
-                <Icon name="plus" className="size-[18px]" strokeWidth={2} />
-                {v.add}
-              </button>
-              <p className="text-xs leading-4 text-ink-2">{v.totalNote}</p>
-            </>
+          {due.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-accent-faint px-2.5 py-1 text-xs leading-4 font-medium text-accent">
+              <Icon name="calendar" className="size-3.5" />
+              {v.dueCount(due.length)}
+            </span>
           )}
-        </div>
+          <ul className="flex flex-col divide-y divide-line border-t border-line">
+            {pension.plans.map((p) => (
+              <li key={p.id}>
+                <PlanRow plan={p} today={today} onOpen={() => open({ kind: 'detail', planId: p.id })} />
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => open({ kind: 'plan' })} className="-my-1 -ml-2 inline-flex h-11 items-center gap-2 self-start rounded-md px-2 text-[15px] font-medium text-accent hover:bg-accent-faint">
+            <Icon name="plus" className="size-[18px]" strokeWidth={2} />
+            {v.add}
+          </button>
+        </>
       )}
       {sheet}
-    </section>
+    </div>
   )
 }
 
-/** A plan on Accounts: name, type, latest balance and change; a badge when it needs an update. */
+/** A plan on Accounts: name, "PGBL · 10 out." and its latest balance; a badge when it needs an update. */
 function PlanRow({ plan, today, onOpen }: { plan: PensionPlan; today: string; onOpen(): void }) {
   const { t } = useI18n()
   const v = t.pension
-  const latest = planLatest(plan)
-  const previous = sortPensionEntries(plan.entries)[1]
+  const latest = planLatest(plan)?.latest
   const due = planDue(plan, today)
+  const meta = [plan.type, latest && formatDay(latest.date)].filter(Boolean).join(' · ')
   return (
     <button type="button" onClick={onOpen} aria-label={v.open(plan.name)} className="flex w-full items-center gap-3 py-3 text-left">
       <PlanMark size={36} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-base leading-[22px] text-ink">{plan.name}</span>
-        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-4 text-ink-2">
-          <TypeBadge type={plan.type} />
-          <span className="whitespace-nowrap">{latest ? v.balanceOn(formatDay(latest.latest.date)) : v.noBalance}</span>
-        </span>
-        {latest?.change != null && previous && (
-          <span className="text-xs leading-4 text-ink-2">
-            <span className={`tabular ${latest.change >= 0 ? 'text-income' : ''}`}>{signed(latest.change)}</span> {v.changeSince(formatDay(previous.date))}
+        {(meta || due) && (
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-4 text-ink-2">
+            {meta && <span className="whitespace-nowrap">{meta}</span>}
+            {due &&
+              (latest ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-accent-faint px-2 py-0.5 text-[11px] leading-[14px] font-medium whitespace-nowrap text-accent">
+                  <Icon name="calendar" className="size-3" />
+                  {v.badgeUpdate}
+                </span>
+              ) : (
+                <Pill>{v.badgeNew}</Pill>
+              ))}
           </span>
         )}
-        {due &&
-          (latest ? (
-            <span className="mt-1 inline-flex items-center gap-1 self-start rounded-full bg-accent-faint px-2 py-0.5 text-[11px] leading-[14px] font-medium whitespace-nowrap text-accent">
-              <Icon name="calendar" className="size-3" />
-              {v.badgeUpdate}
-            </span>
-          ) : (
-            <span className="mt-1 self-start">
-              <Pill>{v.badgeNew}</Pill>
-            </span>
-          ))}
       </span>
-      <span className="tabular shrink-0 text-base text-ink">{latest ? formatMoney(latest.latest.balance) : '—'}</span>
+      {latest && <span className="tabular shrink-0 text-base text-ink">{formatMoney(latest.balance)}</span>}
       <Icon name="chevronRight" className="size-[18px] shrink-0 text-ink-2" />
     </button>
   )
 }
-
-/** Under net worth's tiles: "Previdência privada · 2 planos · saldos até 10 out. · R$ … · Fora do total". */
-export function PensionNetWorthLine() {
-  const { pension } = useData()
-  const { t } = useI18n()
-  const total = pensionTotal(pension)
-  if (!pension.tracking || !total) return null
-  return <OutOfTotalLine icon="piggy" tint="indigo" label={t.pension.netWorth.label} sub={t.pension.netWorth.sub(total.plans, formatDay(total.upTo))} amount={total.total} />
-}
-
-/** Whether net worth shows the previdência line. */
-export const showsPensionLine = (pension: Pension) => pension.tracking && pensionTotal(pension) !== null
 
 /**
  * "Adicionar plano" or "Editar plano": the name (up to 40 characters), the

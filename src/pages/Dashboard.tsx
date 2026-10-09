@@ -6,13 +6,12 @@ import { balances, expensesByCategory, inMonth, totals, visible } from '../lib/s
 import { incomeAverage, NO_FILTER } from '../data/incomeAverage'
 import { CategoryBadge, catVar } from '../components/CategoryBadge'
 import { SyncBar } from '../components/SyncBar'
-import { FgtsNetWorthLine, showsFgtsLine } from '../components/Fgts'
-import { PensionNetWorthLine, showsPensionLine } from '../components/Pension'
+import { OutOfTotalGroup } from '../components/OutOfTotal'
 import { BalancesReminder } from '../components/BalancesReminder'
 import { cashByCurrency, cashByInstitution } from '../lib/history'
 import { installmentPlans, upcomingByMonth } from '../lib/installments'
 import { currentBill, isIdleCard } from '../lib/bills'
-import { dayOfMonth, daysBetween, formatDay, formatFullDate, formatMonthName, formatMonthShort, formatShortDate, formatTime, lastMonths, monthKey, toISO } from '../lib/dates'
+import { dayOfMonth, formatDay, formatFullDate, formatMonthName, formatMonthShort, formatShortDate, lastMonths, monthKey, toISO } from '../lib/dates'
 import { useMonthCounts, useStoredTransactions } from '../lib/storedMonths'
 import { MonthPicker, monthTitle } from '../components/MonthPicker'
 import { formatCompactMoney, formatMoney, formatPercent, formatWholeMoney, signOf } from '../lib/money'
@@ -432,19 +431,16 @@ function Tile({ label, value, tone }: { label: string; value: string; tone: stri
  * banks report them (no history, no chart). A bank that failed the latest
  * sync is named, with the day of the balance used and "Tentar de novo";
  * a negative total gets a neutral note. The FGTS and previdência balances
- * tracked by hand are lines of their own below the tiles, not in the total.
+ * tracked by hand are below, in a dashed "Fora do total" group.
  */
 function NetWorthCard({ className }: { className: string }) {
-  const { accounts, fgts, pension } = useData()
+  const { accounts } = useData()
   const { info, failed, sync } = useSync()
   const { t } = useI18n()
   const o = t.overview
   const bal = balances(accounts)
-  const cashAccounts = accounts.filter((a) => a.type === 'BANK').length
-  const cards = accounts.filter((a) => a.type === 'CREDIT').length
   const stale = failed[0]
   const staleAt = stale && info?.connections.find((c) => c.id === stale.id)?.lastSyncedAt
-  const updated = info?.lastSyncedAt ? when(new Date(info.lastSyncedAt), o) : null
   return (
     <Card className={`flex flex-col gap-3 ${className}`}>
       <div className="flex items-center justify-between gap-3">
@@ -458,12 +454,11 @@ function NetWorthCard({ className }: { className: string }) {
         {`${bal.net < 0 ? signOf(bal.net) : ''}${formatMoney(Math.abs(bal.net))}`}
       </p>
       <div className="grid grid-cols-2 gap-2 lg:gap-3">
-        <NetWorthTile icon="checking" label={o.inAccounts} value={formatMoney(bal.cash)} sub={o.accountsCount(cashAccounts)} />
-        <NetWorthTile icon="card" label={o.cardBills} value={`${signOf(-bal.cardDebt)}${formatMoney(bal.cardDebt)}`} sub={o.cardsCount(cards)} />
+        <NetWorthTile icon="checking" label={o.inAccounts} value={formatMoney(bal.cash)} />
+        <NetWorthTile icon="card" label={o.cardBills} value={`${signOf(-bal.cardDebt)}${formatMoney(bal.cardDebt)}`} />
       </div>
       {/* The FGTS and the previdência, apart from what's added up. */}
-      <FgtsNetWorthLine />
-      <PensionNetWorthLine />
+      <OutOfTotalGroup />
       {stale ? (
         <>
           <p role="status" className="flex items-start gap-2.5 rounded-md border border-critical/30 bg-critical-soft px-3 py-2.5 text-[13px] leading-[18px] text-ink">
@@ -487,32 +482,11 @@ function NetWorthCard({ className }: { className: string }) {
           </p>
         )
       )}
-      {!stale && (
-        <p className="flex items-start gap-2 text-xs leading-4 text-ink-2">
-          <Icon name="info" className="size-3.5 shrink-0 text-muted" />
-          <span>
-            {showsFgtsLine(fgts) || showsPensionLine(pension) ? (
-              showsFgtsLine(fgts) && showsPensionLine(pension) ? (
-                t.netWorthNotes.both
-              ) : showsFgtsLine(fgts) ? (
-                t.netWorthNotes.fgts
-              ) : (
-                t.netWorthNotes.pension
-              )
-            ) : (
-              <>
-                {o.netWorthNote}
-                {updated && ` · ${o.updated(updated)}`}
-              </>
-            )}
-          </span>
-        </p>
-      )}
     </Card>
   )
 }
 
-function NetWorthTile({ icon, label, value, sub }: { icon: IconName; label: string; value: string; sub: string }) {
+function NetWorthTile({ icon, label, value }: { icon: IconName; label: string; value: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-0.5 rounded-md bg-page px-3 py-2.5">
       <span className="inline-flex min-w-0 items-center gap-1.5 text-xs leading-4 text-ink-2">
@@ -520,16 +494,8 @@ function NetWorthTile({ icon, label, value, sub }: { icon: IconName; label: stri
         <span className="truncate">{label}</span>
       </span>
       <span className="tabular truncate text-[17px] leading-6 font-bold text-ink">{value}</span>
-      <span className="text-xs leading-4 text-muted">{sub}</span>
     </div>
   )
-}
-
-/** "hoje às 10:00", "ontem às 10:00", "em 06/10 às 10:00". */
-function when(at: Date, o: typeof messages.overview): string {
-  const days = daysBetween(at, new Date())
-  const time = formatTime(at)
-  return days === 0 ? o.today(time) : days === 1 ? o.yesterday(time) : o.onDate(formatShortDate(toISO(at)), time)
 }
 
 /** The day of a moment, in this device's time zone (YYYY-MM-DD). */

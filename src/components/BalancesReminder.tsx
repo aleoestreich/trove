@@ -67,6 +67,7 @@ export function BalancesReminder({ className = '' }: { className?: string }) {
   if (fgtsIsDue && plans.length > 0) {
     const b = t.balancesReminder
     const one = plans.length === 1 ? plans[0] : null
+    const oneLast = one && planLatest(one)?.latest
     const row = (mark: React.ReactNode, title: string, sub: string, onUpdate: () => void) => (
       <div className="flex items-center gap-3 py-2">
         {mark}
@@ -82,14 +83,11 @@ export function BalancesReminder({ className = '' }: { className?: string }) {
     return (
       <>
         <section role="status" className={card}>
-          <span className="flex flex-col gap-0.5">
-            <span className="text-base leading-[22px] font-medium text-ink">{b.title}</span>
-            <span className="text-[13px] leading-[18px] text-ink-2">{b.note}</span>
-          </span>
+          <span className="text-base leading-[22px] font-medium text-ink">{b.title}</span>
           <div className="flex flex-col divide-y divide-accent/20">
-            {row(<FgtsMark size={36} />, t.fgts.section, fgtsLast ? b.fgtsSub(formatDay(fgtsLast.date)) : t.fgts.reminder.first, updateFgts)}
+            {row(<FgtsMark size={36} />, t.fgts.section, fgtsLast ? b.balanceOf(formatDay(fgtsLast.date)) : t.fgts.reminder.first, updateFgts)}
             {one
-              ? row(<PlanMark size={36} />, one.name, planLatest(one) ? b.planLate : b.planNew, updatePlans)
+              ? row(<PlanMark size={36} />, one.name, oneLast ? b.balanceOf(formatDay(oneLast.date)) : b.planNew, updatePlans)
               : row(<PlanMark size={36} />, b.plansLabel, b.plansLate(plans.length), updatePlans)}
           </div>
           <div className="flex justify-end">{dismiss}</div>
