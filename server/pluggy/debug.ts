@@ -8,7 +8,11 @@
 //   (no endpoint)                         -> { itemIds } configured in PLUGGY_ITEM_IDS
 //   endpoint=item&itemId=                 -> GET /items/{id}
 //   endpoint=accounts&itemId=             -> GET /accounts?itemId=
-//   endpoint=transactions&itemId=&accountId=[&after=]  -> GET /v2/transactions (one page)
+//   endpoint=transactions&itemId=&accountId=[&after=][&dateFrom=]  -> GET /v2/transactions (one page)
+//   endpoint=transactionsV1&itemId=&accountId=[&page=][&dateFrom=]  -> GET /transactions (one page; the older
+//                                         endpoint, to compare a card's list)
+// Transactions are read from `dateFrom` (default ALL_HISTORY): without one,
+// Pluggy applies its own default window, which can leave a card's list short.
 //   endpoint=bills&itemId=&accountId=     -> GET /bills?accountId=
 //   endpoint=identity&itemId=             -> GET /identity?itemId=
 //   endpoint=investments&itemId=          -> GET /investments?itemId=
@@ -20,6 +24,7 @@
 // user only): responses are no-store, never cached on the server and never
 // logged. Nothing is stored.
 
+import { ALL_HISTORY } from '../../src/data/syncPeriod.js'
 import { PluggyClient, PluggyError, type PluggyConfig } from './client.js'
 
 function json(status: number, body: unknown): Response {
@@ -29,7 +34,8 @@ function json(status: number, body: unknown): Response {
   })
 }
 
-const ENDPOINTS = ['item', 'accounts', 'transactions', 'bills', 'identity', 'investments', 'investmentTransactions', 'loans'] as const
+const ENDPOINTS = ['item', 'accounts', 'transactions', 'transactionsV1', 'bills', 'identity', 'investments', 'investmentTransactions', 'loans'] as const
+const DAY = /^\d{4}-\d{2}-\d{2}$/
 type Endpoint = (typeof ENDPOINTS)[number]
 
 export async function pluggyDebug(request: Request, config: PluggyConfig | null, fetchFn: typeof fetch = fetch): Promise<Response> {
@@ -68,8 +74,20 @@ export async function pluggyDebug(request: Request, config: PluggyConfig | null,
     const accounts = await client.raw('accounts', { itemId, pageSize: '500' })
     const ids = ((accounts.body as { results?: { id?: string }[] })?.results ?? []).map((a) => a.id)
     if (!accountId || !ids.includes(accountId)) return json(403, { error: 'account_not_in_item' })
+    const dateFrom = params.get('dateFrom') ?? ALL_HISTORY
+    if (!DAY.test(dateFrom)) return json(400, { error: 'invalid_date' })
     if (endpoint === 'transactions') {
-      return reply(`GET /v2/transactions?accountId=${accountId}${after ? '&after=…' : ''}`, await client.raw('v2/transactions', { accountId, after }))
+      return reply(
+        `GET /v2/transactions?accountId=${accountId}&dateFrom=${dateFrom}${after ? '&after=…' : ''}`,
+        await client.raw('v2/transactions', { accountId, dateFrom, after }),
+      )
+    }
+    if (endpoint === 'transactionsV1') {
+      const page = params.get('page') ?? undefined
+      return reply(
+        `GET /transactions?accountId=${accountId}&from=${dateFrom}${page ? `&page=${page}` : ''}`,
+        await client.raw('transactions', { accountId, from: dateFrom, pageSize: '500', page }),
+      )
     }
     return reply(`GET /bills?accountId=${accountId}`, await client.raw('bills', { accountId }))
   } catch (e) {

@@ -1,8 +1,9 @@
 // TEMPORARY (debug screen): everything Meu Pluggy returns for one bank
 // connection, through GET /api/debug/pluggy one call at a time: the item,
-// its accounts, every page of each account's transactions, each card's
-// bills, identity, investments with every page of their movements, and
-// loans. A product the bank doesn't share keeps Pluggy's error as returned.
+// its accounts, every page of each account's transactions (from all
+// history), each card's bills and its transactions from the older endpoint
+// too (to compare), identity, investments with every page of their
+// movements, and loans. A product the bank doesn't share keeps Pluggy's error as returned.
 
 /** One call's answer, as the debug route gives it. */
 export interface Answer {
@@ -22,6 +23,8 @@ export interface Dump {
   transactions: Record<string, Answer[]>
   /** Per credit card account ID. */
   bills: Record<string, Answer>
+  /** Per credit card account ID: every page of GET /transactions (the older endpoint), to compare with `transactions`. */
+  cardTransactionsV1: Record<string, Answer[]>
   identity: Answer
   investments: Answer
   /** Per investment ID: every page, in order. */
@@ -54,6 +57,7 @@ export async function loadEverything(itemId: string, call: Call, onCall: () => v
   const accounts = await get({ endpoint: 'accounts' })
   const transactions: Dump['transactions'] = {}
   const bills: Dump['bills'] = {}
+  const cardTransactionsV1: Dump['cardTransactionsV1'] = {}
   for (const account of results(accounts)) {
     const accountId = String(account.id)
     const pages: Answer[] = []
@@ -65,22 +69,30 @@ export async function loadEverything(itemId: string, call: Call, onCall: () => v
       if (!after) break
     }
     transactions[accountId] = pages
-    if (account.type === 'CREDIT') bills[accountId] = await get({ endpoint: 'bills', accountId })
+    if (account.type === 'CREDIT') {
+      bills[accountId] = await get({ endpoint: 'bills', accountId })
+      cardTransactionsV1[accountId] = await pagesOf(get, { endpoint: 'transactionsV1', accountId })
+    }
   }
   const identity = await get({ endpoint: 'identity' })
   const investments = await get({ endpoint: 'investments' })
   const investmentTransactions: Dump['investmentTransactions'] = {}
   for (const investment of results(investments)) {
     const investmentId = String(investment.id)
-    const pages: Answer[] = []
-    for (let page = 1; page <= MAX_PAGES; page++) {
-      const a = await get({ endpoint: 'investmentTransactions', investmentId, page: String(page) })
-      pages.push(a)
-      const total = (a.body as { totalPages?: unknown } | null)?.totalPages
-      if (a.status !== 200 || typeof total !== 'number' || page >= total) break
-    }
-    investmentTransactions[investmentId] = pages
+    investmentTransactions[investmentId] = await pagesOf(get, { endpoint: 'investmentTransactions', investmentId })
   }
   const loans = await get({ endpoint: 'loans' })
-  return { itemId, fetchedAt: now.toISOString(), item, accounts, transactions, bills, identity, investments, investmentTransactions, loans }
+  return { itemId, fetchedAt: now.toISOString(), item, accounts, transactions, bills, cardTransactionsV1, identity, investments, investmentTransactions, loans }
+}
+
+/** Every page of a page-numbered endpoint (`page`, `totalPages`). */
+async function pagesOf(get: (p: Record<string, string | undefined>) => Promise<Answer>, params: Record<string, string>): Promise<Answer[]> {
+  const pages: Answer[] = []
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const a = await get({ ...params, page: String(page) })
+    pages.push(a)
+    const total = (a.body as { totalPages?: unknown } | null)?.totalPages
+    if (a.status !== 200 || typeof total !== 'number' || page >= total) break
+  }
+  return pages
 }

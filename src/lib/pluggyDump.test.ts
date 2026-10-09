@@ -19,6 +19,8 @@ function fakeRoute() {
           : ok({ results: [{ id: `t-${p.accountId}-${p.after ?? 1}` }], next: null })
       case 'bills':
         return ok({ results: [{ id: 'bill-1' }] })
+      case 'transactionsV1':
+        return ok({ results: [{ id: `v1-${p.page}` }], page: Number(p.page), totalPages: 2 })
       case 'identity':
         return ok({ id: 'identity-1' })
       case 'investments':
@@ -44,6 +46,8 @@ describe('debug: everything for a bank', () => {
       'transactions acc-1 cur2',
       'transactions card-1',
       'bills card-1',
+      'transactionsV1 card-1 1',
+      'transactionsV1 card-1 2',
       'identity',
       'investments',
       'investmentTransactions inv-1 1',
@@ -53,6 +57,7 @@ describe('debug: everything for a bank', () => {
     expect(counted).toBe(calls.length)
     expect(dump.transactions['acc-1']).toHaveLength(2)
     expect(Object.keys(dump.bills)).toEqual(['card-1'])
+    expect(dump.cardTransactionsV1['card-1']).toHaveLength(2)
     expect(dump.investmentTransactions['inv-1']).toHaveLength(2)
     expect(dump.loans.status).toBe(400)
     expect(dump.fetchedAt).toBe('2026-10-09T12:00:00.000Z')

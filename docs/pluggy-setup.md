@@ -150,7 +150,10 @@ When the sync can't start at all, the reason comes from the HTTP status of
 **Contas → Depuração do Pluggy** (or `/#/debug`) on the deployed site shows
 Pluggy's raw answer for each call, as the server receives it. Per item in
 `PLUGGY_ITEM_IDS`: the item, its accounts, each account's transactions (one
-page at a time, with "Próxima página"), a card's bills, identity
+page at a time, with "Próxima página"; from 2000-01-01, so Pluggy returns
+all the history it has instead of its default window), a card's bills and
+its transactions from the older endpoint too (`GET /transactions`, to
+compare), identity
 (`GET /identity`), investments (`GET /investments`) and each investment's
 movements (`GET /investments/{id}/transactions`), and loans (`GET /loans`).
 A product the bank doesn't share shows Pluggy's own error status.
