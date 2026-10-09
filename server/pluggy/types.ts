@@ -55,6 +55,8 @@ export interface PluggyAccount {
 export interface PluggyBill {
   id: string
   dueDate: string
+  /** When the bill closed; not every bank reports it. */
+  billClosingDate?: string | null
   totalAmount: number
   totalAmountCurrencyCode?: string | null
   minimumPaymentAmount?: number | null
@@ -83,5 +85,7 @@ export interface PluggyTransaction {
     totalInstallments?: number
     totalAmount?: number
     purchaseDate?: string
+    /** The card bill this transaction was charged to. */
+    billId?: string | null
   } | null
 }

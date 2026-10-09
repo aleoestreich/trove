@@ -95,6 +95,8 @@ No backend, no auth. It runs in the browser on hardcoded data.
 - ✅ Categories and subcategories in the database (Categories tab), hidden
   transactions, category colours and icons.
 - ✅ Background, idempotent sync (also stores card bills).
+- ✅ Closing and due days estimated from each card's last 3 stored bills
+  (the purchases charged to each), for banks that report no closing date.
 - Next: card closing days in the database (today per device); use the stored
   card bills for the current bill (PR #23 reads them live).
 

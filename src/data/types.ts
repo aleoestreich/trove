@@ -28,6 +28,15 @@ export interface CreditData {
   balanceDueDate: string | null
   /** Closing and due days set by hand; when present, the dates above come from them. */
   userDays?: { close: number; due: number }
+  /**
+   * Closing and due days from the card's last bills: their closing dates, or
+   * estimated from their purchases (see
+   * src/data/closingDay.ts); used when the bank reports no closing date and
+   * none was set by hand.
+   */
+  estimatedDays?: { close: number; due: number; bills: number; source: 'closing' | 'purchases' }
+  /** The dates above come from `estimatedDays`. */
+  estimated?: boolean
 }
 
 export interface Account {
