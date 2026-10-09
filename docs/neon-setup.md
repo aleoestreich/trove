@@ -61,6 +61,12 @@ it adds the sync jobs' `period` and `account_ids` and the accounts'
 `transactions_synced_at`, for [Advanced sync](#advanced-sync). Until it
 runs, every sync fails with a database error.
 
+Then run [`db/migrations/009_card_days.sql`](../db/migrations/009_card_days.sql):
+it adds the accounts' `card_close_day` and `card_due_day` and the bills'
+`closing_date`, and fills `closing_date` in from the bills already stored
+(see [Card closing days](#card-closing-days)). Until it runs, every page
+reports that the tables are out of date.
+
 ## 3. Give Vercel the connection string
 
 1. In Neon, open **Connect**, choose the database and role, and turn
@@ -348,6 +354,22 @@ A name set in Trove for an account or card is the `nickname` column of
 (`{ op: "renameAccount", accountId, name }`; `name: null` goes back to the
 bank's) and read with each account. Sync's upsert only writes the bank's
 columns (`name`, `raw`…), never `nickname`, so a sync never changes it.
+
+## Card closing days
+
+A card's bill needs its closing and due dates. In order, they come from:
+
+1. The days set in Trove, the `card_close_day` and `card_due_day` columns
+   of `accounts` (migration 009). They're saved through `POST /api/edits`
+   (`{ op: "setCardDays", accountId, days: { close, due } }`; `days: null`
+   clears them) and work on every device. Days an older version kept in
+   the browser are moved there on the next load. Sync never writes these
+   columns.
+2. The dates the bank reports for the card (`creditData.balanceCloseDate`).
+3. The card's last 3 bills: their `closing_date` (Pluggy's
+   `billClosingDate`, stored by each sync), or, when the bank doesn't
+   report it, an estimate from the purchases charged to each bill
+   (`src/data/closingDay.ts`).
 
 ## Reads
 

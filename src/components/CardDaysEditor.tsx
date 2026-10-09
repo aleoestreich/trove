@@ -9,8 +9,8 @@ const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
 
 /**
  * Under a card on Accounts: its closing and due days, which can be set by hand
- * when the bank doesn't report them (or reports wrong ones). Saved on this
- * device; the bill and dates then follow them. Without the bank's dates, the
+ * when the bank doesn't report them (or reports wrong ones). Saved in the
+ * database, for every device; the bill and dates then follow them. Without the bank's dates, the
  * days from the card's last bills (their closing dates, or estimated from
  * their purchases) are shown and used until set.
  */

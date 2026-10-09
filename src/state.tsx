@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Repository } from './data/repository'
 import { errorMessage, SyncStartError } from './data/apiRepository'
 import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/syncProblems'
-import { applyCardDays, readCardDays, saveCardDays, type CardDays } from './data/cardDays'
+import { applyCardDays, deviceCardDays, forgetDeviceCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
 import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type SyncOptions, type Transaction } from './data/types'
 import { computeInsights, type Insights } from './data/insights'
@@ -57,7 +57,7 @@ interface AppData extends Snapshot {
   saveIncomeFilter(filter: IncomeFilter): Promise<void>
   /** Renames an account or card (null: back to the bank's name), server first; rejects with a message for the UI. */
   renameAccount(accountId: string, name: string | null): Promise<void>
-  /** Set (or clear, with null) a card's closing and due days; saved on this device. */
+  /** Set (or clear, with null) a card's closing and due days; saved in the database. */
   setCardDays(accountId: string, days: CardDays | null): void
 }
 
@@ -222,11 +222,25 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [save],
   )
 
-  const [cardDays, setCardDaysState] = useState(readCardDays)
-  const setCardDays = useCallback((accountId: string, days: CardDays | null) => {
-    saveCardDays(accountId, days)
-    setCardDaysState(readCardDays())
-  }, [])
+  const setCardDays = useCallback((accountId: string, days: CardDays | null) => edit({ op: 'setCardDays', accountId, days }), [edit])
+
+  // Days an older version kept on this device move to the database once (a
+  // card that already has days there keeps them); each leaves the device when saved.
+  const loaded = snapshot !== null
+  useEffect(() => {
+    const s = snapshotRef.current
+    if (!loaded || !s) return
+    for (const [accountId, days] of Object.entries(deviceCardDays())) {
+      const card = s.accounts.some((a) => a.id === accountId && a.type === 'CREDIT')
+      if (!card) continue
+      if (s.cardDays?.[accountId]) forgetDeviceCardDays(accountId)
+      else
+        save({ op: 'setCardDays', accountId, days }).then(
+          () => forgetDeviceCardDays(accountId),
+          () => {}, // Kept on the device; tried again on the next load.
+        )
+    }
+  }, [loaded, save])
 
   // Sync runs on the server in the background (it continues with the app
   // closed); the app polls the job, then reloads from the database.
@@ -352,7 +366,7 @@ export function DataProvider({ repository, children }: { repository: Repository;
   const value = useMemo<AppData | null>(() => {
     if (!snapshot) return null
     // Closing and due days set by hand replace the bank's dates for those cards.
-    const accounts = applyCardDays(snapshot.accounts, cardDays)
+    const accounts = applyCardDays(snapshot.accounts, snapshot.cardDays ?? {})
     const categories = [...snapshot.categories].sort(byOrder)
     const subcategories = [...snapshot.subcategories].sort(byOrder)
     const today = toISO(new Date())
@@ -388,7 +402,7 @@ export function DataProvider({ repository, children }: { repository: Repository;
       renameAccount,
       setCardDays,
     }
-  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, cardDays, setCardDays, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
+  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

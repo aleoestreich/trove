@@ -1,6 +1,8 @@
 // Closing and due days set by hand per card, for banks that don't report a
-// card's dates (or report wrong ones). Kept in this browser's localStorage,
-// like category edits, and applied on top of whatever data source is loaded.
+// card's dates (or report wrong ones). Stored in Trove's database (the
+// setCardDays edit; the demo keeps them on the device) and applied on top of
+// the bank's dates. Older versions kept them in this browser's localStorage:
+// `deviceCardDays` reads what's left there, to move it to the database.
 
 import { addMonths, dayOfMonth, toISO } from '../lib/dates'
 import type { Account } from './types'
@@ -14,7 +16,8 @@ export interface CardDays {
 
 const KEY = 'trove.cardDays'
 
-export function readCardDays(): Record<string, CardDays> {
+/** Days still kept on this device by an older version (moved to the database on load). */
+export function deviceCardDays(): Record<string, CardDays> {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, CardDays>
     // Keep only well-formed entries.
@@ -24,14 +27,15 @@ export function readCardDays(): Record<string, CardDays> {
   }
 }
 
-export function saveCardDays(accountId: string, days: CardDays | null) {
+/** Forgets a card's days on this device, once they're in the database. */
+export function forgetDeviceCardDays(accountId: string) {
   try {
-    const all = readCardDays()
-    if (days) all[accountId] = days
-    else delete all[accountId]
-    localStorage.setItem(KEY, JSON.stringify(all))
+    const all = deviceCardDays()
+    delete all[accountId]
+    if (Object.keys(all).length) localStorage.setItem(KEY, JSON.stringify(all))
+    else localStorage.removeItem(KEY)
   } catch {
-    // Storage unavailable (private mode): the setting lasts until reload.
+    // Storage unavailable: nothing to forget.
   }
 }
 

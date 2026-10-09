@@ -210,3 +210,22 @@ describe('renaming an account', () => {
     expect(validateEdit({ op: 'renameAccount', accountId: 'card-1', name: '   ' })).toEqual({ op: 'renameAccount', accountId: 'card-1', name: null })
   })
 })
+
+describe('a card’s closing and due days', () => {
+  const card = { id: 'card-1', institutionId: 'bank', name: 'Cartão Exemplo', type: 'CREDIT' as const, subtype: 'CREDIT_CARD' as const, balance: 0 }
+  const checking = { id: 'acc-1', institutionId: 'bank', name: 'Conta Exemplo', type: 'BANK' as const, subtype: 'CHECKING_ACCOUNT' as const, balance: 0 }
+  const withCards = (): Snapshot => ({ ...snapshot(), accounts: [card, checking] })
+
+  it('sets them and clears them', () => {
+    const set = applyEdit(withCards(), validateEdit({ op: 'setCardDays', accountId: 'card-1', days: { close: 3, due: 10 } }))
+    expect(set.cardDays).toEqual({ 'card-1': { close: 3, due: 10 } })
+    expect(applyEdit(set, validateEdit({ op: 'setCardDays', accountId: 'card-1', days: null })).cardDays).toEqual({})
+  })
+
+  it('refuses days outside 1–31, a missing card and an account that isn’t a card', () => {
+    for (const days of [{ close: 0, due: 10 }, { close: 3, due: 32 }, { close: 2.5, due: 10 }, { close: 3 }, 'x'])
+      expect(() => validateEdit({ op: 'setCardDays', accountId: 'card-1', days })).toThrow(EditError)
+    expect(() => applyEdit(withCards(), { op: 'setCardDays', accountId: 'other', days: { close: 3, due: 10 } })).toThrow(EditError)
+    expect(() => applyEdit(withCards(), { op: 'setCardDays', accountId: 'acc-1', days: { close: 3, due: 10 } })).toThrow(EditError)
+  })
+})

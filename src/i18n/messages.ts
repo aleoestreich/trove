@@ -947,7 +947,7 @@ export const messages: Messages = {
       useBank: 'Usar as datas do banco',
       useEstimate: 'Usar a estimativa',
       useBills: 'Usar as datas das faturas',
-      note: 'Salvo neste aparelho.',
+      note: 'Salvo no Trove: vale em todos os aparelhos.',
       estimated: (close, due) => `Fecha por volta do dia ${close} · vence no dia ${due}`,
       fromBills: (close, due) => `Fecha no dia ${close} · vence no dia ${due}`,
       fromClosings: (bills) => (bills === 1 ? 'Pela data de fechamento da última fatura.' : `Pelas datas de fechamento das últimas ${bills} faturas.`),

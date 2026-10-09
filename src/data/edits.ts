@@ -41,6 +41,8 @@ export type Edit =
   | { op: 'recurringAction'; id: string; action: RecurringAction; at: string }
   /** Names an account or card in Trove; null goes back to the bank's name. */
   | { op: 'renameAccount'; accountId: string; name: string | null }
+  /** Sets a card's closing and due days (1–31); null goes back to the bank's dates (or the bills'). */
+  | { op: 'setCardDays'; accountId: string; days: { close: number; due: number } | null }
 
 /** A transaction's category before a bulk change. `editedAt`: when it was last set by hand (server only). */
 export interface PreviousCategory {
@@ -200,6 +202,12 @@ export function validateEdit(e: unknown): Edit {
       if (n !== null && n.length > NICKNAME_MAX) bad('name')
       return { op: 'renameAccount', accountId: id(x.accountId, 'account'), name: n || null }
     }
+    case 'setCardDays': {
+      if (x.days === null) return { op: 'setCardDays', accountId: id(x.accountId, 'account'), days: null }
+      const d = (x.days ?? {}) as Record<string, unknown>
+      const dayOf = (v: unknown, what: string) => (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 31 ? (v as number) : bad(what))
+      return { op: 'setCardDays', accountId: id(x.accountId, 'account'), days: { close: dayOf(d.close, 'close'), due: dayOf(d.due, 'due') } }
+    }
     default:
       return bad('op')
   }
@@ -306,6 +314,11 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
       if (!s.accounts.some((a) => a.id === e.accountId)) fail('not_found', 'account')
       const { [e.accountId]: _old, ...others } = s.accountNames ?? {}
       return withAccountNames({ ...s, accountNames: e.name ? { ...others, [e.accountId]: e.name } : others })
+    }
+    case 'setCardDays': {
+      if (!s.accounts.some((a) => a.id === e.accountId && a.type === 'CREDIT')) fail('not_found', 'card')
+      const { [e.accountId]: _old, ...others } = s.cardDays ?? {}
+      return { ...s, cardDays: e.days ? { ...others, [e.accountId]: e.days } : others }
     }
     case 'recurringAction': {
       const overrides = s.recurringOverrides ?? {}
