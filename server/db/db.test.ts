@@ -598,7 +598,7 @@ suite('database', () => {
     expect(s.transactions.map((t) => [t.id, t.transfer])).toEqual([['credit', 'card-payment']])
   })
 
-  it('estimates a card’s closing and due days from its last bills, when the bank reports none', async () => {
+  it('gives a card’s closing and due days from its last bills, when the bank reports none for the card', async () => {
     const card: PluggyAccount = { id: 'card-1', itemId: 'item-1', type: 'CREDIT', subtype: 'CREDIT_CARD', name: 'Cartão Exemplo', balance: 300, currencyCode: 'BRL', creditData: { creditLimit: 1000 } }
     // Due on the 10th; a purchase on the 2nd and the 5th of each month: it closes between them (the 3rd, the middle day).
     const months = ['2026-06', '2026-07', '2026-08', '2026-09']
@@ -609,8 +609,13 @@ suite('database', () => {
     const txs = months.flatMap((m) => [purchase(`a-${m}`, `${m}-02`, `bill-${m}`), purchase(`b-${m}`, `${m}-05`, next(m) && `bill-${next(m)}`)])
     await inTransaction(pool, (db) => save(db, { ...fetched(txs, bills), from: '2026-05-01', accounts: [checking, card] }, now))
     const s = (await readSnapshot(pool, ['item-1'], '2026-05-01'))!
-    expect(s.accounts.find((a) => a.id === 'card-1')?.creditData?.estimatedDays).toEqual({ close: 3, due: 10, bills: 3 })
+    expect(s.accounts.find((a) => a.id === 'card-1')?.creditData?.estimatedDays).toEqual({ close: 3, due: 10, bills: 3, source: 'purchases' })
     expect(s.accounts.find((a) => a.id === 'acc-1')?.creditData).toBeUndefined()
+    // Bills that carry their closing date give it directly (Brazil time: 03:00Z is the start of the day there).
+    const closing = bills.map((b) => ({ ...b, bill: { ...b.bill, billClosingDate: `${b.bill.dueDate.slice(0, 8)}01T03:00:00.000Z` } }))
+    await inTransaction(pool, (db) => save(db, { ...fetched(txs, closing), from: '2026-05-01', accounts: [checking, card] }, now))
+    const again = (await readSnapshot(pool, ['item-1'], '2026-05-01'))!
+    expect(again.accounts.find((a) => a.id === 'card-1')?.creditData?.estimatedDays).toEqual({ close: 1, due: 10, bills: 3, source: 'closing' })
   })
 
   describe('insight routes', () => {

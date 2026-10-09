@@ -1,6 +1,11 @@
 // A card's closing and due days estimated from its last bills, for banks that
-// don't report the closing date. Shared by the server (which reads the stored
-// bills) and tests; no browser-only imports.
+// don't report the card's closing date. Shared by the server (which reads the
+// stored bills) and tests; no browser-only imports.
+//
+// When the bills carry their own closing date (Pluggy's billClosingDate), the
+// last 3 give the days directly: the most common closing and due days (banks
+// move a date off weekends and holidays). Otherwise they're estimated from the
+// purchases:
 //
 // Each purchase on a card is charged to a bill (Pluggy's billId). For a closed
 // bill, its purchases are dated up to its closing date and the next bills'
@@ -21,11 +26,15 @@ export interface EstimatedCardDays {
   due: number
   /** How many past bills it's estimated from. */
   bills: number
+  /** From the bills' own closing dates, or estimated from the purchases charged to them. */
+  source: 'closing' | 'purchases'
 }
 
 export interface StoredBill {
   id: string
   dueDate: string
+  /** When the bill closed, if the bank reports it. */
+  closingDate?: string | null
 }
 
 /** A purchase on the card (bill payments and refunds left out). */
@@ -39,9 +48,15 @@ export interface BilledPurchase {
 export const BILLS_USED = 3
 const MAX_GAP = 40
 
-/** Null when no closed bill has purchases both in it and after it. */
+/** Null when no bill reports its closing date and none has purchases both in it and after it. */
 export function estimateCardDays(bills: StoredBill[], purchases: BilledPurchase[]): EstimatedCardDays | null {
   const sorted = [...bills].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+
+  // Newest first; only closings before their due date make sense.
+  const closed = sorted.filter((b) => b.closingDate && b.closingDate < b.dueDate).reverse().slice(0, BILLS_USED)
+  if (closed.length > 0)
+    return { close: commonDay(closed.map((b) => b.closingDate!)), due: commonDay(closed.map((b) => b.dueDate)), bills: closed.length, source: 'closing' }
+
   const order = new Map(sorted.map((b, i) => [b.id, i]))
   // Purchases with an unknown bill ID can't be placed: left out.
   const placed = purchases.filter((p) => p.billId === null || order.has(p.billId))
@@ -69,7 +84,7 @@ export function estimateCardDays(bills: StoredBill[], purchases: BilledPurchase[
 
   // The latest bill sets the days; the due day is the most common one (banks move a due date off weekends).
   const latest = used[0].due
-  return { close: day(addDays(latest, -gap)), due: commonDay(used.map((b) => b.due)), bills: used.length }
+  return { close: day(addDays(latest, -gap)), due: commonDay(used.map((b) => b.due)), bills: used.length, source: 'purchases' }
 }
 
 const day = (iso: string) => Number(iso.slice(8, 10))

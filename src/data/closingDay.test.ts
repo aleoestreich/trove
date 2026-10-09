@@ -21,12 +21,12 @@ function purchases(): BilledPurchase[] {
 
 describe('estimated closing day', () => {
   it('finds the closing and due days from the last 3 bills', () => {
-    expect(estimateCardDays(bills, purchases())).toEqual({ close: 3, due: 10, bills: 3 })
+    expect(estimateCardDays(bills, purchases())).toEqual({ close: 3, due: 10, bills: 3, source: 'purchases' })
   })
 
   it('isn’t moved by a late posting or an installment dated on the original purchase', () => {
     const odd = [...purchases(), { date: '2026-08-02', billId: 'b9' }, { date: '2026-03-15', billId: 'b8' }]
-    expect(estimateCardDays(bills, odd)).toEqual({ close: 3, due: 10, bills: 3 })
+    expect(estimateCardDays(bills, odd)).toEqual({ close: 3, due: 10, bills: 3, source: 'purchases' })
   })
 
   it('uses the most common due day when one moved off a weekend', () => {
@@ -37,11 +37,25 @@ describe('estimated closing day', () => {
   it('reads the open bill’s purchases (no bill yet) as after the last closing', () => {
     const open = purchases()
     expect(open.some((p) => p.billId === null)).toBe(true)
-    expect(estimateCardDays(bills.slice(-1), open)).toEqual({ close: 3, due: 10, bills: 1 })
+    expect(estimateCardDays(bills.slice(-1), open)).toEqual({ close: 3, due: 10, bills: 1, source: 'purchases' })
   })
 
   it('gives nothing without bills, or when the bank doesn’t say which bill a purchase is in', () => {
     expect(estimateCardDays([], purchases())).toBeNull()
     expect(estimateCardDays(bills, purchases().map((p) => ({ ...p, billId: null })))).toBeNull()
+  })
+
+  it('takes the days from the bills’ own closing dates when the bank reports them', () => {
+    const closing = bills.map((b) => ({ ...b, closingDate: `${b.dueDate.slice(0, 8)}01` }))
+    // One closing moved off a weekend; the most common day stands.
+    closing[2] = { ...closing[2], closingDate: '2026-08-03' }
+    expect(estimateCardDays(closing, purchases())).toEqual({ close: 1, due: 10, bills: 3, source: 'closing' })
+    // Without any purchase data too.
+    expect(estimateCardDays(closing, [])).toEqual({ close: 1, due: 10, bills: 3, source: 'closing' })
+  })
+
+  it('ignores a closing date that isn’t before its due date', () => {
+    const odd = bills.map((b) => ({ ...b, closingDate: b.dueDate }))
+    expect(estimateCardDays(odd, purchases())?.source).toBe('purchases')
   })
 })

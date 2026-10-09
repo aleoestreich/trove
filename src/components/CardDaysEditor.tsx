@@ -11,7 +11,8 @@ const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
  * Under a card on Accounts: its closing and due days, which can be set by hand
  * when the bank doesn't report them (or reports wrong ones). Saved on this
  * device; the bill and dates then follow them. Without the bank's dates, the
- * days estimated from the card's last bills are shown and used until set.
+ * days from the card's last bills (their closing dates, or estimated from
+ * their purchases) are shown and used until set.
  */
 export function CardDaysEditor({ account }: { account: Account }) {
   const { t } = useI18n()
@@ -28,7 +29,7 @@ export function CardDaysEditor({ account }: { account: Account }) {
   if (!editing && guess)
     return (
       <div className="flex flex-col gap-0.5 px-4 pb-4 lg:px-5">
-        <p className="text-[13px] leading-[18px] text-ink-2">{t.accounts.cardDays.estimatedFrom(guess.bills)}</p>
+        <p className="text-[13px] leading-[18px] text-ink-2">{guess.source === 'closing' ? t.accounts.cardDays.fromClosings(guess.bills) : t.accounts.cardDays.estimatedFrom(guess.bills)}</p>
         <button
           type="button"
           onClick={() => setEditing(true)}
@@ -36,7 +37,7 @@ export function CardDaysEditor({ account }: { account: Account }) {
         >
           <Icon name="installments" className="size-[18px] shrink-0" strokeWidth={1.9} />
           <span>
-            <span className="text-ink-2">{t.accounts.cardDays.estimated(guess.close, guess.due)}</span> · {t.accounts.cardDays.adjust}
+            <span className="text-ink-2">{(guess.source === 'closing' ? t.accounts.cardDays.fromBills : t.accounts.cardDays.estimated)(guess.close, guess.due)}</span> · {t.accounts.cardDays.adjust}
           </span>
         </button>
       </div>
@@ -108,7 +109,7 @@ export function CardDaysEditor({ account }: { account: Account }) {
               setEditing(false)
             }}
           >
-            {credit.estimatedDays ? t.accounts.cardDays.useEstimate : t.accounts.cardDays.useBank}
+            {!credit.estimatedDays ? t.accounts.cardDays.useBank : credit.estimatedDays.source === 'closing' ? t.accounts.cardDays.useBills : t.accounts.cardDays.useEstimate}
           </Button>
         )}
       </div>

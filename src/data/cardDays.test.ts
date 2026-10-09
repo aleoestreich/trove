@@ -52,7 +52,7 @@ describe('applying the days to cards', () => {
   })
 
   it('uses the days estimated from past bills when the bank reports no closing date and none was set by hand', () => {
-    const guessed: Account = { ...card, creditData: { ...card.creditData!, estimatedDays: { close: 3, due: 10, bills: 3 } } }
+    const guessed: Account = { ...card, creditData: { ...card.creditData!, estimatedDays: { close: 3, due: 10, bills: 3, source: 'purchases' } } }
     const [c] = applyCardDays([guessed], {}, oct1)
     expect(c.creditData).toMatchObject({ balanceCloseDate: '2026-10-03', balanceDueDate: '2026-10-10', estimated: true })
     // Set by hand wins; so do the bank's own dates.
