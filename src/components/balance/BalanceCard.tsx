@@ -128,6 +128,12 @@ function FilledBalanceCard() {
               </span>
             )
           )}
+          {balance.expectedSpending > 0 && shares && (
+            <span className="flex items-center gap-1.5 text-xs leading-4 text-muted">
+              <Icon name="calendar" className="size-3.5 shrink-0" />
+              <span className="tabular">{b.includesExpected(formatMoney(balance.expectedSpending))}</span>
+            </span>
+          )}
         </div>
       </div>
     </Card>

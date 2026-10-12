@@ -162,6 +162,8 @@ function SummaryCard({
   const shares = roundedShares(balance)
   const soFar = status.kind === 'partial'
   const points = (n: number) => (isMoneyMasked() ? '' : d.points(n))
+  // The month in progress: with what's still expected, the figures run to the end of the month.
+  const soFarTag = balance.expectedSpending > 0 ? d.withExpectedTag : d.soFarTag
 
   return (
     <Card className="flex flex-col gap-3">
@@ -175,18 +177,19 @@ function SummaryCard({
           <BarLegend target={target} over={balance.overIncome > 0} onEditTarget={onEditTarget} />
           <IncomeBase balance={balance} />
           <div className="flex flex-col">
-            <ShareRow part="essential" name={b.groups.essential} note={d.rowShare(pct(shares.essential), target.essential)} amount={balance.essential} tag={soFar ? d.soFarTag : points(shares.essential - target.essential)} />
-            <ShareRow part="lifestyle" name={b.groups.lifestyle} note={d.rowShare(pct(shares.lifestyle), target.lifestyle)} amount={balance.lifestyle} tag={soFar ? d.soFarTag : points(shares.lifestyle - target.lifestyle)} />
+            <ShareRow part="essential" name={b.groups.essential} note={d.rowShare(pct(shares.essential), target.essential)} amount={balance.essential} tag={soFar ? soFarTag : points(shares.essential - target.essential)} />
+            <ShareRow part="lifestyle" name={b.groups.lifestyle} note={d.rowShare(pct(shares.lifestyle), target.lifestyle)} amount={balance.lifestyle} tag={soFar ? soFarTag : points(shares.lifestyle - target.lifestyle)} />
             <ShareRow
               part="future"
               name={b.groups.future}
               note={d.rowShare(pct(shares.future), target.future)}
               amount={balance.future}
-              tag={soFar ? d.soFarTag : points(shares.future - target.future)}
+              tag={soFar ? soFarTag : points(shares.future - target.future)}
               critical={balance.future < 0}
             />
             {balance.ungrouped > 0 && <UngroupedRow amount={balance.ungrouped} />}
           </div>
+          {balance.expectedSpending > 0 && <p className="tabular text-xs leading-4 text-muted">{d.expectedSpendNote(formatMoney(balance.expectedSpending))}</p>}
         </>
       ) : (
         <>
@@ -374,6 +377,7 @@ function ItemRow({ item, total, month }: { item: BalanceItem; total: number; mon
           </span>
           <span className="tabular w-24 shrink-0 text-right text-xs leading-4 text-muted">{sub && category ? d.fromCategory(category.name) : isMoneyMasked() ? '' : d.shareOfGroup(share)}</span>
         </span>
+        {item.expected > 0 && <span className="tabular text-xs leading-4 text-muted">{d.itemExpected(formatMoney(item.expected))}</span>}
       </span>
     </Link>
   )
