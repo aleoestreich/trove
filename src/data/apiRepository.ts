@@ -47,6 +47,13 @@ export function errorMessage(code: string | undefined, status?: number, reason?:
     subcategory_category: e.bulkSubcategory,
     nothing_selected: e.nothingSelected,
     not_income: e.notIncome,
+    not_expense: e.receivableNotExpense,
+    not_money_in: e.receivableNotMoneyIn,
+    over_expense: e.receivableOverExpense,
+    over_owed: e.receivableOverOwed,
+    over_received: e.receivableOverReceived,
+    below_received: e.receivableBelowReceived,
+    other_transaction: e.receivableOtherTransaction,
   }
   if (reason && bulk[reason]) return bulk[reason]
   const byCode: Record<string, string> = {

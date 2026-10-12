@@ -401,7 +401,8 @@ const REPLACED_WITHIN_DAYS = 10
 /**
  * A bank can replace a transaction under a new ID (a pending card purchase
  * that posts). The old row was just marked removed; its edits (category,
- * subcategory, hidden) move to the new row, so they aren't lost to the guess.
+ * subcategory, hidden) move to the new row, so they aren't lost to the guess,
+ * and so do the receivables and payments back that point at it ("A receber").
  * The new row is the one with the same bank ID (provider_id) or, failing that,
  * a pending one with the same account, type and amount, nearest in date. Each
  * row is matched at most once.
@@ -411,7 +412,9 @@ async function carryEdits(db: Db, newIds: Set<string>, removedAt: Date) {
   const old = await db.query<Candidate>(
     `SELECT id, account_id, provider_id, type, amount_cents::text AS amount, booked_on::text AS day, status,
        category_id, subcategory_id, is_hidden, category_edited_at, transfer_override
-     FROM transactions WHERE removed_at = $1 AND (category_edited_at IS NOT NULL OR is_hidden OR transfer_override IS NOT NULL)`,
+     FROM transactions t WHERE removed_at = $1 AND (category_edited_at IS NOT NULL OR is_hidden OR transfer_override IS NOT NULL
+       OR EXISTS (SELECT 1 FROM receivables r WHERE r.transaction_id = t.id)
+       OR EXISTS (SELECT 1 FROM receivable_payments p WHERE p.transaction_id = t.id))`,
     [removedAt],
   )
   if (old.rows.length === 0) return
@@ -444,6 +447,8 @@ async function carryEdits(db: Db, newIds: Set<string>, removedAt: Date) {
       ])
     else await db.query(`UPDATE transactions SET is_hidden = $2 WHERE id = $1`, [to.id, from.is_hidden])
     if (from.transfer_override) await db.query(`UPDATE transactions SET transfer_override = $2 WHERE id = $1`, [to.id, from.transfer_override])
+    await db.query(`UPDATE receivables SET transaction_id = $2 WHERE transaction_id = $1`, [from.id, to.id])
+    await db.query(`UPDATE receivable_payments SET transaction_id = $2 WHERE transaction_id = $1`, [from.id, to.id])
   }
 }
 

@@ -81,6 +81,10 @@ it adds the categories' and subcategories' `spending_group`, for the
 [Equilíbrio do mês](#equilíbrio-do-mês). Until it runs, every page reports
 that the tables are out of date.
 
+Then run [`db/migrations/013_receivables.sql`](../db/migrations/013_receivables.sql):
+it adds `receivables` and `receivable_payments`, for [A receber](#a-receber).
+Until it runs, every page reports that the tables are out of date.
+
 ## 3. Give Vercel the connection string
 
 1. In Neon, open **Connect**, choose the database and role, and turn
@@ -144,6 +148,8 @@ use today can be read later without fetching it again.
 | `sync_runs` | generated `id` | Log of each connection sync: what triggered it, how many rows changed, and errors as status codes only |
 | `webhook_events` | `event_id` (Pluggy's) | Webhook deliveries already handled, so a repeated delivery runs once |
 | `app_settings` | `key` | App-wide values: when the default categories were seeded, when anything last synced, and the average income's filter (`income_avg_filter`) |
+| `receivables` | `id` → `transactions` | "A receber": part or all of an expense owed by a person (name, amount in cents) |
+| `receivable_payments` | `id` → `receivables` | Payments back of a receivable: day, amount, and the incoming transaction (NULL: typed in by hand) |
 
 Transactions that disappear are kept, not deleted. A pending card purchase can
 come back under a new ID once it posts; when a sync no longer finds the old
@@ -246,7 +252,8 @@ A category, subcategory or hidden flag set in the app stays as set:
   row is the one with the same bank ID (`provider_id`) or, failing that, a new
   transaction in the same account with the same type and amount, at most 10
   days from the pending one, nearest in date. Each edit moves once. Without
-  edits, the new row keeps its own guess.
+  edits, the new row keeps its own guess. Receivables and payments back that
+  point at the old row move to the new one too.
 - **Transfer detection on read:** a transaction whose category was edited
   (`category_edited_at` set) keeps that category even when it would be paired
   as an own transfer or read as a card bill payment.
@@ -457,6 +464,35 @@ The order of the Visão geral's cards and the hidden ones ("Personalizar",
   app later shows at its default place (after the card before it by
   default).
 
+## A receber
+
+Money paid on someone else's behalf, tracked until it's paid back
+(`src/data/receivables.ts`):
+
+- Each receivable is a row of `receivables`: the expense it came from
+  (`transaction_id`, a purchase or a Pix out), the person (up to 40
+  characters) and what they owe (`amount_cents`, in BRL, part or all of the
+  expense). Several people can owe parts of one expense.
+- Each payment back is a row of `receivable_payments`: the day, the amount,
+  and the incoming transaction it came in (`transaction_id`), or NULL when
+  typed in by hand (cash, an account that isn't connected). Deleting a
+  receivable deletes its payments (`ON DELETE CASCADE`).
+- Edits, through `POST /api/edits`: `saveReceivable` (`receivable: { id,
+  transactionId, person, amount }`, adds one or changes who and how much),
+  `deleteReceivable`, `saveReceivablePayment` (`receivableId`, `payment: {
+  id, date, amount, transactionId }`, adds one or corrects it) and
+  `deleteReceivablePayment`. Read with the snapshot (`receivables`).
+- The rules (`applyReceivableEdit` in `src/data/edits.ts`, the same in the
+  app and on the server, which reads the transactions as the app shows them
+  first, under one lock): the expense is money out and not a transfer, and
+  stays the same; its receivables add up to at most its amount; what one is
+  owed is never below what was paid back; its payments add up to at most
+  what's owed; a payment from a transaction is money in, not a transfer, and
+  the payments from one transaction add up to at most what came in. A
+  refused edit answers 400 with a `reason`.
+- Totals are unchanged: the expense still counts as the bank charged it,
+  and the money that came in still counts as income.
+
 ## Equilíbrio do mês
 
 How each month's income splits between Essencial, Estilo de vida and
@@ -530,8 +566,9 @@ Other reads and their indexes:
 - **Computed on every load:** Trove's category guesses for display, transfer
   pairs, bill cycles, installment plans and monthly totals. Improving a rule
   fixes past transactions at once, with no data migration.
-- **Stored:** Pluggy's data, the categories and subcategories, and each
-  transaction's `category_id`, `subcategory_id` and `is_hidden`. A new
+- **Stored:** Pluggy's data, the categories and subcategories, each
+  transaction's `category_id`, `subcategory_id` and `is_hidden`, and the
+  receivables with their payments back. A new
   transaction's category is the guess at its first sync; after that only
   edits change it.
 

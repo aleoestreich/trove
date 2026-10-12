@@ -110,6 +110,12 @@ No backend, no auth. It runs in the browser on hardcoded data.
   Card on Visão geral, a page per month with the categories behind each
   group and the months before, a guided "Organizar categorias" with
   suggestions by name, and the groups on the Categories tab.
+- ✅ A receber: a purchase or Pix paid on someone else's behalf, marked in
+  its details (who, and how much of it), tracked until it's paid back, with
+  payments back from money that came in or typed in by hand. Page with who
+  owes what, and a card on Visão geral. Totals are unchanged.
+  - Open question: leave the owed part out of spending (and the payments
+    back out of income), which changes every total, chart and average.
 - Next: use the stored card bills for the current bill (PR #23 reads them live).
 
 ## Phase 3 — Authentication & security

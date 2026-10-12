@@ -6,7 +6,7 @@
 //        Transações' filters, for months older than /api/finance loads: 200 { transactions } · 400 invalid
 //        (one function with /api/finance, api/finance.ts, through a vercel.json rewrite)
 //   POST /api/edits    one change to categories or transactions (src/data/edits.ts)
-//        204 · 400 invalid (with a `reason` for bulk rules) · 404 not_found · 409 name_taken
+//        204 · 400 invalid (with a `reason` for bulk and receivable rules) · 404 not_found · 409 name_taken
 //        categorizeMany: 200 { updated, previous }; restoreCategories: 200 { updated }
 //   POST /api/sync     { connectionIds?, accountIds?, period? }: start a background sync (default: every
 //        connection and account, the default window; see SyncOptions)
@@ -25,7 +25,7 @@
 // no-store. Errors carry status codes and fixed messages, never amounts,
 // descriptions, connection strings or credentials.
 
-import { EditError, validateEdit } from '../../src/data/edits.js'
+import { EditError, isReceivableEdit, validateEdit } from '../../src/data/edits.js'
 import { filterLabel, incomeAverage, incomeOptions, summarizeIncomeFilter, NO_FILTER } from '../../src/data/incomeAverage.js'
 import { SYNC_PERIODS, type Snapshot, type SyncPeriod } from '../../src/data/types.js'
 import { messages } from '../../src/i18n/messages.js'
@@ -105,9 +105,9 @@ export async function edits(request: Request, config: DbConfig): Promise<Respons
   } catch (e) {
     return json(400, { error: 'invalid', message: e instanceof EditError ? e.message : 'Invalid JSON.' })
   }
-  // Bulk edits only touch the configured connections' transactions.
-  const bulk = edit.op === 'categorizeMany' || edit.op === 'restoreCategories'
-  if (bulk && !config.pluggy) return notConfigured()
+  // Bulk and receivable edits only touch the configured connections' transactions.
+  const scoped = edit.op === 'categorizeMany' || edit.op === 'restoreCategories' || isReceivableEdit(edit)
+  if (scoped && !config.pluggy) return notConfigured()
   try {
     const outcome = await applyEditSql(getPool(config.databaseUrl), edit, { itemIds: config.pluggy?.itemIds })
     return outcome ? json(200, outcome) : json(204, null)

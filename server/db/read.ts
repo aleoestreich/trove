@@ -9,6 +9,7 @@ import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/typ
 import { readBalanceTarget, readExtraPay, readOverviewLayout, readCategories, readFgts, readIncomeFilter, readPension, readProjectionSettings, readRecurringOverrides } from './categories.js'
 import { withAccountNames } from '../../src/data/edits.js'
 import type { Db } from './connection.js'
+import { readReceivables } from './receivables.js'
 import { HISTORY_START } from './sync.js'
 import { filterTransactions, type TransactionQuery } from '../../src/data/transactionFilter.js'
 import { addDays, daysInMonth } from '../../src/lib/dates.js'
@@ -99,6 +100,7 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string, to: 
     balanceTarget: await readBalanceTarget(db),
     overviewLayout: await readOverviewLayout(db),
     extraPay: await readExtraPay(db),
+    receivables: await readReceivables(db),
   })
 }
 

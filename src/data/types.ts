@@ -3,6 +3,7 @@
 
 import type { Fgts } from './fgts.js'
 import type { Pension } from './pension.js'
+import type { Receivable } from './receivables.js'
 
 /** ISO 4217 code (e.g. 'BRL', 'USD'). BRL is the home currency; everything is totalled in BRL. */
 export type CurrencyCode = string
@@ -130,6 +131,7 @@ export type OverviewSection =
   | 'balance'
   | 'projection'
   | 'extraPay'
+  | 'receivables'
   | 'unusual'
   | 'recurring'
   | 'whereMoney'
@@ -233,6 +235,8 @@ export interface Snapshot {
   overviewLayout?: OverviewLayout
   /** "13º e férias" (off when absent). */
   extraPay?: ExtraPay
+  /** "A receber": money paid on someone else's behalf, with what they paid back (none when absent). */
+  receivables?: Receivable[]
 }
 
 /** What the month-end projection counts. */

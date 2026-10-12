@@ -3,6 +3,7 @@
 
 import type pg from 'pg'
 import { EditError, checkBulk, checkIncomeFilter, defaultCategories, type BulkResult, type Edit } from '../../src/data/edits.js'
+import { applyReceivableSql } from './receivables.js'
 import { NO_FILTER, pruneIncomeFilter } from '../../src/data/incomeAverage.js'
 import { DEFAULT_PROJECTION_SETTINGS } from '../../src/data/projection.js'
 import { applyRecurringAction } from '../../src/data/recurring.js'
@@ -211,8 +212,8 @@ export type EditOutcome = BulkResult | { updated: number } | null
 
 /**
  * Applies one (validated) edit in a database transaction: all of it or none.
- * `itemIds`: the configured connections; bulk edits only touch their
- * transactions (required for those).
+ * `itemIds`: the configured connections; bulk and receivable edits only
+ * touch their transactions (required for those).
  */
 export async function applyEditSql(pool: pg.Pool, e: Edit, ctx: { itemIds?: string[] } = {}): Promise<EditOutcome> {
   try {
@@ -414,6 +415,12 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
       // Their own columns too; cards only, as in the app.
       await one(`UPDATE accounts SET card_close_day = $2, card_due_day = $3 WHERE id = $1 AND type = 'CREDIT'`, [e.accountId, e.days?.close ?? null, e.days?.due ?? null], 'card')
       return null
+    case 'saveReceivable':
+    case 'deleteReceivable':
+    case 'saveReceivablePayment':
+    case 'deleteReceivablePayment':
+      await applyReceivableSql(db, e, connections(itemIds))
+      return null
     case 'recurringAction': {
       // The row is locked so two answers given at once both stay.
       await db.query(`INSERT INTO app_settings (key, value) VALUES ($1, '{}'::jsonb) ON CONFLICT (key) DO NOTHING`, [RECURRING_KEY])
@@ -425,7 +432,7 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
   }
 }
 
-const connections = (itemIds: string[] | undefined) => itemIds ?? fail('Bulk edits need the configured connections.')
+const connections = (itemIds: string[] | undefined) => itemIds ?? fail('Bulk and receivable edits need the configured connections.')
 const fail = (message: string): never => {
   throw new Error(message)
 }
