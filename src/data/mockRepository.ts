@@ -31,6 +31,8 @@ interface DemoOwner {
   overviewLayout?: Snapshot['overviewLayout']
   /** "13º e férias" (app_settings too). */
   extraPay?: Snapshot['extraPay']
+  /** "A receber" (its own tables). */
+  receivables?: Snapshot['receivables']
 }
 
 function read(): DemoOwner | null {
@@ -75,6 +77,7 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
     balanceTarget: owner.balanceTarget,
     overviewLayout: owner.overviewLayout,
     extraPay: owner.extraPay,
+    receivables: owner.receivables,
     categories: owner.categories,
     subcategories: owner.subcategories,
     incomeFilter: owner.incomeFilter,
@@ -134,6 +137,7 @@ export function createMockRepository(today: Date = new Date()): Repository {
         balanceTarget: next.balanceTarget,
         overviewLayout: next.overviewLayout,
         extraPay: next.extraPay,
+        receivables: next.receivables,
       })
       return previous && { updated: previous.length, previous }
     },

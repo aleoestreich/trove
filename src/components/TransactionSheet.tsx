@@ -9,11 +9,12 @@ import { kindOf } from '../lib/summary'
 import { Icon } from './Icon'
 import { CategoryBadge, TransactionBadge, catInk, catTint, catVar } from './CategoryBadge'
 import { useAccountLabel } from './TransactionRow'
+import { ReceivableSection } from './Receivables'
 import { useI18n } from '../i18n/I18nProvider'
 
 /**
  * Transaction details: amount, facts, the category in two steps (category,
- * then subcategory) and the "Hide this transaction" switch. Changes save at
+ * then subcategory), "A receber" and the "Hide this transaction" switch. Changes save at
  * once. Phones show it in a bottom sheet (`sheet`); the desktop Transactions
  * page shows it in a side panel (`panel`).
  */
@@ -216,6 +217,9 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
           ))}
         </div>
       )}
+
+      {/* A receber: paid on someone's behalf (an expense), or paid back (money in). */}
+      <ReceivableSection tx={current} />
 
       <HideSwitch hidden={!!current.hidden} onChange={(hidden) => edit({ op: 'hide', transactionId: current.id, hidden })} />
       {removed &&
@@ -466,7 +470,7 @@ export function TransactionPanel({ tx, onClose }: { tx: Transaction; onClose(): 
   return (
     <aside
       aria-label={t.transactions.details}
-      className="sticky top-8 flex max-h-[calc(100dvh-64px)] w-[300px] shrink-0 xl:w-[360px] flex-col self-start overflow-y-auto rounded-lg border border-line bg-surface p-5"
+      className="sticky top-8 flex max-h-[calc(100dvh-64px)] w-[300px] shrink-0 xl:w-[360px] flex-col self-start overflow-y-auto rounded-lg border border-line bg-surface p-5 [&>*]:shrink-0"
     >
       <TransactionDetails tx={tx} onClose={onClose} variant="panel" />
     </aside>

@@ -32,7 +32,7 @@ describe('Visão geral layout', () => {
 
   it('makes a stored layout whole: unknown and repeated cards dropped, missing ones at their default place', () => {
     expect(normalizeLayout({ order: ['monthInDetail', 'old', 'netWorth', 'netWorth'], hidden: ['old', 'unusual', 'unusual'] })).toEqual({
-      order: ['monthInDetail', 'netWorth', 'balance', 'projection', 'extraPay', 'unusual', 'recurring', 'whereMoney', 'comingUp', 'incomeVsExpenses', 'spendingByCategory', 'averageIncome'],
+      order: ['monthInDetail', 'netWorth', 'balance', 'projection', 'extraPay', 'receivables', 'unusual', 'recurring', 'whereMoney', 'comingUp', 'incomeVsExpenses', 'spendingByCategory', 'averageIncome'],
       hidden: ['unusual'],
     })
     expect(normalizeLayout({ order: 'x', hidden: null })).toEqual(DEFAULT_LAYOUT)

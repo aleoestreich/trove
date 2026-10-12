@@ -12,7 +12,8 @@ import { NO_PENSION, PENSION_MAX, PLAN_NAME_MAX, PLAN_TYPES, sortPensionEntries,
 import { SPENDING_GROUPS, isTarget } from './spendingBalance.js'
 import { isLayout, normalizeLayout } from './overviewLayout.js'
 import { isExtraPay, normalizeExtraPay } from './extraPay.js'
-import type { BalanceTarget, Category, ExtraPay, OverviewLayout, CategoryType, IncomeFilter, ProjectionHorizon, ProjectionSettings, Snapshot, SpendingGroup, Subcategory, TransferOverride } from './types.js'
+import { PERSON_MAX, RECEIVABLE_MAX, canBeOwed, canRepay, owedOf, received, sortPayments, usedOf, type Receivable } from './receivables.js'
+import type { BalanceTarget, Category, ExtraPay, OverviewLayout, CategoryType, IncomeFilter, ProjectionHorizon, ProjectionSettings, Snapshot, SpendingGroup, Subcategory, Transaction, TransferOverride } from './types.js'
 
 export type Edit =
   /** Sets a transaction's category and subcategory (null: uncategorized / none). */
@@ -77,6 +78,23 @@ export type Edit =
   | { op: 'setOverviewLayout'; layout: OverviewLayout }
   /** "13º e férias": on or off, the salary, the 13º's 1st part and the planned vacations. */
   | { op: 'setExtraPay'; extraPay: ExtraPay }
+  | ReceivableEdit
+
+/**
+ * "A receber" (src/data/receivables.ts): marks part or all of an expense as
+ * owed by someone, or changes who and how much (by ID; its expense stays);
+ * deletes one with its payments; records a payment back (by ID: a correction),
+ * from an incoming transaction or typed in by hand (transactionId null); or
+ * deletes a payment. The rules: applyReceivableEdit.
+ */
+export type ReceivableEdit =
+  | { op: 'saveReceivable'; receivable: { id: string; transactionId: string; person: string; amount: number } }
+  | { op: 'deleteReceivable'; id: string }
+  | { op: 'saveReceivablePayment'; receivableId: string; payment: { id: string; date: string; amount: number; transactionId: string | null } }
+  | { op: 'deleteReceivablePayment'; receivableId: string; id: string }
+
+export const RECEIVABLE_OPS: readonly ReceivableEdit['op'][] = ['saveReceivable', 'deleteReceivable', 'saveReceivablePayment', 'deleteReceivablePayment']
+export const isReceivableEdit = (e: Edit): e is ReceivableEdit => (RECEIVABLE_OPS as readonly string[]).includes(e.op)
 
 /** A transaction's category before a bulk change. `editedAt`: when it was last set by hand (server only). */
 export interface PreviousCategory {
@@ -95,6 +113,14 @@ export interface BulkResult {
 /** Why a bulk change is refused (EditError.reason), for the app to explain. */
 export type BulkReason = 'transfer' | 'mixed_types' | 'category_type' | 'subcategory_category' | 'nothing_selected' | 'not_income'
 
+/**
+ * Why a receivable edit is refused: the transaction isn't money out (or, for
+ * a payment, money in); more than the expense would be owed; a payment would
+ * go beyond what's owed, or beyond what came in; what's owed would drop below
+ * what was already paid back; or its expense would change.
+ */
+export type ReceivableReason = 'not_expense' | 'not_money_in' | 'over_expense' | 'over_owed' | 'over_received' | 'below_received' | 'other_transaction'
+
 /** The most transactions one bulk change may touch. */
 export const BULK_MAX = 2000
 
@@ -102,7 +128,7 @@ export class EditError extends Error {
   constructor(
     readonly code: 'not_found' | 'invalid' | 'name_taken',
     message: string,
-    readonly reason?: BulkReason,
+    readonly reason?: BulkReason | ReceivableReason,
   ) {
     super(message)
   }
@@ -133,6 +159,7 @@ export function validateEdit(e: unknown): Edit {
   const type = (v: unknown) => (v === 'expense' || v === 'income' ? v : bad('type'))
   const color = (v: unknown) => ((CATEGORY_COLORS as readonly unknown[]).includes(v) ? (v as string) : bad('color'))
   const icon = (v: unknown) => ((CATEGORY_ICONS as readonly unknown[]).includes(v) ? (v as string) : bad('icon'))
+  const cents = (v: unknown) => (Number.isSafeInteger(v) && (v as number) > 0 && (v as number) <= RECEIVABLE_MAX ? (v as number) : bad('amount'))
   const spendingGroup = (v: unknown) => (v === null ? null : (SPENDING_GROUPS as readonly unknown[]).includes(v) ? (v as SpendingGroup) : bad('group'))
   if (!e || typeof e !== 'object') return bad('body')
   const x = e as Record<string, unknown>
@@ -301,6 +328,25 @@ export function validateEdit(e: unknown): Edit {
       if (!isLayout(x.layout)) bad('layout')
       return { op: 'setOverviewLayout', layout: normalizeLayout(x.layout) }
     }
+    case 'saveReceivable': {
+      const r = (x.receivable ?? {}) as Record<string, unknown>
+      const person = typeof r.person === 'string' ? cleanName(r.person) : ''
+      if (!person || person.length > PERSON_MAX) bad('person')
+      return { op: 'saveReceivable', receivable: { id: id(r.id, 'id'), transactionId: id(r.transactionId, 'transaction'), person, amount: cents(r.amount) } }
+    }
+    case 'deleteReceivable':
+      return { op: 'deleteReceivable', id: id(x.id, 'id') }
+    case 'saveReceivablePayment': {
+      const p = (x.payment ?? {}) as Record<string, unknown>
+      if (!isDay(p.date)) bad('date')
+      return {
+        op: 'saveReceivablePayment',
+        receivableId: id(x.receivableId, 'receivable'),
+        payment: { id: id(p.id, 'id'), date: p.date as string, amount: cents(p.amount), transactionId: optId(p.transactionId, 'transaction') },
+      }
+    }
+    case 'deleteReceivablePayment':
+      return { op: 'deleteReceivablePayment', receivableId: id(x.receivableId, 'receivable'), id: id(x.id, 'id') }
     case 'setCardDays': {
       if (x.days === null) return { op: 'setCardDays', accountId: id(x.accountId, 'account'), days: null }
       const d = (x.days ?? {}) as Record<string, unknown>
@@ -481,6 +527,13 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
       const { [e.accountId]: _old, ...others } = s.cardDays ?? {}
       return { ...s, cardDays: e.days ? { ...others, [e.accountId]: e.days } : others }
     }
+    case 'saveReceivable':
+    case 'deleteReceivable':
+    case 'saveReceivablePayment':
+    case 'deleteReceivablePayment': {
+      const byId = new Map(s.transactions.map((t) => [t.id, t]))
+      return { ...s, receivables: applyReceivableEdit(s.receivables ?? [], e, (id) => byId.get(id)) }
+    }
     case 'recurringAction': {
       const overrides = s.recurringOverrides ?? {}
       return { ...s, recurringOverrides: { ...overrides, [e.id]: applyRecurringAction(overrides[e.id], e.action, e.at) } }
@@ -498,6 +551,60 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
             : { ...rest, transfer: e.value, categoryId: null, subcategoryId: null, transferOverride: e.value }
         }),
       }
+    }
+  }
+}
+
+/**
+ * The rules of "A receber", on the receivables and the transactions as the
+ * app shows them (the server reads both first, then writes the change):
+ * - a receivable's expense is money out and not a transfer, and stays the
+ *   same; what all its receivables are owed is at most the expense, and what
+ *   one is owed is at least what was paid back;
+ * - a payment goes into a receivable that exists, and its payments add up to
+ *   at most what's owed; when it came in through a transaction, that is money
+ *   in, not a transfer, and its payments add up to at most what came in.
+ * Returns the receivables after the edit. Throws EditError (with a `reason`).
+ * `find`: a transaction by ID (undefined when there's no such live one).
+ */
+export function applyReceivableEdit(list: Receivable[], e: ReceivableEdit, find: (id: string) => Transaction | undefined): Receivable[] {
+  const refuse = (reason: ReceivableReason): never => {
+    throw new EditError('invalid', `Invalid receivable edit: ${reason}.`, reason)
+  }
+  const receivable = (id: string) => list.find((r) => r.id === id) ?? fail('not_found', 'receivable')
+  switch (e.op) {
+    case 'saveReceivable': {
+      const v = e.receivable
+      const known = list.find((r) => r.id === v.id)
+      if (known && known.transactionId !== v.transactionId) refuse('other_transaction')
+      const tx = find(v.transactionId) ?? fail('not_found', 'transaction')
+      if (!canBeOwed(tx)) refuse('not_expense')
+      if (owedOf(list, tx.id, v.id) + v.amount > -tx.amount) refuse('over_expense')
+      if (known && v.amount < received(known)) refuse('below_received')
+      return known
+        ? list.map((r) => (r.id === v.id ? { ...r, person: v.person, amount: v.amount, date: tx.date } : r))
+        : [...list, { id: v.id, transactionId: tx.id, date: tx.date, person: v.person, amount: v.amount, payments: [] }]
+    }
+    case 'deleteReceivable':
+      receivable(e.id)
+      return list.filter((r) => r.id !== e.id)
+    case 'saveReceivablePayment': {
+      const r = receivable(e.receivableId)
+      const p = e.payment
+      if (list.some((x) => x.id !== r.id && x.payments.some((y) => y.id === p.id))) fail('invalid', 'payment id in use')
+      const others = r.payments.filter((x) => x.id !== p.id)
+      if (others.reduce((sum, x) => sum + x.amount, 0) + p.amount > r.amount) refuse('over_owed')
+      if (p.transactionId) {
+        const tx = find(p.transactionId) ?? fail('not_found', 'transaction')
+        if (!canRepay(tx)) refuse('not_money_in')
+        if (usedOf(list, tx.id, p.id) + p.amount > tx.amount) refuse('over_received')
+      }
+      return list.map((x) => (x.id === r.id ? { ...x, payments: sortPayments([...others, { ...p }]) } : x))
+    }
+    case 'deleteReceivablePayment': {
+      const r = receivable(e.receivableId)
+      if (!r.payments.some((x) => x.id === e.id)) fail('not_found', 'payment')
+      return list.map((x) => (x.id === r.id ? { ...x, payments: x.payments.filter((y) => y.id !== e.id) } : x))
     }
   }
 }

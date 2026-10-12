@@ -49,7 +49,7 @@ suite('database', () => {
   })
   afterAll(() => pool.end())
   beforeEach(async () => {
-    await pool.query(`TRUNCATE app_settings, manual_balances, manual_accounts, categories, subcategories, transactions, accounts, account_balances, card_bills, bank_connections, exchange_rates, sync_runs, sync_jobs, sync_job_items CASCADE`)
+    await pool.query(`TRUNCATE app_settings, receivable_payments, receivables, manual_balances, manual_accounts, categories, subcategories, transactions, accounts, account_balances, card_bills, bank_connections, exchange_rates, sync_runs, sync_jobs, sync_job_items CASCADE`)
     await ensureSeeded(pool)
   })
 
@@ -748,6 +748,89 @@ suite('database', () => {
     await pool.query(migration)
     await pool.query(migration)
     await expect(pool.query(`UPDATE categories SET spending_group = 'essential' WHERE id = 'salary'`)).rejects.toThrow()
+  })
+
+  describe('A receber', () => {
+    const scope = { itemIds: ['item-1'] }
+    const owe = (id: string, person: string, amount: number, transactionId = 'dinner') =>
+      applyEditSql(pool, { op: 'saveReceivable', receivable: { id, transactionId, person, amount } }, scope)
+    const pay = (receivableId: string, id: string, amount: number, transactionId: string | null = null) =>
+      applyEditSql(pool, { op: 'saveReceivablePayment', receivableId, payment: { id, date: '2026-10-04', amount, transactionId } }, scope)
+    const read = async () => (await readSnapshot(pool, ['item-1'], '2026-09-01'))!.receivables
+    const refused = async (p: Promise<unknown>) => {
+      try {
+        await p
+      } catch (e) {
+        return e instanceof EditError ? (e.reason ?? e.code) : 'other'
+      }
+      return null
+    }
+    const seed = () => sync([tx('dinner', { amount: -150 }), tx('pix-in', { type: 'CREDIT', amount: 50, description: 'PIX RECEBIDO EXEMPLO', date: '2026-10-03T12:00:00.000Z' })])
+
+    it('keeps receivables and their payments, through syncs, with the same rules as the app', async () => {
+      await seed()
+      await owe('r1', 'Ana', 75_00)
+      await owe('r2', 'Bruno', 75_00)
+      await pay('r1', 'p1', 50_00, 'pix-in')
+      await pay('r1', 'p2', 5_00)
+      await seed()
+      expect(await read()).toEqual([
+        { id: 'r1', transactionId: 'dinner', date: '2026-10-01', person: 'Ana', amount: 75_00, payments: [
+          { id: 'p1', date: '2026-10-04', amount: 50_00, transactionId: 'pix-in' },
+          { id: 'p2', date: '2026-10-04', amount: 5_00, transactionId: null },
+        ] },
+        { id: 'r2', transactionId: 'dinner', date: '2026-10-01', person: 'Bruno', amount: 75_00, payments: [] },
+      ])
+      expect(await refused(owe('r3', 'Carla', 1))).toBe('over_expense')
+      expect(await refused(owe('r3', 'Carla', 1, 'pix-in'))).toBe('not_expense')
+      expect(await refused(owe('r3', 'Carla', 1, 'nope'))).toBe('not_found')
+      expect(await refused(owe('r1', 'Ana', 54_99))).toBe('below_received')
+      expect(await refused(pay('r1', 'p3', 20_01))).toBe('over_owed')
+      expect(await refused(pay('r2', 'p3', 1, 'pix-in'))).toBe('over_received')
+      expect(await refused(pay('r2', 'p3', 1, 'dinner'))).toBe('not_money_in')
+      expect(await refused(pay('r2', 'p1', 1))).toBe('invalid')
+      expect(await refused(pay('nope', 'p3', 1))).toBe('not_found')
+      // A correction, by ID; deleting a payment, then a receivable with its payments.
+      await owe('r1', 'Ana Paula', 60_00)
+      await applyEditSql(pool, { op: 'deleteReceivablePayment', receivableId: 'r1', id: 'p2' }, scope)
+      expect((await read())![0]).toMatchObject({ person: 'Ana Paula', amount: 60_00, payments: [{ id: 'p1' }] })
+      await applyEditSql(pool, { op: 'deleteReceivable', id: 'r1' }, scope)
+      expect((await read())!.map((r) => r.id)).toEqual(['r2'])
+      expect(await count('receivable_payments')).toBe(0)
+      expect(await refused(applyEditSql(pool, { op: 'deleteReceivable', id: 'r1' }, scope))).toBe('not_found')
+    })
+
+    it('POST /api/edits needs the configured connections for them, and gives the reason a change is refused', async () => {
+      await seed()
+      const post = (body: unknown, pluggy: PluggyConfig | null) =>
+        edits(new Request('https://trove.test/api/edits', { method: 'POST', body: JSON.stringify(body) }), { pluggy, databaseUrl: url! })
+      const config: PluggyConfig = { clientId: 'cid', clientSecret: 'secret', itemIds: ['item-1'], baseUrl: 'https://api.pluggy.ai' }
+      const body = { op: 'saveReceivable', receivable: { id: 'r1', transactionId: 'dinner', person: 'Ana', amount: 150_01 } }
+      expect((await post(body, null)).status).toBe(503)
+      const res = await post(body, config)
+      expect(res.status).toBe(400)
+      expect(await res.json()).toMatchObject({ error: 'invalid', reason: 'over_expense' })
+      expect((await post({ ...body, receivable: { ...body.receivable, amount: 150_00 } }, config)).status).toBe(204)
+      // Another connection's transaction isn't one.
+      expect((await post({ ...body, receivable: { ...body.receivable, id: 'r2', amount: 1 } }, { ...config, itemIds: ['item-2'] })).status).toBe(404)
+    })
+
+    it('moves them to the transaction a bank replaces under a new ID', async () => {
+      await sync([tx('p1', { status: 'PENDING' }), tx('pix-in', { type: 'CREDIT', amount: 50, status: 'PENDING', date: '2026-10-03T12:00:00.000Z' })])
+      await owe('r1', 'Ana', 100_00, 'p1')
+      await pay('r1', 'p1', 50_00, 'pix-in')
+      await sync([tx('n1', { date: '2026-10-02T12:00:00.000Z' }), tx('n2', { type: 'CREDIT', amount: 50, date: '2026-10-04T12:00:00.000Z' })])
+      expect(await read()).toEqual([
+        { id: 'r1', transactionId: 'n1', date: '2026-10-02', person: 'Ana', amount: 100_00, payments: [{ id: 'p1', date: '2026-10-04', amount: 50_00, transactionId: 'n2' }] },
+      ])
+    })
+
+    it('migration 013 can run again', async () => {
+      const migration = readFileSync(new URL('../../db/migrations/013_receivables.sql', import.meta.url), 'utf8')
+      await pool.query(migration)
+      await pool.query(migration)
+      await expect(pool.query(`INSERT INTO receivables (id, transaction_id, person, amount_cents) VALUES ('x', 'nope', 'Ana', 1)`)).rejects.toThrow()
+    })
   })
 
   it('GET /api/transactions fetches older months and every stored month, with the filters', async () => {

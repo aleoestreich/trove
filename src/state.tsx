@@ -5,7 +5,8 @@ import { problemFromCode, problemFromStatus, type SyncProblem } from './lib/sync
 import { NO_FGTS, type Fgts } from './data/fgts'
 import { NO_PENSION, type Pension } from './data/pension'
 import { applyCardDays, deviceCardDays, forgetDeviceCardDays, type CardDays } from './data/cardDays'
-import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
+import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory, type ReceivableEdit } from './data/edits'
+import type { Receivable } from './data/receivables'
 import { DEFAULT_TARGET } from './data/spendingBalance'
 import { DEFAULT_LAYOUT } from './data/overviewLayout'
 import { DEFAULT_EXTRA_PAY } from './data/extraPay'
@@ -92,6 +93,10 @@ interface AppData extends Snapshot {
   extraPay: ExtraPay
   /** Saves it, server first; rejects with a message for the UI. */
   saveExtraPay(extraPay: ExtraPay): Promise<void>
+  /** "A receber" (src/data/receivables.ts): newest first, with their payments back. */
+  receivables: Receivable[]
+  /** Saves or deletes a receivable or a payment back, server first; rejects with a message for the UI. */
+  saveReceivable(e: ReceivableEdit): Promise<void>
 }
 
 /** The previdência privada edits saved from its sheets. */
@@ -221,7 +226,8 @@ export function DataProvider({ repository, children }: { repository: Repository;
       try {
         result = await saving
       } catch (err) {
-        throw new Error(err instanceof EditError ? errorMessage(err.code, undefined, err.reason) : err instanceof Error ? err.message : String(err))
+        // The browser's own (fetch) errors are in English.
+        throw new Error(err instanceof EditError ? errorMessage(err.code, undefined, err.reason) : err instanceof TypeError ? messages.errors.network : err instanceof Error ? err.message : String(err))
       }
       // The saved change, shown; if it no longer applies here, reload what's stored.
       try {
@@ -291,6 +297,12 @@ export function DataProvider({ repository, children }: { repository: Repository;
   const saveExtraPay = useCallback(
     async (extraPay: ExtraPay) => {
       await save({ op: 'setExtraPay', extraPay })
+    },
+    [save],
+  )
+  const saveReceivable = useCallback(
+    async (e: ReceivableEdit) => {
+      await save(e)
     },
     [save],
   )
@@ -498,8 +510,10 @@ export function DataProvider({ repository, children }: { repository: Repository;
       saveOverviewLayout,
       extraPay: snapshot.extraPay ?? DEFAULT_EXTRA_PAY,
       saveExtraPay,
+      receivables: snapshot.receivables ?? [],
+      saveReceivable,
     }
-  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, setFgtsTracking, saveFgts, setPensionTracking, savePension, saveBalanceTarget, saveCategoryGroups, saveSubcategoryGroup, saveOverviewLayout, saveExtraPay, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
+  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, setFgtsTracking, saveFgts, setPensionTracking, savePension, saveBalanceTarget, saveCategoryGroups, saveSubcategoryGroup, saveOverviewLayout, saveExtraPay, saveReceivable, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

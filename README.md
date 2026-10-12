@@ -129,6 +129,15 @@ between accounts, and card bill payments.
   salary in the months with vacation days, already paid in advance. Amounts
   are estimates from the net monthly salary (the projection's median month,
   or one typed in). A card on the Overview lists the next payments.
+- **A receber** (`#/receivables`): a purchase or Pix paid on someone
+  else's behalf is marked in its details ("Paguei por alguém": who, and how
+  much of it; several people can share one), then tracked until it's paid
+  back. A payment back is recorded from money that came in ("É uma
+  devolução" in its details, or the receivable's suggestions, the matching
+  amounts first) or typed in by hand. The page lists who owes what, most
+  owed first, and the ones already paid back; a card on the Overview shows
+  the total while someone owes something. Totals don't change: the expense
+  and the money that came back count as the banks report them.
 - **Overview layout:** "Personalizar" (the sliders icon in the phone
   header, a button next to the desktop title) moves each card up or down
   and hides the ones not wanted; "Restaurar padrão" brings back the default.

@@ -13,6 +13,7 @@ export const OVERVIEW_SECTIONS: readonly OverviewSection[] = [
   'balance',
   'projection',
   'extraPay',
+  'receivables',
   'unusual',
   'recurring',
   'whereMoney',

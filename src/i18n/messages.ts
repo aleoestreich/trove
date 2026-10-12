@@ -296,6 +296,8 @@ export interface Messages {
       hiddenTag: string
       /** Under "13º e férias" while it's turned off. */
       extraPayOff: string
+      /** Under "A receber" while nobody owes anything. */
+      receivablesNone: string
       shownCount: (n: number, total: number) => string
       reset: string
       cancel: string
@@ -537,6 +539,78 @@ export interface Messages {
     panelNote: string
   }
   /** Server errors, by the code the API returns (never its text, which is English and technical). */
+  /** "A receber": money paid on someone else's behalf, until it's paid back (src/data/receivables.ts). */
+  receivables: {
+    title: string
+    sub: string
+    total: string
+    people: (n: number) => string
+    emptyTitle: string
+    emptyText: string
+    settled: string
+    settledCount: (n: number) => string
+    left: (amount: string) => string
+    leftOf: (left: string, total: string) => string
+    paidBack: string
+    received: (amount: string) => string
+    progress: (person: string) => string
+    unknownTransaction: string
+    card: { title: string; total: string; more: (n: number) => string }
+    sheet: {
+      section: string
+      add: string
+      addNote: string
+      addMore: string
+      repay: string
+      repayNote: string
+      repaidBy: (person: string) => string
+    }
+    form: {
+      newTitle: string
+      editTitle: string
+      person: string
+      personPlaceholder: string
+      personRequired: string
+      amount: string
+      amountHint: (max: string) => string
+      amountInvalid: (max: string) => string
+      amountBelowReceived: (min: string) => string
+      all: string
+      half: string
+      save: string
+      failed: string
+    }
+    detail: {
+      receivedLabel: string
+      leftLabel: string
+      payments: string
+      noPayments: string
+      fromTransaction: (description: string) => string
+      byHand: string
+      deletePayment: string
+      addPayment: string
+      receivedAll: string
+      edit: string
+      delete: string
+      confirmDelete: string
+      deleteYes: string
+    }
+    payment: {
+      title: string
+      who: string
+      whoSub: (amount: string) => string
+      none: string
+      cameIn: string
+      byHandOption: string
+      byHandNote: string
+      noCandidates: string
+      amount: string
+      amountHint: (max: string) => string
+      amountInvalid: (max: string) => string
+      date: string
+      save: string
+    }
+  }
   errors: {
     database: string
     schemaOutdated: string
@@ -551,6 +625,13 @@ export interface Messages {
     bulkSubcategory: string
     nothingSelected: string
     notIncome: string
+    receivableNotExpense: string
+    receivableNotMoneyIn: string
+    receivableOverExpense: string
+    receivableOverOwed: string
+    receivableOverReceived: string
+    receivableBelowReceived: string
+    receivableOtherTransaction: string
     http: (status: number) => string
   }
   /** "13º e férias": a CLT job's extra pay, off by default (src/data/extraPay.ts). */
@@ -1296,6 +1377,7 @@ export const messages: Messages = {
         spendingByCategory: 'Gastos por categoria',
         averageIncome: 'Renda média',
         extraPay: '13º e férias',
+        receivables: 'A receber',
         monthInDetail: 'Mês em detalhe',
       },
       moveUp: (name) => `Subir ${name}`,
@@ -1303,6 +1385,7 @@ export const messages: Messages = {
       show: (name) => `Mostrar ${name}`,
       hiddenTag: 'Oculto',
       extraPayOff: 'Aparece quando 13º e férias está ligado',
+      receivablesNone: 'Aparece quando alguém te deve',
       shownCount: (n, total) => `${n} de ${total} visíveis`,
       reset: 'Restaurar padrão',
       cancel: 'Cancelar',
@@ -1531,6 +1614,77 @@ export const messages: Messages = {
     undoFailed: 'Não foi possível desfazer. Tente de novo.',
     panelNote: 'Shift + clique seleciona um intervalo. Transferências entre suas contas não podem ser selecionadas.',
   },
+  receivables: {
+    title: 'A receber',
+    sub: 'Compras e Pix que você pagou por outras pessoas, até elas devolverem.',
+    total: 'Total a receber',
+    people: (n) => (n === 1 ? '1 pessoa' : `${n} pessoas`),
+    emptyTitle: 'Ninguém te deve nada',
+    emptyText: 'Abra uma compra ou um Pix que você pagou por alguém e toque em “Paguei por alguém”.',
+    settled: 'Já devolvidos',
+    settledCount: (n) => (n === 1 ? '1 devolvido' : `${n} devolvidos`),
+    left: (amount) => `Faltam ${amount}`,
+    leftOf: (left, total) => `Faltam ${left} de ${total}`,
+    paidBack: 'Devolvido',
+    received: (amount) => `${amount} devolvido`,
+    progress: (person) => `Quanto ${person} já devolveu`,
+    unknownTransaction: 'Transação fora dos meses carregados',
+    card: { title: 'A receber', total: 'Te devem', more: (n) => (n === 1 ? '+1 pessoa' : `+${n} pessoas`) },
+    sheet: {
+      section: 'A receber',
+      add: 'Paguei por alguém',
+      addNote: 'Acompanhe até a pessoa te devolver. Os totais não mudam.',
+      addMore: 'Mais alguém vai devolver',
+      repay: 'É uma devolução',
+      repayNote: 'Abate do que alguém te deve',
+      repaidBy: (person) => `Devolução de ${person}`,
+    },
+    form: {
+      newTitle: 'Paguei por alguém',
+      editTitle: 'Editar valor a receber',
+      person: 'Quem vai devolver',
+      personPlaceholder: 'Nome',
+      personRequired: 'Digite um nome.',
+      amount: 'Valor',
+      amountHint: (max) => `Até ${max}`,
+      amountInvalid: (max) => `Digite um valor entre R$ 0,01 e ${max}.`,
+      amountBelowReceived: (min) => `Já foram devolvidos ${min}: o valor não pode ser menor.`,
+      all: 'Tudo',
+      half: 'Metade',
+      save: 'Salvar',
+      failed: 'Não foi possível salvar. Tente de novo.',
+    },
+    detail: {
+      receivedLabel: 'Devolvido',
+      leftLabel: 'Falta',
+      payments: 'Devoluções',
+      noPayments: 'Nenhuma devolução ainda.',
+      fromTransaction: (description) => `Entrada · ${description}`,
+      byHand: 'Registrada à mão',
+      deletePayment: 'Excluir devolução',
+      addPayment: 'Registrar devolução',
+      receivedAll: 'Recebi tudo',
+      edit: 'Editar',
+      delete: 'Excluir',
+      confirmDelete: 'Excluir este valor a receber e as devoluções registradas? A transação continua igual.',
+      deleteYes: 'Excluir',
+    },
+    payment: {
+      title: 'Registrar devolução',
+      who: 'De quem é esta devolução?',
+      whoSub: (amount) => `Entrada de ${amount}`,
+      none: 'Ninguém te deve nada agora. Marque antes a compra ou o Pix que você pagou por alguém.',
+      cameIn: 'Como chegou',
+      byHandOption: 'Outra forma',
+      byHandNote: 'Dinheiro, outra conta ou algo fora do Trove',
+      noCandidates: 'Nenhuma entrada recente livre. Registre de outra forma.',
+      amount: 'Valor devolvido',
+      amountHint: (max) => `Até ${max}`,
+      amountInvalid: (max) => `Digite um valor entre R$ 0,01 e ${max}.`,
+      date: 'Data',
+      save: 'Registrar',
+    },
+  },
   errors: {
     database: 'O banco de dados não respondeu. Tente de novo em instantes.',
     schemaOutdated: 'As tabelas do banco de dados estão desatualizadas: rode os arquivos pendentes de db/migrations (docs/neon-setup.md).',
@@ -1545,6 +1699,13 @@ export const messages: Messages = {
     bulkSubcategory: 'Essa subcategoria é de outra categoria.',
     nothingSelected: 'Selecione pelo menos uma categoria',
     notIncome: 'Só categorias de receita entram na renda média.',
+    receivableNotExpense: 'Só uma saída de dinheiro pode ficar a receber.',
+    receivableNotMoneyIn: 'Só uma entrada de dinheiro pode ser uma devolução.',
+    receivableOverExpense: 'O valor a receber passa do valor da transação.',
+    receivableOverOwed: 'A devolução passa do que falta receber.',
+    receivableOverReceived: 'A devolução passa do valor que entrou.',
+    receivableBelowReceived: 'O valor não pode ficar abaixo do que já foi devolvido.',
+    receivableOtherTransaction: 'Este valor a receber é de outra transação.',
     http: (status) => `A requisição falhou (HTTP ${status}).`,
   },
   extraPay: {
