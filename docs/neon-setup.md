@@ -451,7 +451,8 @@ Futuro, against a target (`src/data/spendingBalance.ts`):
   payments; installments in the month they're charged). The month in
   progress also counts the charges still expected in it: installments to be
   charged and recurring charges not charged yet, each in its category's
-  group. Futuro = income − Essencial −
+  group; and a group that hasn't reached its target yet keeps the rest of
+  it in reserve, out of the Futuro. Futuro = income − Essencial −
   Estilo de vida; "Sem grupo" sits inside it until classified.
 
 ## Reads

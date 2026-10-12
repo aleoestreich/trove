@@ -4,7 +4,7 @@ import { useData } from '../../state'
 import { useI18n } from '../../i18n/I18nProvider'
 import { Icon, type IconName } from '../Icon'
 import { NO_FILTER } from '../../data/incomeAverage'
-import { balanceStatus, expectedCharges, monthBalance, roundedShares, type BalanceStatus, type Bucket, type MonthBalance } from '../../data/spendingBalance'
+import { balanceStatus, expectedCharges, monthBalance, withReserve, roundedShares, type BalanceStatus, type Bucket, type MonthBalance } from '../../data/spendingBalance'
 import type { BalanceTarget } from '../../data/types'
 import { formatMonthName, fromISO, monthKey } from '../../lib/dates'
 import { installmentPlans } from '../../lib/installments'
@@ -25,6 +25,11 @@ export const GROUP_FILL: Record<Part, string> = {
 }
 /** Spending above the income: hatched critical. */
 export const OVER_FILL = hatch('var(--critical)', 22)
+/** A group's reserve (the month in progress): its colour, faint and hatched. */
+export const RESERVE_FILL: Record<'essential' | 'lifestyle', string> = {
+  essential: hatch('color-mix(in srgb, var(--accent) 55%, var(--surface))', 18),
+  lifestyle: hatch('color-mix(in srgb, var(--accent) 30%, var(--surface))', 12),
+}
 
 /** A small square in a group's colour. */
 export function GroupSwatch({ part, size = 12, className = '' }: { part: Part | 'over'; size?: number; className?: string }) {
@@ -58,7 +63,8 @@ export function useMonthBalance(month?: string): { balance: MonthBalance; status
   return useMemo(() => {
     const of = (m: string) => monthBalance(allTransactions, categories, subcategories, incomeFilter ?? NO_FILTER, m, today, expected)
     const shown = month ?? defaultBalanceMonth(today, (m) => of(m).income > 0)
-    const balance = of(shown)
+    // The month in progress keeps each group's room up to its target out of the Futuro.
+    const balance = withReserve(of(shown), balanceTarget)
     return { balance, status: balanceStatus(balance, balanceTarget, today), target: balanceTarget, month: shown }
   }, [allTransactions, categories, subcategories, incomeFilter, balanceTarget, today, month, expected])
 }
@@ -125,11 +131,14 @@ export function SplitBar({ balance, target, height = 14 }: { balance: MonthBalan
   const at = (v: number) => `${(v / scale) * 100}%`
   const over = balance.overIncome > 0
   const ungroupedShown = over ? balance.ungrouped : Math.min(balance.ungrouped, Math.max(0, balance.future))
-  const segments: [Part, number][] = [
-    ['essential', balance.essential],
-    ['lifestyle', balance.lifestyle],
-    ['ungrouped', ungroupedShown],
-    ['future', over ? 0 : Math.max(0, balance.future - ungroupedShown)],
+  // The month in progress: each group's reserve right after it, before the Futuro.
+  const segments: [string, number, string][] = [
+    ['essential', balance.essential, GROUP_FILL.essential],
+    ['essential-reserve', over ? 0 : balance.reserved.essential, RESERVE_FILL.essential],
+    ['lifestyle', balance.lifestyle, GROUP_FILL.lifestyle],
+    ['lifestyle-reserve', over ? 0 : balance.reserved.lifestyle, RESERVE_FILL.lifestyle],
+    ['ungrouped', ungroupedShown, GROUP_FILL.ungrouped],
+    ['future', over ? 0 : Math.max(0, balance.future - ungroupedShown), GROUP_FILL.future],
   ]
   const incomeAt = (pct: number) => (balance.income * pct) / 100
   const marker = (left: string, dashed = false): CSSProperties =>
@@ -145,8 +154,8 @@ export function SplitBar({ balance, target, height = 14 }: { balance: MonthBalan
         <div data-progress className="relative flex gap-0.5 overflow-hidden bg-surface" style={{ height, borderRadius: height > 14 ? 9 : 4 }}>
           {segments
             .filter(([, v]) => v > 0)
-            .map(([part, v]) => (
-              <span key={part} className="min-w-0" style={{ flex: `${v} 1 0`, background: GROUP_FILL[part] }} />
+            .map(([part, v, fill]) => (
+              <span key={part} className="min-w-0" style={{ flex: `${v} 1 0`, background: fill }} />
             ))}
           {over && <span className="absolute inset-y-0 right-0" style={{ left: at(balance.income), background: OVER_FILL }} />}
         </div>
@@ -160,7 +169,7 @@ export function SplitBar({ balance, target, height = 14 }: { balance: MonthBalan
 }
 
 /** The legend under the big bar: the target's marks, and the income line and overflow when spending passed it. */
-export function BarLegend({ target, over, onEditTarget }: { target: BalanceTarget; over: boolean; onEditTarget?(): void }) {
+export function BarLegend({ target, over, reserve = false, onEditTarget }: { target: BalanceTarget; over: boolean; reserve?: boolean; onEditTarget?(): void }) {
   const { t } = useI18n()
   const d = t.spendingBalance.detail
   const mark = (
@@ -183,6 +192,12 @@ export function BarLegend({ target, over, onEditTarget }: { target: BalanceTarge
         </button>
       ) : (
         <span className="inline-flex items-center gap-1.5">{mark}</span>
+      )}
+      {reserve && (
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="size-3 shrink-0 rounded-[3px]" style={{ background: RESERVE_FILL.essential }} />
+          {d.legendReserve}
+        </span>
       )}
       {over && (
         <>

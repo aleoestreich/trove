@@ -6,7 +6,7 @@ import { Card } from '../ui'
 import { formatMoney } from '../../lib/money'
 import { monthKey } from '../../lib/dates'
 import { hasGroups, roundedShares } from '../../data/spendingBalance'
-import { GROUP_FILL, GroupSwatch, SplitBar, pct, StatusPill, monthLabel, useMonthBalance, useStatusText, type Part } from './parts'
+import { GROUP_FILL, GroupSwatch, RESERVE_FILL, SplitBar, pct, StatusPill, monthLabel, useMonthBalance, useStatusText, type Part } from './parts'
 
 /**
  * "Equilíbrio do mês" on the Visão geral: the verdict, the month as one bar
@@ -127,6 +127,12 @@ function FilledBalanceCard() {
                 <span className="tabular">{b.includesUngrouped(formatMoney(balance.ungrouped))}</span>
               </span>
             )
+          )}
+          {balance.reserved.essential + balance.reserved.lifestyle > 0 && shares && (
+            <span className="flex items-center gap-1.5 text-xs leading-4 text-muted">
+              <span aria-hidden className="size-2.5 shrink-0 rounded-[2px]" style={{ background: RESERVE_FILL.essential }} />
+              <span className="tabular">{b.includesReserve(formatMoney(balance.reserved.essential + balance.reserved.lifestyle))}</span>
+            </span>
           )}
           {balance.expectedSpending > 0 && shares && (
             <span className="flex items-center gap-1.5 text-xs leading-4 text-muted">
