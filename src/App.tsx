@@ -12,6 +12,8 @@ import { HiddenTransactions } from './pages/Transactions'
 import { Projection } from './pages/Projection'
 import { UnusualAll, UnusualCategory } from './pages/UnusualCategory'
 import { Recurring } from './pages/Recurring'
+import { SpendingBalance } from './pages/SpendingBalance'
+import { BalanceOrganize } from './pages/BalanceOrganize'
 import { Debug } from './pages/Debug'
 import { Snackbar, SyncBar } from './components/SyncBar'
 import { Icon, type IconName } from './components/Icon'
@@ -28,7 +30,7 @@ const repository = isDeployed() ? withDemoFallback(createApiRepository(), create
 /** The insight pages open from the Overview, so its tab stays current there. */
 function useOverviewDetail(): boolean {
   const { pathname } = useLocation()
-  return pathname.startsWith('/insights') || pathname === '/recurring'
+  return pathname.startsWith('/insights') || pathname === '/recurring' || pathname.startsWith('/balance')
 }
 
 const tabs: { to: string; label: keyof Messages['nav']; icon: IconName }[] = [
@@ -127,6 +129,8 @@ function Shell() {
                     <Route path="/insights/unusual" element={<UnusualAll />} />
                     <Route path="/insights/unusual/:categoryId" element={<UnusualCategory />} />
                     <Route path="/recurring" element={<Recurring />} />
+                    <Route path="/balance" element={<SpendingBalance />} />
+                    <Route path="/balance/organize" element={<BalanceOrganize />} />
                     {/* TEMPORARY: Pluggy's raw responses. */}
                     <Route path="/debug" element={<Debug />} />
                   </Routes>

@@ -6,7 +6,8 @@ import { EditError, checkBulk, checkIncomeFilter, defaultCategories, type BulkRe
 import { NO_FILTER, pruneIncomeFilter } from '../../src/data/incomeAverage.js'
 import { DEFAULT_PROJECTION_SETTINGS } from '../../src/data/projection.js'
 import { applyRecurringAction } from '../../src/data/recurring.js'
-import type { Category, IncomeFilter, ProjectionSettings, RecurringOverride, Subcategory } from '../../src/data/types.js'
+import type { BalanceTarget, Category, IncomeFilter, ProjectionSettings, RecurringOverride, SpendingGroup, Subcategory } from '../../src/data/types.js'
+import { DEFAULT_TARGET, isTarget } from '../../src/data/spendingBalance.js'
 import { inTransaction, type Db } from './connection.js'
 import { readSnapshot } from './read.js'
 import { sortFgts, type Fgts } from '../../src/data/fgts.js'
@@ -46,15 +47,15 @@ export async function ensureSeeded(pool: pg.Pool): Promise<void> {
 }
 
 export async function readCategories(db: Db): Promise<{ categories: Category[]; subcategories: Subcategory[] }> {
-  const cats = await db.query<{ id: string; name: string; type: Category['type']; color: string; icon: string; sort_order: number }>(
-    `SELECT id, name, type, color, icon, sort_order FROM categories ORDER BY sort_order, name`,
+  const cats = await db.query<{ id: string; name: string; type: Category['type']; color: string; icon: string; sort_order: number; spending_group: SpendingGroup | null }>(
+    `SELECT id, name, type, color, icon, sort_order, spending_group FROM categories ORDER BY sort_order, name`,
   )
-  const subs = await db.query<{ id: string; category_id: string; name: string; sort_order: number }>(
-    `SELECT id, category_id, name, sort_order FROM subcategories ORDER BY sort_order, name`,
+  const subs = await db.query<{ id: string; category_id: string; name: string; sort_order: number; spending_group: SpendingGroup | null }>(
+    `SELECT id, category_id, name, sort_order, spending_group FROM subcategories ORDER BY sort_order, name`,
   )
   return {
-    categories: cats.rows.map((c) => ({ id: c.id, name: c.name, type: c.type, color: c.color, icon: c.icon, sortOrder: c.sort_order })),
-    subcategories: subs.rows.map((s) => ({ id: s.id, categoryId: s.category_id, name: s.name, sortOrder: s.sort_order })),
+    categories: cats.rows.map((c) => ({ id: c.id, name: c.name, type: c.type, color: c.color, icon: c.icon, sortOrder: c.sort_order, group: c.spending_group })),
+    subcategories: subs.rows.map((s) => ({ id: s.id, categoryId: s.category_id, name: s.name, sortOrder: s.sort_order, group: s.spending_group })),
   }
 }
 
@@ -159,6 +160,15 @@ export async function readPension(db: Db): Promise<Pension> {
   }
 }
 
+/** The "Equilíbrio do mês" target, in app_settings under `balance_target`. Nothing stored (or not a target): 50/30/20. */
+const BALANCE_TARGET_KEY = 'balance_target'
+
+export async function readBalanceTarget(db: Db): Promise<BalanceTarget> {
+  const r = await db.query<{ value: unknown }>(`SELECT value FROM app_settings WHERE key = $1`, [BALANCE_TARGET_KEY])
+  const v = r.rows[0]?.value
+  return isTarget(v) ? { essential: v.essential, lifestyle: v.lifestyle, future: v.future } : DEFAULT_TARGET
+}
+
 async function writeSetting(db: Db, key: string, value: unknown): Promise<void> {
   await db.query(
     `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, now())
@@ -219,11 +229,15 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
     }
     case 'updateCategory': {
       const c = e.changes
+      // An income category has no group, nor do its subcategories.
       await one(
-        `UPDATE categories SET name = coalesce($2, name), type = coalesce($3, type), color = coalesce($4, color), icon = coalesce($5, icon) WHERE id = $1`,
+        `UPDATE categories SET name = coalesce($2, name), type = coalesce($3, type), color = coalesce($4, color), icon = coalesce($5, icon),
+           spending_group = CASE WHEN coalesce($3, type) = 'income' THEN NULL ELSE spending_group END
+         WHERE id = $1`,
         [e.id, c.name ?? null, c.type ?? null, c.color ?? null, c.icon ?? null],
         'category',
       )
+      if (c.type === 'income') await db.query(`UPDATE subcategories SET spending_group = NULL WHERE category_id = $1`, [e.id])
       return null
     }
     case 'deleteCategory':
@@ -260,8 +274,9 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
         await one(`SELECT 1 FROM subcategories WHERE id = $1`, [e.id], 'subcategory')
         return null // already there
       }
-      // Its transactions move with it.
+      // Its transactions move with it; under an income category it has no group.
       await db.query(`UPDATE transactions SET category_id = $2 WHERE subcategory_id = $1`, [e.id, e.categoryId])
+      await db.query(`UPDATE subcategories s SET spending_group = NULL FROM categories c WHERE s.id = $1 AND c.id = s.category_id AND c.type = 'income'`, [e.id])
       return null
     }
     case 'categorizeMany':
@@ -340,6 +355,35 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
       return null
     case 'deletePensionBalance':
       await one(`DELETE FROM manual_balances WHERE id = $1 AND account_id = $2 AND kind = 'pension'`, [e.id, e.planId], 'balance')
+      return null
+    case 'setCategoryGroups': {
+      // Expense categories only, all or none.
+      const rows = JSON.stringify(e.groups.map((g) => ({ category_id: g.categoryId, spending_group: g.group })))
+      const updated = await db.query(
+        `UPDATE categories c SET spending_group = r.spending_group
+         FROM jsonb_to_recordset($1::jsonb) AS r(category_id text, spending_group text)
+         WHERE c.id = r.category_id AND c.type = 'expense'`,
+        [rows],
+      )
+      if (updated.rowCount !== e.groups.length) {
+        const found = await db.query(`SELECT 1 FROM categories WHERE id = ANY($1::text[])`, [e.groups.map((g) => g.categoryId)])
+        throw found.rowCount !== e.groups.length ? notFound('category') : new EditError('invalid', 'Only expense categories have a group.')
+      }
+      return null
+    }
+    case 'setSubcategoryGroup': {
+      const updated = await db.query(
+        `UPDATE subcategories s SET spending_group = $2 FROM categories c WHERE s.id = $1 AND c.id = s.category_id AND c.type = 'expense'`,
+        [e.id, e.group],
+      )
+      if (!updated.rowCount) {
+        await one(`SELECT 1 FROM subcategories WHERE id = $1`, [e.id], 'subcategory')
+        throw new EditError('invalid', 'Only subcategories of expense categories have a group.')
+      }
+      return null
+    }
+    case 'setBalanceTarget':
+      await writeSetting(db, BALANCE_TARGET_KEY, e.target)
       return null
     case 'setCardDays':
       // Their own columns too; cards only, as in the app.

@@ -91,7 +91,10 @@ CREATE TABLE IF NOT EXISTS categories (
   color       text NOT NULL,                     -- a colour key, e.g. "orange" (CSS token --cat-orange)
   icon        text NOT NULL,                     -- an icon key, e.g. "fork" (src/assets/icons/categories/)
   sort_order  integer NOT NULL DEFAULT 0,
-  created_at  timestamptz NOT NULL DEFAULT now()
+  spending_group text,                           -- "Equilíbrio do mês": 'essential' or 'lifestyle' (expense only); NULL: none yet (012)
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT categories_spending_group_check
+    CHECK (spending_group IN ('essential', 'lifestyle') AND type = 'expense' OR spending_group IS NULL)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS categories_name_idx ON categories (lower(name));
 
@@ -100,6 +103,7 @@ CREATE TABLE IF NOT EXISTS subcategories (
   category_id  text NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   name         text NOT NULL,
   sort_order   integer NOT NULL DEFAULT 0,
+  spending_group text CHECK (spending_group IN ('essential', 'lifestyle')),  -- its own group; NULL: follows the category (012)
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS subcategories_name_idx ON subcategories (category_id, lower(name));
@@ -235,7 +239,8 @@ CREATE TABLE IF NOT EXISTS webhook_events (
   processed_at  timestamptz
 );
 
--- Small app-wide values: when categories were seeded, when everything last synced.
+-- Small app-wide values: when categories were seeded, when everything last synced,
+-- and settings such as the "Equilíbrio do mês" target ('balance_target').
 CREATE TABLE IF NOT EXISTS app_settings (
   key         text PRIMARY KEY,
   value       jsonb NOT NULL,

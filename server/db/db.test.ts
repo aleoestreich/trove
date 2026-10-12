@@ -678,6 +678,49 @@ suite('database', () => {
     await expect(pool.query(`INSERT INTO manual_balances (id, kind, as_of, balance_cents) VALUES ('x', 'pension', '2026-09-22', 1)`)).rejects.toThrow()
   })
 
+  it('keeps the Equilíbrio groups and target, through syncs, with the same rules as the app', async () => {
+    await sync([tx('t1')])
+    const read = async () => (await readSnapshot(pool, ['item-1'], '2026-09-01'))!
+    expect((await read()).balanceTarget).toEqual({ essential: 50, lifestyle: 30, future: 20 })
+    expect((await read()).categories.every((c) => c.group === null)).toBe(true)
+    await applyEditSql(pool, { op: 'setCategoryGroups', groups: [{ categoryId: 'home', group: 'essential' }, { categoryId: 'transport', group: 'essential' }, { categoryId: 'travel', group: 'lifestyle' }] })
+    const ride = await subOf('transport', 'Apps de corrida')
+    await applyEditSql(pool, { op: 'setSubcategoryGroup', id: ride, group: 'lifestyle' })
+    await applyEditSql(pool, { op: 'setBalanceTarget', target: { essential: 60, lifestyle: 20, future: 20 } })
+    await sync([tx('t1')])
+    let s = await read()
+    expect(s.categories.filter((c) => c.group).map((c) => [c.id, c.group])).toEqual([
+      ['home', 'essential'],
+      ['transport', 'essential'],
+      ['travel', 'lifestyle'],
+    ])
+    expect(s.subcategories.filter((x) => x.group).map((x) => [x.id, x.group])).toEqual([[ride, 'lifestyle']])
+    expect(s.balanceTarget).toEqual({ essential: 60, lifestyle: 20, future: 20 })
+    // All or none: an income category or a missing one refuses the whole change.
+    await expect(applyEditSql(pool, { op: 'setCategoryGroups', groups: [{ categoryId: 'travel', group: null }, { categoryId: 'salary', group: 'essential' }] })).rejects.toThrow(EditError)
+    await expect(applyEditSql(pool, { op: 'setCategoryGroups', groups: [{ categoryId: 'travel', group: null }, { categoryId: 'nope', group: 'essential' }] })).rejects.toMatchObject({ code: 'not_found' })
+    expect((await read()).categories.find((c) => c.id === 'travel')!.group).toBe('lifestyle')
+    await expect(applyEditSql(pool, { op: 'setSubcategoryGroup', id: await subOf('salary', 'Salário base'), group: 'essential' })).rejects.toMatchObject({ code: 'invalid' })
+    await expect(applyEditSql(pool, { op: 'setSubcategoryGroup', id: 'nope', group: 'essential' })).rejects.toMatchObject({ code: 'not_found' })
+    // A category that becomes income loses its group and its subcategories' groups.
+    await applyEditSql(pool, { op: 'updateCategory', id: 'transport', changes: { type: 'income' } })
+    s = await read()
+    expect(s.categories.find((c) => c.id === 'transport')!.group).toBeNull()
+    expect(s.subcategories.find((x) => x.id === ride)!.group).toBeNull()
+    // So does a subcategory moved under an income category.
+    const fuel = await subOf('home', 'Energia')
+    await applyEditSql(pool, { op: 'setSubcategoryGroup', id: fuel, group: 'lifestyle' })
+    await applyEditSql(pool, { op: 'linkSubcategory', id: fuel, categoryId: 'salary' })
+    expect((await read()).subcategories.find((x) => x.id === fuel)!.group).toBeNull()
+  })
+
+  it('migration 012 can run again', async () => {
+    const migration = readFileSync(new URL('../../db/migrations/012_spending_groups.sql', import.meta.url), 'utf8')
+    await pool.query(migration)
+    await pool.query(migration)
+    await expect(pool.query(`UPDATE categories SET spending_group = 'essential' WHERE id = 'salary'`)).rejects.toThrow()
+  })
+
   it('GET /api/transactions fetches older months and every stored month, with the filters', async () => {
     await sync([
       tx('old-1', { date: '2025-02-10T12:00:00.000Z', description: 'LOJA ANTIGA' }),

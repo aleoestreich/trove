@@ -104,6 +104,12 @@ No backend, no auth. It runs in the browser on hardcoded data.
 - ✅ Previdência privada tracked by hand (Accounts): named plans (PGBL/VGBL),
   each with its history, a reminder a month after the latest balance; shown
   apart from net worth.
+- ✅ Equilíbrio do mês: expense categories (and, optionally, subcategories)
+  in Essencial or Estilo de vida; each month's income split between them and
+  Futuro (what's left), against a target (50/30/20 by default, editable).
+  Card on Visão geral, a page per month with the categories behind each
+  group and the months before, a guided "Organizar categorias" with
+  suggestions by name, and the groups on the Categories tab.
 - Next: use the stored card bills for the current bill (PR #23 reads them live).
 
 ## Phase 3 — Authentication & security

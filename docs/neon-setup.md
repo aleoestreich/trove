@@ -76,6 +76,11 @@ it adds `manual_accounts` and the balances' `account_id`, for the
 [previdência privada plans](#previdência-privada). Until it runs, every
 page reports that the tables are out of date.
 
+Then run [`db/migrations/012_spending_groups.sql`](../db/migrations/012_spending_groups.sql):
+it adds the categories' and subcategories' `spending_group`, for the
+[Equilíbrio do mês](#equilíbrio-do-mês). Until it runs, every page reports
+that the tables are out of date.
+
 ## 3. Give Vercel the connection string
 
 1. In Neon, open **Connect**, choose the database and role, and turn
@@ -419,6 +424,30 @@ Previdência privada plans are tracked by hand too (`src/data/pension.ts`):
   latest balances added up as a line of their own.
 - A plan's balance is due for an update when it has none, or its latest is
   more than a month old; Visão geral reminds about those plans.
+
+## Equilíbrio do mês
+
+How each month's income splits between Essencial, Estilo de vida and
+Futuro, against a target (`src/data/spendingBalance.ts`):
+
+- Each expense category's group is `categories.spending_group`
+  (`essential`, `lifestyle`, or NULL: "Sem grupo"); a check keeps income
+  categories without one. A subcategory may have its own
+  (`subcategories.spending_group`; NULL: it follows its category). A
+  category that becomes income, or a subcategory moved under one, loses it.
+- The target is `app_settings` `balance_target`
+  (`{ "essential": 50, "lifestyle": 30, "future": 20 }`, whole percents
+  that add up to 100); 50/30/20 when absent.
+- Edits, through `POST /api/edits`: `setCategoryGroups` (`groups:
+  [{ categoryId, group }]`, all or none, expense categories only; also the
+  undo of "Organizar categorias"), `setSubcategoryGroup` (`id`, `group`) and
+  `setBalanceTarget` (`target`). Read with the snapshot (`categories`,
+  `subcategories`, `balanceTarget`). Syncs never touch them.
+- The split itself is computed in the app from the stored transactions:
+  the income is the average income's filter, the spending the expenses that
+  count everywhere else (no hidden ones, transfers or bill payments;
+  installments in the month they're charged). Futuro = income − Essencial −
+  Estilo de vida; "Sem grupo" sits inside it until classified.
 
 ## Reads
 
