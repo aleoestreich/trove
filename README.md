@@ -133,7 +133,10 @@ between accounts, and card bill payments.
   guesses a category for them again.
 - **Average income** (Overview) averages the last 6 complete months of
   income in the categories chosen on its card (all by default; the choice is
-  saved in the database and shared between devices).
+  saved in the database and shared between devices). It is the app's one
+  reference income: the Equilíbrio do mês measures the month in progress
+  against it too. The month-end projection forecasts the salary itself (its
+  usual paydays and amount), since it needs to know when money comes in.
 - **13º e férias** (`#/extra-pay`, off by default, only for CLT jobs):
   when turned on, the month-end projection expects the 13º in two parts
   (the 1st by 30 November, an earlier month or with the vacation pay; the

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit, defaultCategories, EditError, validateEdit } from './edits'
-import { NO_FILTER } from './incomeAverage'
+import { NO_FILTER, incomeAverage } from './incomeAverage'
 import { DEFAULT_TARGET, reservedShares, withReserve, expectedCharges, expectedIncome, balanceStatus, hasGroups, isTarget, monthBalance, monthBalances, roundedShares, suggestGroup, worstDeviation } from './spendingBalance'
 import type { Category, Snapshot, Subcategory, Transaction } from './types'
 import type { InstallmentPlan } from '../lib/installments'
@@ -100,6 +100,13 @@ describe('Equilíbrio do mês', () => {
     expect(monthBalance(history, categories, subcategories, NO_FILTER, '2026-10').income).toBe(4_000_00)
     // No history: nothing expected.
     expect(expectedIncome([tx('only', '2026-10-02', -100_00)], categories, subcategories, NO_FILTER, '2026-10')).toBe(0)
+  })
+
+  it('expects Renda média itself: the last 6 complete months, not 3', () => {
+    // R$ 6.000 a month from April to June, then R$ 12.000 from July to September.
+    const history = ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'].map((m, i) => tx(`sal-${m}`, `${m}-28`, (i < 3 ? 6_000 : 12_000) * 100, { categoryId: 'salary' }))
+    expect(expectedIncome(history, categories, subcategories, NO_FILTER, '2026-10')).toBe(9_000_00)
+    expect(expectedIncome(history, categories, subcategories, NO_FILTER, '2026-10')).toBe(incomeAverage(history, categories, subcategories, NO_FILTER, '2026-10')!.average)
   })
 
   it('expects only the income Renda média counts: its filter leaves the rest out', () => {

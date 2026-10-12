@@ -1911,7 +1911,7 @@ export const messages: Messages = {
       legendOver: 'Acima da renda',
       base: (income) => `Sobre ${income} de renda`,
       baseExpected: (income) => `Sobre ${income} de renda prevista`,
-      expectedNote: (received) => `Média dos últimos 3 meses; já entraram ${received}.`,
+      expectedNote: (received) => `Sua renda média (últimos 6 meses); já entraram ${received}.`,
       baseAll: 'Toda a renda do mês.',
       baseNote: (included, excluded) => (excluded ? `${included}. ${excluded} ficam fora.` : `${included}.`),
       change: 'Alterar',

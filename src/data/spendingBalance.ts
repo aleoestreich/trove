@@ -8,9 +8,9 @@
 //   category; otherwise it follows it.
 // - Income: the month's income under the average income's filter (the same
 //   "renda" as Renda média). For the month in progress it's the income
-//   expected: the average of the last 3 complete months (or what already
-//   came in, when that's more), since some income only arrives at the end
-//   of the month.
+//   expected: Renda média itself, the average of the last 6 complete months
+//   (or what already came in, when that's more), since some income only
+//   arrives at the end of the month.
 // - Spending: expenses (kindOf), not hidden, so own transfers and card bill
 //   payments never count, refunds reduce them, and an installment counts in
 //   the month it's charged. Uncategorized expenses and those of a category
@@ -29,7 +29,7 @@
 //   income not spent yet.
 
 import { kindOf } from './categories.js'
-import { incomeByMonth } from './incomeAverage.js'
+import { incomeAverage, incomeByMonth } from './incomeAverage.js'
 import { daysInMonth, lastMonths, monthKey } from '../lib/dates.js'
 import type { BalanceTarget, Category, Cents, IncomeFilter, SpendingGroup, Subcategory, Transaction } from './types.js'
 import type { InstallmentPlan } from '../lib/installments.js'
@@ -132,7 +132,7 @@ export interface MonthBalance {
   income: Cents
   /** What came in during the month (so far). */
   received: Cents
-  /** The month in progress: the income expected (average of the last 3 complete months); null for other months. */
+  /** The month in progress: the income expected (Renda média: the average of the last 6 complete months); null for other months. */
   expected: Cents | null
   essential: Cents
   lifestyle: Cents
@@ -164,21 +164,13 @@ export function bucketOf(t: Pick<Transaction, 'categoryId' | 'subcategoryId'>, c
   return category.group ?? 'ungrouped'
 }
 
-/** Complete months averaged for the income expected in the month in progress. */
-export const EXPECTED_INCOME_MONTHS = 3
-
 /**
- * The income expected in `month`: the average of up to 3 complete months
- * before it (from the first month with any data); 0 without any.
+ * The income expected in `month`: Renda média under the same filter (the
+ * average of up to 6 complete months before it, from the first month with
+ * any data), so the app has one reference income; 0 without any.
  */
 export function expectedIncome(transactions: Transaction[], categories: Category[], subcategories: Subcategory[], filter: IncomeFilter, month: string): Cents {
-  const first = transactions.reduce((min, t) => (!t.hidden && t.date < min ? t.date : min), '9999-12')
-  const before = lastMonths(month, EXPECTED_INCOME_MONTHS + 1)
-    .slice(0, -1)
-    .filter((m) => m >= monthKey(first))
-  if (!before.length) return 0
-  const totals = incomeByMonth(transactions, categories, subcategories, filter, before).map((m) => m.total)
-  return Math.round(totals.reduce((s, x) => s + x, 0) / totals.length)
+  return incomeAverage(transactions, categories, subcategories, filter, month)?.average ?? 0
 }
 
 /**
