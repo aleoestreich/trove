@@ -100,6 +100,23 @@ describe('Equilíbrio do mês', () => {
     expect(expectedIncome([tx('only', '2026-10-02', -100_00)], categories, subcategories, NO_FILTER, '2026-10')).toBe(0)
   })
 
+  it('expects only the income Renda média counts: its filter leaves the rest out', () => {
+    const salarySubs = subcategories.filter((x) => x.categoryId === 'salary')
+    const months = ['2026-07', '2026-08', '2026-09']
+    const history = months.flatMap((m) => [
+      tx(`base-${m}`, `${m}-30`, 10_000_00, { categoryId: 'salary', subcategoryId: salarySubs[0].id }),
+      tx(`extra-${m}`, `${m}-20`, 1_000_00, { categoryId: 'salary', subcategoryId: salarySubs[1].id }),
+      tx(`free-${m}`, `${m}-10`, 3_000_00, { categoryId: 'freelance' }),
+      tx(`pix-${m}`, `${m}-12`, 500_00),
+    ])
+    const filter = { excludedCategoryIds: ['freelance'], excludedSubcategoryIds: [salarySubs[1].id], excludeUncategorized: true }
+    expect(expectedIncome(history, categories, subcategories, NO_FILTER, '2026-10')).toBe(14_500_00)
+    expect(expectedIncome(history, categories, subcategories, filter, '2026-10')).toBe(10_000_00)
+    // What came in this month is filtered the same way.
+    const october = [...history, tx('oct-free', '2026-10-05', 3_000_00, { categoryId: 'freelance' })]
+    expect(monthBalance(october, categories, subcategories, filter, '2026-10', '2026-10-16')).toMatchObject({ income: 10_000_00, received: 0, expected: 10_000_00 })
+  })
+
   it('tells each state apart', () => {
     const today = '2026-10-12'
     expect(balanceStatus(balance(), DEFAULT_TARGET, today)).toEqual({ kind: 'attention', worst: { group: 'essential', points: 6 } })
