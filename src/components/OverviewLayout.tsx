@@ -37,7 +37,7 @@ export function CustomizeButton({ onClick, compact = false }: { onClick(): void;
 export function OverviewLayoutSheet({ onClose }: { onClose(): void }) {
   const { t } = useI18n()
   const l = t.overview.layout
-  const { overviewLayout, saveOverviewLayout } = useData()
+  const { overviewLayout, saveOverviewLayout, extraPay } = useData()
   const [layout, setLayout] = useState(overviewLayout)
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -120,7 +120,11 @@ export function OverviewLayoutSheet({ onClose }: { onClose(): void }) {
                 </span>
                 <span className="flex min-w-0 flex-col">
                   <span className={`text-[15px] leading-5 break-words ${hidden ? 'text-muted' : 'text-ink'}`}>{name}</span>
-                  {hidden && <span className="text-xs leading-4 text-muted">{l.hiddenTag}</span>}
+                  {hidden ? (
+                    <span className="text-xs leading-4 text-muted">{l.hiddenTag}</span>
+                  ) : (
+                    x === 'extraPay' && !extraPay.enabled && <span className="text-xs leading-4 text-muted">{l.extraPayOff}</span>
+                  )}
                 </span>
               </button>
               <MoveButton icon="arrowUp" label={l.moveUp(name)} disabled={i === 0} onClick={() => change(moveSection(layout, x, -1))} />

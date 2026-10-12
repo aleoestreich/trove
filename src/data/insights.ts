@@ -14,7 +14,7 @@ export interface Insights {
 }
 
 /** Everything as of `today` (ISO date). `snapshot.transactions` should hold MONTHS_OF_ANALYSIS months. */
-export function computeInsights(s: Pick<Snapshot, 'accounts' | 'transactions' | 'categories' | 'projectionSettings' | 'recurringOverrides'>, today: string): Insights {
+export function computeInsights(s: Pick<Snapshot, 'accounts' | 'transactions' | 'categories' | 'projectionSettings' | 'recurringOverrides' | 'extraPay'>, today: string): Insights {
   const recurring = detectRecurring(s.transactions, s.accounts, s.categories, s.recurringOverrides ?? {}, today)
   return {
     recurring,
@@ -25,6 +25,7 @@ export function computeInsights(s: Pick<Snapshot, 'accounts' | 'transactions' | 
       categories: s.categories,
       settings: s.projectionSettings ?? DEFAULT_PROJECTION_SETTINGS,
       recurring: [...recurring.active, ...recurring.stopped],
+      extraPay: s.extraPay,
       today,
     }),
   }

@@ -12,6 +12,7 @@ export const OVERVIEW_SECTIONS: readonly OverviewSection[] = [
   'netWorth',
   'balance',
   'projection',
+  'extraPay',
   'unusual',
   'recurring',
   'whereMoney',

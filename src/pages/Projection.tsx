@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useData } from '../state'
 import { useI18n } from '../i18n/I18nProvider'
 import { Card } from '../components/ui'
@@ -202,7 +203,7 @@ function EventsCard({ projection }: { projection: ProjectionData }) {
 /** "O que entra no cálculo": the accounts (a picker) and two switches; every change recalculates at once. */
 function SettingsCard() {
   const { t } = useI18n()
-  const { accounts, institutions, projectionSettings, saveProjectionSettings } = useData()
+  const { accounts, institutions, projectionSettings, saveProjectionSettings, extraPay } = useData()
   const p = t.insights.projection
   const settings = projectionSettings ?? DEFAULT_PROJECTION_SETTINGS
   const chosen = projectionAccounts(accounts, settings)
@@ -232,6 +233,13 @@ function SettingsCard() {
         checked={settings.includeFreelance}
         onChange={(v) => saveProjectionSettings({ ...settings, includeFreelance: v })}
       />
+      <Link to="/extra-pay" className="flex min-h-16 items-center gap-3 border-t border-line py-2 text-left">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-sm leading-[19px] font-medium text-ink">{p.extraPayLabel}</span>
+          <span className="text-xs leading-4 text-muted">{p.extraPayNote(extraPay.enabled)}</span>
+        </span>
+        <Icon name="chevronRight" className="size-5 shrink-0 text-ink-2" strokeWidth={2} />
+      </Link>
       {picking && (
         <AccountPicker
           chosen={chosen}

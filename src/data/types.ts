@@ -104,11 +104,32 @@ export interface BalanceTarget {
   future: number
 }
 
+/** A planned vacation period (CLT): first day off, days off, and whether 10 days are sold (abono pecuniário). */
+export interface Vacation {
+  id: string
+  start: string
+  days: number
+  sold: boolean
+}
+
+/** "13º e férias", for CLT jobs (src/data/extraPay.ts). */
+export interface ExtraPay {
+  /** Off by default: only for CLT (carteira assinada). */
+  enabled: boolean
+  /** The net monthly salary the estimates use; null: the salary Trove detects. */
+  salary: Cents | null
+  /** The month (2–11) the 13º's 1st part comes in, or with the vacation pay. */
+  firstPart: number | 'vacation'
+  /** Planned vacations, by start date. */
+  vacations: Vacation[]
+}
+
 /** A card of the Visão geral. */
 export type OverviewSection =
   | 'netWorth'
   | 'balance'
   | 'projection'
+  | 'extraPay'
   | 'unusual'
   | 'recurring'
   | 'whereMoney'
@@ -210,6 +231,8 @@ export interface Snapshot {
   balanceTarget?: BalanceTarget
   /** The Visão geral's order and hidden cards (the default when absent). */
   overviewLayout?: OverviewLayout
+  /** "13º e férias" (off when absent). */
+  extraPay?: ExtraPay
 }
 
 /** What the month-end projection counts. */

@@ -5,6 +5,7 @@ import { useData, useSync } from '../state'
 import type { OverviewSection, Transaction } from '../data/types'
 import { fillRows, isDefaultLayout, shownSections } from '../data/overviewLayout'
 import { CustomizeButton, OverviewLayoutSheet } from '../components/OverviewLayout'
+import { ExtraPayCard } from '../components/ExtraPay'
 import { balances, expensesByCategory, inMonth, totals, visible } from '../lib/summary'
 import { incomeAverage, NO_FILTER } from '../data/incomeAverage'
 import { CategoryBadge, catVar } from '../components/CategoryBadge'
@@ -38,6 +39,7 @@ const DESKTOP_SPAN: Record<OverviewSection | 'trend', number> = {
   netWorth: 8,
   comingUp: 4,
   projection: 7,
+  extraPay: 12,
   unusual: 5,
   balance: 12,
   recurring: 12,
@@ -52,7 +54,7 @@ const DESKTOP_SPAN: Record<OverviewSection | 'trend', number> = {
 const CURRENCY_COLORS: Record<string, string> = { BRL: 'var(--series-1)', USD: 'var(--series-3)', EUR: 'var(--series-4)' }
 
 export function Dashboard() {
-  const { accounts, transactions, allTransactions, categories, subcategories, incomeFilter, categoriesById, institutionsById, insights, storedMonths, loadedFrom, overviewLayout } = useData()
+  const { accounts, transactions, allTransactions, categories, subcategories, incomeFilter, categoriesById, institutionsById, insights, storedMonths, loadedFrom, overviewLayout, extraPay } = useData()
   const isDesktop = useIsDesktop()
   const [params, setParams] = useSearchParams()
   const { t, categoryName } = useI18n()
@@ -160,6 +162,8 @@ export function Dashboard() {
     balance: <BalanceCard />,
     // Insights: month-end projection, unusual categories, recurring charges (desktop: right below net worth)
     projection: <ProjectionCard projection={insights.projection} />,
+    // 13º e férias (CLT): only when turned on
+    extraPay: <ExtraPayCard />,
     unusual: <UnusualCard unusual={insights.unusual} />,
     recurring: <RecurringCard summary={insights.recurring} />,
     whereMoney: (
@@ -421,7 +425,7 @@ export function Dashboard() {
     </>
   )
   // Cards with nothing to show yet (no comparison, no complete month of income) take no place.
-  const shown = shownSections(overviewLayout).filter((x) => (x === 'unusual' ? !!insights.unusual : x === 'averageIncome' ? !!avgIncome : true))
+  const shown = shownSections(overviewLayout).filter((x) => (x === 'unusual' ? !!insights.unusual : x === 'averageIncome' ? !!avgIncome : x === 'extraPay' ? extraPay.enabled : true))
   const firstTrend = shown.find((x) => x === 'incomeVsExpenses' || x === 'spendingByCategory')
   // A custom layout on desktop: the cards (and the period above the charts) in its order, rows filled.
   const custom = !isDefaultLayout(overviewLayout)

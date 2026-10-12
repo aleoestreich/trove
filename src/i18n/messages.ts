@@ -294,6 +294,8 @@ export interface Messages {
       moveDown: (name: string) => string
       show: (name: string) => string
       hiddenTag: string
+      /** Under "13º e férias" while it's turned off. */
+      extraPayOff: string
       shownCount: (n: number, total: number) => string
       reset: string
       cancel: string
@@ -550,6 +552,61 @@ export interface Messages {
     nothingSelected: string
     notIncome: string
     http: (status: number) => string
+  }
+  /** "13º e férias": a CLT job's extra pay, off by default (src/data/extraPay.ts). */
+  extraPay: {
+    title: string
+    sub: string
+    switchLabel: string
+    switchNote: string
+    offText: string
+    nextTitle: string
+    nextSub: string
+    nextNone: string
+    total: (amount: string) => string
+    thirteenth: (part: 1 | 2) => string
+    thirteenthMeta: (part: 1 | 2) => string
+    vacation: (from: string, to: string) => string
+    vacationMeta: (days: number, sold: boolean) => string
+    salaryCut: (month: string) => string
+    salaryCutMeta: (days: number) => string
+    vacationsTitle: string
+    vacationsNone: string
+    vacationRange: (from: string, to: string) => string
+    vacationDays: (days: number, sold: boolean) => string
+    vacationPast: string
+    add: string
+    edit: (range: string) => string
+    howTitle: string
+    salaryLabel: string
+    salaryDetected: (amount: string) => string
+    salarySet: (amount: string) => string
+    salaryMissing: string
+    firstPartLabel: string
+    firstPartValue: (month: string | null) => string
+    note: string
+    salarySheet: { title: string; sub: string; field: string; hint: (detected: string | null) => string; invalid: string; useDetected: string; save: string; cancel: string }
+    firstPartSheet: { title: string; sub: string; withVacation: string; withVacationNote: string; byDay: (month: string) => string; apply: string }
+    vacationSheet: {
+      addTitle: string
+      editTitle: string
+      start: string
+      startHint: string
+      days: string
+      daysNote: (back: string) => string
+      fewer: string
+      more: string
+      sold: string
+      soldNote: string
+      preview: (date: string, amount: string) => string
+      save: string
+      cancel: string
+      remove: string
+      removeConfirm: string
+      invalidDate: string
+    }
+    failed: string
+    card: { title: string; next: (what: string, date: string) => string; none: string; cut: (month: string, amount: string) => string; open: string; noSalary: string }
   }
   spendingBalance: {
     title: string
@@ -844,9 +901,16 @@ export interface Messages {
         salary: string
         freelance: string
         estimated: string
+        thirteenth: (part: 1 | 2) => string
+        thirteenthMeta: string
+        vacation: string
+        vacationMeta: (days: number, sold: boolean) => string
       }
       methods: { card: string; debit: string; pix: string; boleto: string }
       settingsTitle: string
+      /** The row that opens "13º e férias", with its state. */
+      extraPayLabel: string
+      extraPayNote: (on: boolean) => string
       accountsLabel: string
       accountsDefault: string
       dailyLabel: string
@@ -1231,12 +1295,14 @@ export const messages: Messages = {
         incomeVsExpenses: 'Receitas vs. despesas',
         spendingByCategory: 'Gastos por categoria',
         averageIncome: 'Renda média',
+        extraPay: '13º e férias',
         monthInDetail: 'Mês em detalhe',
       },
       moveUp: (name) => `Subir ${name}`,
       moveDown: (name) => `Descer ${name}`,
       show: (name) => `Mostrar ${name}`,
       hiddenTag: 'Oculto',
+      extraPayOff: 'Aparece quando 13º e férias está ligado',
       shownCount: (n, total) => `${n} de ${total} visíveis`,
       reset: 'Restaurar padrão',
       cancel: 'Cancelar',
@@ -1480,6 +1546,83 @@ export const messages: Messages = {
     nothingSelected: 'Selecione pelo menos uma categoria',
     notIncome: 'Só categorias de receita entram na renda média.',
     http: (status) => `A requisição falhou (HTTP ${status}).`,
+  },
+  extraPay: {
+    title: '13º e férias',
+    sub: 'Para quem trabalha com carteira assinada (CLT)',
+    switchLabel: 'Trabalho com carteira assinada (CLT)',
+    switchNote: 'Ligado, a previsão do fim do mês conta o 13º, as férias e o salário menor no mês das férias. Desligado, nada muda.',
+    offText: 'Sem carteira assinada (PJ, autônomo, freelance), deixe desligado: nada muda nas previsões.',
+    nextTitle: 'Próximos 12 meses',
+    nextSub: 'Estimativas a partir do salário líquido',
+    nextNone: 'Nada previsto nos próximos 12 meses.',
+    total: (amount) => `${amount} a mais no período`,
+    thirteenth: (part) => `13º salário · ${part}ª parcela`,
+    thirteenthMeta: (part) => (part === 1 ? 'Metade do salário, sem descontos' : 'O resto, com INSS e IR do 13º; costuma vir um pouco menor'),
+    vacation: (from, to) => `Férias de ${from} a ${to}`,
+    vacationMeta: (days, sold) => (sold ? `${days} dias + 10 vendidos, com 1/3 · 2 dias antes` : `${days} dias com 1/3 · 2 dias antes`),
+    salaryCut: (month) => `Salário de ${month} menor`,
+    salaryCutMeta: (days) => `${days} ${days === 1 ? 'dia de férias já pago' : 'dias de férias já pagos'} antes`,
+    vacationsTitle: 'Férias planejadas',
+    vacationsNone: 'Nenhuma férias marcada. Adicione as datas assim que forem combinadas.',
+    vacationRange: (from, to) => `${from} a ${to}`,
+    vacationDays: (days, sold) => (sold ? `${days} dias · 10 vendidos` : `${days} dias`),
+    vacationPast: 'Já passou',
+    add: 'Adicionar férias',
+    edit: (range) => `Editar férias de ${range}`,
+    howTitle: 'Como calcular',
+    salaryLabel: 'Salário líquido por mês',
+    salaryDetected: (amount) => `${amount} · média do Trove`,
+    salarySet: (amount) => `${amount} · informado`,
+    salaryMissing: 'Informe o salário: ainda não há histórico',
+    firstPartLabel: '1ª parcela do 13º',
+    firstPartValue: (month) => (month ? `Até o dia 30 de ${month}` : 'Junto com as férias'),
+    note: 'O 13º vem em duas parcelas: a 1ª até 30 de novembro (ou antes) e a 2ª até 20 de dezembro. As férias são pagas 2 dias antes de começar, com 1/3 a mais, e o salário do mês vem menor pelos dias de férias. Dia sem expediente bancário antecipa o pagamento.',
+    salarySheet: {
+      title: 'Salário líquido por mês',
+      sub: 'O que cai na conta num mês normal, sem 13º e férias.',
+      field: 'Salário líquido',
+      hint: (detected) => (detected ? `O Trove calcula ${detected} pelo histórico.` : 'Ainda não há histórico de salário.'),
+      invalid: 'Informe um valor maior que zero.',
+      useDetected: 'Usar a média do Trove',
+      save: 'Salvar',
+      cancel: 'Cancelar',
+    },
+    firstPartSheet: {
+      title: '1ª parcela do 13º',
+      sub: 'Quando a empresa costuma pagar.',
+      withVacation: 'Junto com as férias',
+      withVacationNote: 'Se houver férias de janeiro a novembro; senão, em novembro',
+      byDay: (month) => `Até o dia 30 de ${month}`,
+      apply: 'Aplicar',
+    },
+    vacationSheet: {
+      addTitle: 'Adicionar férias',
+      editTitle: 'Editar férias',
+      start: 'Primeiro dia de férias',
+      startHint: 'O pagamento vem 2 dias antes.',
+      days: 'Dias de férias',
+      daysNote: (back) => `Volta ao trabalho em ${back}`,
+      fewer: 'Menos um dia',
+      more: 'Mais um dia',
+      sold: 'Vender 10 dias (abono)',
+      soldNote: 'Recebe 10 dias a mais com 1/3; até 20 dias de descanso.',
+      preview: (date, amount) => `Pagamento em ${date} · cerca de ${amount}`,
+      save: 'Salvar',
+      cancel: 'Cancelar',
+      remove: 'Excluir',
+      removeConfirm: 'Excluir estas férias?',
+      invalidDate: 'Informe uma data válida.',
+    },
+    failed: 'Não foi possível salvar. Tente de novo.',
+    card: {
+      title: '13º e férias',
+      next: (what, date) => `${what} · ${date}`,
+      none: 'Nada previsto nos próximos 12 meses.',
+      cut: (month, amount) => `Salário de ${month} menor em ${amount}`,
+      open: 'Ver detalhes',
+      noSalary: 'Informe o salário líquido para estimar os valores.',
+    },
   },
   spendingBalance: {
     title: 'Equilíbrio do mês',
@@ -1838,6 +1981,10 @@ export const messages: Messages = {
         recurringMeta: (method) => `Recorrente · ${method}`,
         salary: 'Salário',
         freelance: 'Freelance',
+        thirteenth: (part) => `13º salário · ${part}ª parcela`,
+        thirteenthMeta: 'Estimativa a partir do salário',
+        vacation: 'Férias',
+        vacationMeta: (days, sold) => `${days} dias + 1/3${sold ? ' · 10 dias vendidos' : ''} · estimativa`,
         estimated: 'Estimado · média de 6 meses',
       },
       methods: { card: 'cartão', debit: 'débito', pix: 'Pix', boleto: 'boleto' },
@@ -1848,6 +1995,8 @@ export const messages: Messages = {
       dailyNote: 'Estimativa do que sai no débito e Pix fora das recorrentes',
       freelanceLabel: 'Incluir freelance',
       freelanceNote: 'Renda que varia muito; fica de fora por padrão',
+      extraPayLabel: '13º e férias',
+      extraPayNote: (on) => (on ? 'Ligado · conta o 13º, as férias e o salário menor no mês delas' : 'Desligado · só para quem tem carteira assinada (CLT)'),
       accountsSheetNote: 'O saldo destas contas entra na previsão.',
       apply: 'Aplicar',
       atLeastOne: 'Escolha pelo menos uma conta.',

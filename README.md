@@ -121,6 +121,14 @@ between accounts, and card bill payments.
 - **Average income** (Overview) averages the last 6 complete months of
   income in the categories chosen on its card (all by default; the choice is
   saved in the database and shared between devices).
+- **13º e férias** (`#/extra-pay`, off by default, only for CLT jobs):
+  when turned on, the month-end projection expects the 13º in two parts
+  (the 1st by 30 November, an earlier month or with the vacation pay; the
+  2nd by 20 December), the vacation pay 2 days before each planned vacation
+  (days off plus a third, and 10 days sold when chosen), and a smaller
+  salary in the months with vacation days, already paid in advance. Amounts
+  are estimates from the net monthly salary (the projection's median month,
+  or one typed in). A card on the Overview lists the next payments.
 - **Overview layout:** "Personalizar" (the sliders icon in the phone
   header, a button next to the desktop title) moves each card up or down
   and hides the ones not wanted; "Restaurar padrão" brings back the default.

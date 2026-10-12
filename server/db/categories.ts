@@ -6,9 +6,10 @@ import { EditError, checkBulk, checkIncomeFilter, defaultCategories, type BulkRe
 import { NO_FILTER, pruneIncomeFilter } from '../../src/data/incomeAverage.js'
 import { DEFAULT_PROJECTION_SETTINGS } from '../../src/data/projection.js'
 import { applyRecurringAction } from '../../src/data/recurring.js'
-import type { BalanceTarget, Category, OverviewLayout, IncomeFilter, ProjectionSettings, RecurringOverride, SpendingGroup, Subcategory } from '../../src/data/types.js'
+import type { BalanceTarget, Category, ExtraPay, OverviewLayout, IncomeFilter, ProjectionSettings, RecurringOverride, SpendingGroup, Subcategory } from '../../src/data/types.js'
 import { DEFAULT_TARGET, isTarget } from '../../src/data/spendingBalance.js'
 import { DEFAULT_LAYOUT, normalizeLayout } from '../../src/data/overviewLayout.js'
+import { normalizeExtraPay } from '../../src/data/extraPay.js'
 import { inTransaction, type Db } from './connection.js'
 import { readSnapshot } from './read.js'
 import { sortFgts, type Fgts } from '../../src/data/fgts.js'
@@ -177,6 +178,14 @@ const OVERVIEW_LAYOUT_KEY = 'overview_layout'
 export async function readOverviewLayout(db: Db): Promise<OverviewLayout> {
   const r = await db.query<{ value: unknown }>(`SELECT value FROM app_settings WHERE key = $1`, [OVERVIEW_LAYOUT_KEY])
   return r.rows[0] ? normalizeLayout(r.rows[0].value) : DEFAULT_LAYOUT
+}
+
+/** "13º e férias", in app_settings under `extra_pay`. Nothing stored (or not valid): off. */
+const EXTRA_PAY_KEY = 'extra_pay'
+
+export async function readExtraPay(db: Db): Promise<ExtraPay> {
+  const r = await db.query<{ value: unknown }>(`SELECT value FROM app_settings WHERE key = $1`, [EXTRA_PAY_KEY])
+  return normalizeExtraPay(r.rows[0]?.value)
 }
 
 async function writeSetting(db: Db, key: string, value: unknown): Promise<void> {
@@ -397,6 +406,9 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
       return null
     case 'setOverviewLayout':
       await writeSetting(db, OVERVIEW_LAYOUT_KEY, e.layout)
+      return null
+    case 'setExtraPay':
+      await writeSetting(db, EXTRA_PAY_KEY, e.extraPay)
       return null
     case 'setCardDays':
       // Their own columns too; cards only, as in the app.

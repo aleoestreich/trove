@@ -8,7 +8,8 @@ import { applyCardDays, deviceCardDays, forgetDeviceCardDays, type CardDays } fr
 import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
 import { DEFAULT_TARGET } from './data/spendingBalance'
 import { DEFAULT_LAYOUT } from './data/overviewLayout'
-import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type BalanceTarget, type OverviewLayout, type SpendingGroup, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type SyncOptions, type Transaction } from './data/types'
+import { DEFAULT_EXTRA_PAY } from './data/extraPay'
+import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type BalanceTarget, type ExtraPay, type OverviewLayout, type SpendingGroup, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type SyncOptions, type Transaction } from './data/types'
 import { computeInsights, type Insights } from './data/insights'
 import type { TransactionQuery } from './data/transactionFilter'
 import type { RecurringAction } from './data/recurring'
@@ -87,6 +88,10 @@ interface AppData extends Snapshot {
   overviewLayout: OverviewLayout
   /** Saves the layout, server first; rejects with a message for the UI. */
   saveOverviewLayout(layout: OverviewLayout): Promise<void>
+  /** "13º e férias" (src/data/extraPay.ts), off by default; shared by every device. */
+  extraPay: ExtraPay
+  /** Saves it, server first; rejects with a message for the UI. */
+  saveExtraPay(extraPay: ExtraPay): Promise<void>
 }
 
 /** The previdência privada edits saved from its sheets. */
@@ -280,6 +285,12 @@ export function DataProvider({ repository, children }: { repository: Repository;
   const saveOverviewLayout = useCallback(
     async (layout: OverviewLayout) => {
       await save({ op: 'setOverviewLayout', layout })
+    },
+    [save],
+  )
+  const saveExtraPay = useCallback(
+    async (extraPay: ExtraPay) => {
+      await save({ op: 'setExtraPay', extraPay })
     },
     [save],
   )
@@ -485,8 +496,10 @@ export function DataProvider({ repository, children }: { repository: Repository;
       saveSubcategoryGroup,
       overviewLayout: snapshot.overviewLayout ?? DEFAULT_LAYOUT,
       saveOverviewLayout,
+      extraPay: snapshot.extraPay ?? DEFAULT_EXTRA_PAY,
+      saveExtraPay,
     }
-  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, setFgtsTracking, saveFgts, setPensionTracking, savePension, saveBalanceTarget, saveCategoryGroups, saveSubcategoryGroup, saveOverviewLayout, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
+  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, setFgtsTracking, saveFgts, setPensionTracking, savePension, saveBalanceTarget, saveCategoryGroups, saveSubcategoryGroup, saveOverviewLayout, saveExtraPay, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

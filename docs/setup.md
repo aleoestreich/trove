@@ -139,6 +139,8 @@ Follow [pluggy-setup.md](pluggy-setup.md) steps 1–4:
      hide anything Pluggy guessed wrong (a sync never undoes it).
    - **Visão geral → Equilíbrio do mês → Organizar categorias:** put the
      expense categories in Essencial or Estilo de vida.
+   - **Previsão do fim do mês → 13º e férias**, only with a CLT job:
+     turn it on and add the planned vacations.
    - **Visão geral → Personalizar** (the sliders icon on phones): the
      order of the cards and which ones show, shared by every device.
    - **Contas:** FGTS and previdência privada balances can be tracked by

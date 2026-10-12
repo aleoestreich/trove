@@ -241,7 +241,7 @@ CREATE TABLE IF NOT EXISTS webhook_events (
 
 -- Small app-wide values: when categories were seeded, when everything last synced,
 -- and settings such as the "Equilíbrio do mês" target ('balance_target') and the
--- Visão geral's order and hidden cards ('overview_layout').
+-- Visão geral's order and hidden cards ('overview_layout'), and "13º e férias" ('extra_pay').
 CREATE TABLE IF NOT EXISTS app_settings (
   key         text PRIMARY KEY,
   value       jsonb NOT NULL,

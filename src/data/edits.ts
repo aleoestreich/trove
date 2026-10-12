@@ -11,7 +11,8 @@ import { FGTS_MAX, NO_FGTS, sortFgts, type FgtsEntry } from './fgts.js'
 import { NO_PENSION, PENSION_MAX, PLAN_NAME_MAX, PLAN_TYPES, sortPensionEntries, type Pension, type PlanType } from './pension.js'
 import { SPENDING_GROUPS, isTarget } from './spendingBalance.js'
 import { isLayout, normalizeLayout } from './overviewLayout.js'
-import type { BalanceTarget, Category, OverviewLayout, CategoryType, IncomeFilter, ProjectionHorizon, ProjectionSettings, Snapshot, SpendingGroup, Subcategory, TransferOverride } from './types.js'
+import { isExtraPay, normalizeExtraPay } from './extraPay.js'
+import type { BalanceTarget, Category, ExtraPay, OverviewLayout, CategoryType, IncomeFilter, ProjectionHorizon, ProjectionSettings, Snapshot, SpendingGroup, Subcategory, TransferOverride } from './types.js'
 
 export type Edit =
   /** Sets a transaction's category and subcategory (null: uncategorized / none). */
@@ -74,6 +75,8 @@ export type Edit =
   | { op: 'setBalanceTarget'; target: BalanceTarget }
   /** The Visão geral's order and hidden cards (every card listed once in `order`). */
   | { op: 'setOverviewLayout'; layout: OverviewLayout }
+  /** "13º e férias": on or off, the salary, the 13º's 1st part and the planned vacations. */
+  | { op: 'setExtraPay'; extraPay: ExtraPay }
 
 /** A transaction's category before a bulk change. `editedAt`: when it was last set by hand (server only). */
 export interface PreviousCategory {
@@ -290,6 +293,10 @@ export function validateEdit(e: unknown): Edit {
       const t = x.target as BalanceTarget
       return { op: 'setBalanceTarget', target: { essential: t.essential, lifestyle: t.lifestyle, future: t.future } }
     }
+    case 'setExtraPay': {
+      if (!isExtraPay(x.extraPay)) bad('extraPay')
+      return { op: 'setExtraPay', extraPay: normalizeExtraPay(x.extraPay) }
+    }
     case 'setOverviewLayout': {
       if (!isLayout(x.layout)) bad('layout')
       return { op: 'setOverviewLayout', layout: normalizeLayout(x.layout) }
@@ -467,6 +474,8 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
       return { ...s, balanceTarget: e.target }
     case 'setOverviewLayout':
       return { ...s, overviewLayout: e.layout }
+    case 'setExtraPay':
+      return { ...s, extraPay: e.extraPay }
     case 'setCardDays': {
       if (!s.accounts.some((a) => a.id === e.accountId && a.type === 'CREDIT')) fail('not_found', 'card')
       const { [e.accountId]: _old, ...others } = s.cardDays ?? {}

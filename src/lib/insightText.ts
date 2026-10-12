@@ -45,6 +45,10 @@ export function describeEvent(e: ProjectionEvent, accounts: Account[], instituti
       return { name: p.event.salary, meta: p.event.estimated }
     case 'freelance':
       return { name: p.event.freelance, meta: p.event.estimated }
+    case 'thirteenth':
+      return { name: p.event.thirteenth(e.part), meta: p.event.thirteenthMeta }
+    case 'vacation':
+      return { name: p.event.vacation, meta: p.event.vacationMeta(e.days, e.sold) }
   }
 }
 

@@ -28,6 +28,12 @@
 //   last 3 complete months, without recurring charges, transfers, bill
 //   payments and hidden transactions, times the days left (when turned on).
 //
+// - 13º e férias (CLT, when turned on, src/data/extraPay.ts): the 13º's
+//   parts and the vacation pay due before the end count as income, and a
+//   month's salary is smaller by its vacation days (paid in advance). The
+//   salary's average is then the median month, so a past month with 13º or
+//   vacation pay in it doesn't raise it.
+//
 // Each value is counted once. The daily series is the real balance up to
 // today, then the day-to-day spending each day plus each dated event. The
 // range widens to the salary's standard deviation plus 20% of the
@@ -39,7 +45,8 @@ import { addDays, addMonths, daysFrom, daysInMonth, fromISO, lastMonths, monthKe
 import { businessDayOnOrBefore } from '../lib/holidays.js'
 import { kindOf } from './categories.js'
 import { merchantKey, type PaymentMethod, type RecurringItem } from './recurring.js'
-import type { Account, Category, Cents, ProjectionSettings, Transaction } from './types.js'
+import { extraPayments, salaryCut } from './extraPay.js'
+import type { Account, Category, Cents, ExtraPay, ProjectionSettings, Transaction } from './types.js'
 
 export const DEFAULT_PROJECTION_SETTINGS: ProjectionSettings = { accountIds: null, includeDaily: true, includeFreelance: false, horizon: 'month' }
 
@@ -55,6 +62,8 @@ export type ProjectionEvent =
   | { date: string; kind: 'bill'; accountId: string; amount: Cents; installments: Cents; /** The cycle is still open: the card's recent average. */ estimated?: boolean }
   | { date: string; kind: 'recurring'; recurringId: string; name: string; paymentMethod: PaymentMethod; amount: Cents }
   | { date: string; kind: 'salary' | 'freelance'; amount: Cents }
+  | { date: string; kind: 'thirteenth'; part: 1 | 2; amount: Cents }
+  | { date: string; kind: 'vacation'; days: number; sold: boolean; amount: Cents }
 
 export interface ProjectionPoint {
   day: string
@@ -90,6 +99,8 @@ export interface Projection {
   dailyAverage: Cents
   /** The salary's monthly average and the days it usually comes in, in this month (one per payment). */
   salary: { average: Cents; days: number[] }
+  /** With 13º e férias on: the monthly salary its estimates use (set by hand, or the average). */
+  extraPaySalary: Cents | null
   settings: ProjectionSettings
 }
 
@@ -209,7 +220,7 @@ const paydayIn = (p: Payday, month: string) => {
 }
 
 /** A category's income into the chosen accounts: average, pay schedule, and what came in this month. */
-function expectedIncome(txs: Transaction[], categoryId: string | undefined, accounts: Set<string>, months: string[], current: string): Expected {
+function expectedIncome(txs: Transaction[], categoryId: string | undefined, accounts: Set<string>, months: string[], current: string, useMedian = false): Expected {
   const mine = categoryId ? txs.filter((t) => t.categoryId === categoryId && t.amount > 0 && !t.hidden && !t.transfer && accounts.has(t.accountId)) : []
   const byMonth = new Map<string, Transaction[]>()
   for (const t of mine) {
@@ -218,7 +229,7 @@ function expectedIncome(txs: Transaction[], categoryId: string | undefined, acco
   }
   const total = (m: string) => (byMonth.get(m) ?? []).reduce((s, t) => s + t.amount, 0)
   const totals = months.map(total)
-  const average = totals.length ? Math.round(totals.reduce((s, x) => s + x, 0) / totals.length) : 0
+  const average = !totals.length ? 0 : useMedian ? Math.round(median(totals)!) : Math.round(totals.reduce((s, x) => s + x, 0) / totals.length)
   const withIt = months.filter((m) => byMonth.has(m))
   return { average, schedule: paySchedule(byMonth, withIt.slice(-SALARY_DAY_MONTHS)), totals, monthsWith: withIt.length, received: total(current) }
 }
@@ -253,9 +264,12 @@ export function monthEndProjection(input: {
   settings?: ProjectionSettings
   /** Detected recurring charges (src/data/recurring.ts), active and stopped. */
   recurring: RecurringItem[]
+  /** "13º e férias" (off when absent). */
+  extraPay?: ExtraPay
   today: string
 }): Projection | null {
   const { accounts, transactions, categories, recurring, today } = input
+  const extraPay = input.extraPay?.enabled ? input.extraPay : null
   const settings = input.settings ?? DEFAULT_PROJECTION_SETTINGS
   const categoriesById = new Map(categories.map((c) => [c.id, c]))
   const accountIds = projectionAccounts(accounts, settings)
@@ -277,22 +291,35 @@ export function monthEndProjection(input: {
     .filter((m) => m >= monthKey(first))
 
   const salaryCategory = incomeCategory(categories, 'salary', 'salario')
-  const salary = expectedIncome(transactions, salaryCategory?.id, chosen, complete, current)
+  const salary = expectedIncome(transactions, salaryCategory?.id, chosen, complete, current, !!extraPay)
   if (salary.monthsWith < 2) return null
   const freelance = settings.includeFreelance
     ? expectedIncome(transactions, incomeCategory(categories, 'freelance', 'freelance')?.id, chosen, complete, current)
     : null
 
   const events: ProjectionEvent[] = []
+  // With 13º e férias: the salary its estimates use, and each month's salary less its vacation days.
+  const extraSalary = extraPay ? (extraPay.salary ?? salary.average) : null
+  const cut = (m: string) => (extraPay && extraSalary ? salaryCut(extraPay, extraSalary, m) : 0)
   const incomeEvent = (kind: 'salary' | 'freelance', e: Expected) => {
     // Nothing more comes in once the projection is over.
     if (daysLeft === 0) return
+    const less = (m: string) => (kind === 'salary' ? Math.max(0, e.average - cut(m)) : e.average)
     // This month: what hasn't come in yet; next month: all of it.
-    const payments = [...expectedPayments(e, current), ...(months.length > 1 ? expectedPayments({ ...e, received: 0 }, next) : [])]
+    const payments = [
+      ...expectedPayments({ ...e, average: less(current) }, current),
+      ...(months.length > 1 ? expectedPayments({ ...e, average: less(next), received: 0 }, next) : []),
+    ]
     for (const p of payments) events.push({ date: onOrAfterTomorrow(p.date), kind, amount: p.amount })
   }
   incomeEvent('salary', salary)
   if (freelance) incomeEvent('freelance', freelance)
+  // The 13º's parts and the vacation pay still to come (one due today counts as already in the balance).
+  if (extraPay && extraSalary && daysLeft > 0) {
+    for (const x of extraPayments(extraPay, extraSalary, tomorrow, endDate)) {
+      events.push(x.kind === 'thirteenth' ? { date: x.date, kind: 'thirteenth', part: x.part, amount: x.amount } : { date: x.date, kind: 'vacation', days: x.days, sold: x.sold, amount: x.amount })
+    }
+  }
 
   // Card bills due from today to the end, still to be paid.
   const todayDate = fromISO(today)
@@ -336,7 +363,7 @@ export function monthEndProjection(input: {
 
   const sum = (kind: ProjectionEvent['kind'][]) => events.filter((e) => kind.includes(e.kind)).reduce((s, e) => s + e.amount, 0)
   const saldoHoje = accounts.filter((a) => chosen.has(a.id)).reduce((s, a) => s + a.balance, 0)
-  const receitasPrevistas = sum(['salary', 'freelance'])
+  const receitasPrevistas = sum(['salary', 'freelance', 'thirteenth', 'vacation'])
   const faturas = -sum(['bill'])
   const recorrentes = -sum(['recurring'])
   const end = saldoHoje + receitasPrevistas - faturas - recorrentes - diaADia
@@ -391,6 +418,7 @@ export function monthEndProjection(input: {
     accountIds,
     dailyAverage,
     salary: { average: salary.average, days: salary.schedule.map((p) => Number(paydayIn(p, current).slice(8, 10))) },
+    extraPaySalary: extraSalary,
     settings,
   }
 }
