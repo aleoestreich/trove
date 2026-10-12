@@ -132,7 +132,10 @@ between accounts, and card bill payments.
   working day before) − card bills due this month − recurring
   charges paid by debit, Pix or boleto − the usual day-to-day spending. Each
   value is counted once: card installments and subscriptions are inside the
-  bills. The accounts, day-to-day spending and freelance income are settings
+  bills. "Este mês · Próximo mês" switches the end to the last day of next
+  month: its card bills (a bill still open counts at least the card's average
+  of its last 3), paydays and recurring charges join in. The accounts,
+  day-to-day spending, freelance income and that switch are settings
   saved in the database.
 - **Fora do padrão** compares each expense category with its own average:
   the last complete month vs the 6 before it, or, from day 11, the month so

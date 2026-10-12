@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSeed } from '../data/seed'
 import type { Account, Transaction } from '../data/types'
-import { currentBill, inBill, isIdleCard } from './bills'
+import { currentBill, inBill, isIdleCard, upcomingBills } from './bills'
 import { addMonths } from './dates'
 import { installmentPlans } from './installments'
 
@@ -173,5 +173,33 @@ describe('cards with nothing in the current or future cycles', () => {
 
   it('never hides bank accounts', () => {
     expect(isIdleCard({ ...card(null, null), type: 'BANK', subtype: 'CHECKING_ACCOUNT', balance: 0, creditData: undefined }, [], [], today)).toBe(false)
+  })
+})
+
+describe('upcoming bills', () => {
+  const card: Account = {
+    id: 'c',
+    institutionId: 'b',
+    name: 'Cartão',
+    type: 'CREDIT',
+    subtype: 'CREDIT_CARD',
+    balance: 0,
+    creditData: { creditLimit: 0, availableCreditLimit: 0, balanceCloseDate: '2026-10-22', balanceDueDate: '2026-11-01' },
+  }
+  const buy = (date: string, amount: number): Transaction => ({ id: date, accountId: 'c', date, description: 'LOJA EXEMPLO', amount, categoryId: null, status: 'POSTED' })
+  // Bills of R$ 1.000 closing on the 22nd of July, August and September; R$ 200 so far in the open one.
+  const txs = [buy('2026-07-10', -1_000_00), buy('2026-08-10', -1_000_00), buy('2026-09-10', -1_000_00), buy('2026-10-05', -200_00)]
+
+  it('estimates a bill still open from the last 3, and lists the ones due up to the date', () => {
+    const today = new Date('2026-10-12T12:00:00')
+    expect(upcomingBills(card, txs, [], today, '2026-10-31')).toEqual([])
+    const bills = upcomingBills(card, txs, [], today, '2026-12-01')
+    expect(bills.map((b) => [b.dueDate, b.amount, b.estimated])).toEqual([
+      ['2026-11-01', 1_000_00, true],
+      ['2026-12-01', 1_000_00, true],
+    ])
+    // More than the average so far: what's in it.
+    const big = upcomingBills(card, [...txs, buy('2026-10-06', -1_500_00)], [], today, '2026-11-30')
+    expect(big.map((b) => [b.dueDate, b.amount, b.estimated])).toEqual([['2026-11-01', 1_700_00, false]])
   })
 })

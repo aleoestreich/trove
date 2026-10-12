@@ -198,7 +198,11 @@ export interface ProjectionSettings {
   includeDaily: boolean
   /** Count the expected freelance income next to the salary. */
   includeFreelance: boolean
+  /** How far it looks: the end of this month (default), or of the next one. */
+  horizon?: ProjectionHorizon
 }
+
+export type ProjectionHorizon = 'month' | 'nextMonth'
 
 /**
  * A hand-set answer about a recurring charge. `status`: confirmed (no longer

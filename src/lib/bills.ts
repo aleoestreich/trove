@@ -86,6 +86,58 @@ export function currentBill(account: Account, transactions: Transaction[], plans
   return { amount, closeDate: close, fromDate: addMonths(close, -1), expected, dueDate: due, closed: close < todayISO, paid }
 }
 
+/** Closed bills averaged to estimate one still open. */
+const ESTIMATE_BILLS = 3
+
+/** A bill due later: its own cycle, and whether its amount is an estimate. */
+export interface UpcomingBill extends CardBill {
+  /** The cycle hasn't closed: the amount is the larger of what's in it so far and the card's recent average. */
+  estimated: boolean
+}
+
+/**
+ * The card's bills due from today up to `until` (ISO date): the current one,
+ * then each following cycle. A bill whose cycle is still open can only grow,
+ * so its amount is the larger of what's in it so far (purchases and
+ * installments) and the average of the card's last 3 closed bills.
+ */
+export function upcomingBills(account: Account, transactions: Transaction[], plans: InstallmentPlan[], today: Date, until: string): UpcomingBill[] {
+  const first = currentBill(account, transactions, plans, today)
+  if (!first?.dueDate) return []
+  const todayISO = toISO(today)
+  const own = transactions.filter((t) => t.accountId === account.id && t.transfer !== 'card-payment')
+  const cycleOf = (close: string) => {
+    const from = addMonths(close, -1)
+    let amount = 0
+    let expected = 0
+    for (const t of own) if (t.date > from && t.date <= close) amount -= t.amount
+    for (const p of plans) {
+      if (p.accountId !== account.id) continue
+      for (const u of p.upcoming) if (u.date > from && u.date <= close) expected += u.amount
+    }
+    return { amount: amount + expected, expected, fromDate: from }
+  }
+  // The card's recent closed bills (before today), with anything in them.
+  const past = Array.from({ length: ESTIMATE_BILLS + 2 }, (_, i) => addMonths(first.closeDate, -(i + 1)))
+    .filter((close) => close < todayISO)
+    .map((close) => cycleOf(close).amount)
+    .filter((amount) => amount > 0)
+    .slice(0, ESTIMATE_BILLS)
+  const average = past.length ? Math.round(past.reduce((s, x) => s + x, 0) / past.length) : 0
+  const estimate = (bill: CardBill): UpcomingBill => {
+    const open = bill.closeDate >= todayISO
+    return open && average > bill.amount ? { ...bill, amount: average, estimated: true } : { ...bill, estimated: false }
+  }
+  const out: UpcomingBill[] = []
+  for (let k = 0, bill: CardBill = first; k < 24 && bill.dueDate && bill.dueDate <= until; k++) {
+    out.push(estimate(bill))
+    const close = addMonths(first.closeDate, k + 1)
+    const c = cycleOf(close)
+    bill = { amount: c.amount, closeDate: close, fromDate: c.fromDate, expected: c.expected, dueDate: addMonths(first.dueDate, k + 1), closed: false, paid: 0 }
+  }
+  return out
+}
+
 /** Whether a transaction is part of a bill: the card's purchases and refunds in its cycle (bill payments aren't). */
 export function inBill(t: Transaction, accountId: string, bill: CardBill): boolean {
   return t.accountId === accountId && t.transfer !== 'card-payment' && t.date > bill.fromDate && t.date <= bill.closeDate

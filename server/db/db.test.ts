@@ -804,7 +804,12 @@ suite('database', () => {
       const res = await call('PUT', '/api/insights/projection/settings', { accountIds: ['acc-1'], includeDaily: false, includeFreelance: true })
       expect(res.status).toBe(200)
       expect((await res.json()).breakdown.diaADia).toBe(0)
-      expect((await readSnapshot(pool, ['item-1'], '2026-04-01'))!.projectionSettings).toEqual({ accountIds: ['acc-1'], includeDaily: false, includeFreelance: true })
+      expect((await readSnapshot(pool, ['item-1'], '2026-04-01'))!.projectionSettings).toEqual({ accountIds: ['acc-1'], includeDaily: false, includeFreelance: true, horizon: 'month' })
+      // Up to the end of next month.
+      const longer = await call('PUT', '/api/insights/projection/settings', { accountIds: ['acc-1'], includeDaily: false, includeFreelance: true, horizon: 'nextMonth' })
+      expect((await longer.json()).endDate).toBe('2026-11-30')
+      expect((await readSnapshot(pool, ['item-1'], '2026-04-01'))!.projectionSettings?.horizon).toBe('nextMonth')
+      expect((await call('PUT', '/api/insights/projection/settings', { accountIds: null, includeDaily: true, includeFreelance: false, horizon: 'year' })).status).toBe(400)
       expect((await call('PUT', '/api/insights/projection/settings', { accountIds: [], includeDaily: false, includeFreelance: true })).status).toBe(400)
       expect((await call('POST', '/api/insights/projection/settings', {})).status).toBe(405)
     })

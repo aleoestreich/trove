@@ -1,6 +1,7 @@
 // Month-end projection ("Previsão do fim do mês"): how much is likely left
-// in the chosen accounts on the last day of the current month. Shared by the
-// app and the server (GET /api/insights/projection).
+// in the chosen accounts on the last day of the current month, or of the
+// next one (settings.horizon 'nextMonth'). Shared by the app and the server
+// (GET /api/insights/projection).
 //
 //   fim = saldo hoje + receitas previstas − faturas − recorrentes − dia a dia
 //
@@ -15,11 +16,14 @@
 //   and the last day) is expected in two parts. What already came in this
 //   month covers the earliest parts first. Freelance the same way, when
 //   turned on. Only income into the chosen accounts counts.
-// - Faturas: card bills due from today to the end of the month, not paid
-//   yet. They already hold the card's installments and subscriptions, so
-//   those are never subtracted again.
+//   Over two months, next month's paydays get the whole average.
+// - Faturas: card bills due from today to the end, not paid yet. They
+//   already hold the card's installments and subscriptions, so those are
+//   never subtracted again. A bill whose cycle is still open counts at least
+//   the card's average of its last 3 bills (src/lib/bills.ts).
 // - Recorrentes: active recurring charges paid from the chosen accounts
-//   (not by card), expected after today and not charged yet this month.
+//   (not by card), each time they're expected from today to the end, not
+//   charged yet.
 // - Dia a dia: the average spent per day from the chosen accounts over the
 //   last 3 complete months, without recurring charges, transfers, bill
 //   payments and hidden transactions, times the days left (when turned on).
@@ -29,15 +33,15 @@
 // range widens to the salary's standard deviation plus 20% of the
 // day-to-day spending at the end of the month.
 
-import { currentBill, inBill } from '../lib/bills.js'
+import { inBill, upcomingBills } from '../lib/bills.js'
 import { installmentPlans } from '../lib/installments.js'
-import { addDays, daysFrom, daysInMonth, fromISO, lastMonths, monthKey } from '../lib/dates.js'
+import { addDays, addMonths, daysFrom, daysInMonth, fromISO, lastMonths, monthKey } from '../lib/dates.js'
 import { businessDayOnOrBefore } from '../lib/holidays.js'
 import { kindOf } from './categories.js'
 import { merchantKey, type PaymentMethod, type RecurringItem } from './recurring.js'
 import type { Account, Category, Cents, ProjectionSettings, Transaction } from './types.js'
 
-export const DEFAULT_PROJECTION_SETTINGS: ProjectionSettings = { accountIds: null, includeDaily: true, includeFreelance: false }
+export const DEFAULT_PROJECTION_SETTINGS: ProjectionSettings = { accountIds: null, includeDaily: true, includeFreelance: false, horizon: 'month' }
 
 /** Months of salary in the average, and of its usual day. */
 const SALARY_MONTHS = 6
@@ -48,7 +52,7 @@ const DAILY_MONTHS = 3
 const DAILY_SPREAD = 0.2
 
 export type ProjectionEvent =
-  | { date: string; kind: 'bill'; accountId: string; amount: Cents; installments: Cents }
+  | { date: string; kind: 'bill'; accountId: string; amount: Cents; installments: Cents; /** The cycle is still open: the card's recent average. */ estimated?: boolean }
   | { date: string; kind: 'recurring'; recurringId: string; name: string; paymentMethod: PaymentMethod; amount: Cents }
   | { date: string; kind: 'salary' | 'freelance'; amount: Cents }
 
@@ -257,7 +261,10 @@ export function monthEndProjection(input: {
   const accountIds = projectionAccounts(accounts, settings)
   const chosen = new Set(accountIds)
   const current = monthKey(today)
-  const endDate = `${current}-${String(daysInMonth(today)).padStart(2, '0')}`
+  const next = monthKey(addMonths(`${current}-01`, 1))
+  const months = settings.horizon === 'nextMonth' ? [current, next] : [current]
+  const lastMonth = months[months.length - 1]
+  const endDate = `${lastMonth}-${String(daysInMonth(lastMonth)).padStart(2, '0')}`
   const daysLeft = daysFrom(today, endDate)
   const tomorrow = addDays(today, 1)
   /** An event's day: never before tomorrow (or today, on the last day). */
@@ -278,31 +285,38 @@ export function monthEndProjection(input: {
 
   const events: ProjectionEvent[] = []
   const incomeEvent = (kind: 'salary' | 'freelance', e: Expected) => {
-    // Nothing more comes in once the month is over.
+    // Nothing more comes in once the projection is over.
     if (daysLeft === 0) return
-    for (const p of expectedPayments(e, current)) events.push({ date: onOrAfterTomorrow(p.date), kind, amount: p.amount })
+    // This month: what hasn't come in yet; next month: all of it.
+    const payments = [...expectedPayments(e, current), ...(months.length > 1 ? expectedPayments({ ...e, received: 0 }, next) : [])]
+    for (const p of payments) events.push({ date: onOrAfterTomorrow(p.date), kind, amount: p.amount })
   }
   incomeEvent('salary', salary)
   if (freelance) incomeEvent('freelance', freelance)
 
-  // Card bills due from today to the end of the month, still to be paid.
+  // Card bills due from today to the end, still to be paid.
   const todayDate = fromISO(today)
   const plans = installmentPlans(transactions, todayDate)
   let parcelas = 0
   for (const card of accounts) {
     if (card.type !== 'CREDIT') continue
-    const bill = currentBill(card, transactions, plans, todayDate)
-    if (!bill?.dueDate || bill.dueDate < today || bill.dueDate > endDate || bill.amount <= 0) continue
-    const installments = transactions.filter((t) => t.installment && inBill(t, card.id, bill)).reduce((s, t) => s - t.amount, 0) + bill.expected
-    parcelas += installments
-    events.push({ date: onOrAfterTomorrow(bill.dueDate), kind: 'bill', accountId: card.id, amount: -bill.amount, installments })
+    for (const bill of upcomingBills(card, transactions, plans, todayDate, endDate)) {
+      if (!bill.dueDate || bill.dueDate < today || bill.amount <= 0) continue
+      const installments = transactions.filter((t) => t.installment && inBill(t, card.id, bill)).reduce((s, t) => s - t.amount, 0) + bill.expected
+      parcelas += installments
+      events.push({ date: onOrAfterTomorrow(bill.dueDate), kind: 'bill', accountId: card.id, amount: -bill.amount, installments, estimated: bill.estimated })
+    }
   }
 
-  // Recurring charges from the chosen accounts (cards' are in their bills), not charged yet this month.
+  // Recurring charges from the chosen accounts (cards' are in their bills): each one expected up to the end, not charged yet.
   for (const r of recurring) {
-    if (r.status === 'stopped' || r.paymentMethod === 'card' || !chosen.has(r.accountId)) continue
-    if (monthKey(r.lastDate) === current || monthKey(r.nextDate) > current || daysLeft === 0) continue
-    events.push({ date: onOrAfterTomorrow(r.nextDate), kind: 'recurring', recurringId: r.id, name: r.merchant, paymentMethod: r.paymentMethod, amount: -r.amount })
+    if (r.status === 'stopped' || r.paymentMethod === 'card' || !chosen.has(r.accountId) || daysLeft === 0) continue
+    const step = r.cadence === 'yearly' ? 12 : 1
+    for (let date = r.nextDate, k = 0; date <= endDate && k < 24; k++, date = addMonths(r.nextDate, step * k)) {
+      // Already charged this month, or not due before the end.
+      if (monthKey(date) === current && monthKey(r.lastDate) === current) continue
+      events.push({ date: onOrAfterTomorrow(date), kind: 'recurring', recurringId: r.id, name: r.merchant, paymentMethod: r.paymentMethod, amount: -r.amount })
+    }
   }
   events.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount)
 
@@ -328,13 +342,14 @@ export function monthEndProjection(input: {
   const end = saldoHoje + receitasPrevistas - faturas - recorrentes - diaADia
 
   // Real balances up to today: today's balance minus what happened after each day.
-  const days = Array.from({ length: daysInMonth(today) }, (_, i) => `${current}-${String(i + 1).padStart(2, '0')}`)
+  const days = months.flatMap((m) => Array.from({ length: daysInMonth(m) }, (_, i) => `${m}-${String(i + 1).padStart(2, '0')}`))
   const after = new Map<string, Cents>()
   for (const t of transactions) {
     if (!chosen.has(t.accountId) || monthKey(t.date) !== current || t.date > today) continue
     after.set(t.date, (after.get(t.date) ?? 0) + t.amount)
   }
-  const width = stdDev(salary.totals) + DAILY_SPREAD * diaADia
+  // Each month of salary still to come adds its own spread.
+  const width = stdDev(salary.totals) * months.length + DAILY_SPREAD * diaADia
   const daily: ProjectionPoint[] = []
   let balance = saldoHoje
   const actualDays = days.filter((d) => d <= today)

@@ -10,7 +10,7 @@ import { RECURRING_ACTIONS, applyRecurringAction, type RecurringAction } from '.
 import { FGTS_MAX, NO_FGTS, sortFgts, type FgtsEntry } from './fgts.js'
 import { NO_PENSION, PENSION_MAX, PLAN_NAME_MAX, PLAN_TYPES, sortPensionEntries, type Pension, type PlanType } from './pension.js'
 import { SPENDING_GROUPS, isTarget } from './spendingBalance.js'
-import type { BalanceTarget, Category, CategoryType, IncomeFilter, ProjectionSettings, Snapshot, SpendingGroup, Subcategory, TransferOverride } from './types.js'
+import type { BalanceTarget, Category, CategoryType, IncomeFilter, ProjectionHorizon, ProjectionSettings, Snapshot, SpendingGroup, Subcategory, TransferOverride } from './types.js'
 
 export type Edit =
   /** Sets a transaction's category and subcategory (null: uncategorized / none). */
@@ -221,7 +221,11 @@ export function validateEdit(e: unknown): Edit {
         if (list.length === 0 || list.length > 100) bad('accounts')
         accountIds = [...new Set(list)]
       }
-      return { op: 'setProjectionSettings', settings: { accountIds, includeDaily: v.includeDaily as boolean, includeFreelance: v.includeFreelance as boolean } }
+      if (v.horizon !== undefined && v.horizon !== 'month' && v.horizon !== 'nextMonth') bad('horizon')
+      return {
+        op: 'setProjectionSettings',
+        settings: { accountIds, includeDaily: v.includeDaily as boolean, includeFreelance: v.includeFreelance as boolean, horizon: (v.horizon as ProjectionHorizon | undefined) ?? 'month' },
+      }
     }
     case 'recurringAction': {
       if (!(RECURRING_ACTIONS as readonly unknown[]).includes(x.action)) bad('action')
