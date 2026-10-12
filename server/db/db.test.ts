@@ -823,6 +823,10 @@ suite('database', () => {
         ] },
         { id: 'r2', transactionId: 'dinner', date: '2026-10-01', person: 'Bruno', amount: 75_00, payments: [] },
       ])
+      // Only your part counts: the expense's owed part and the money paid back are marked on read.
+      const marked = (await readSnapshot(pool, ['item-1'], '2026-09-01'))!.transactions
+      expect(marked.find((t) => t.id === 'dinner')).toMatchObject({ amount: -150_00, shared: 150_00 })
+      expect(marked.find((t) => t.id === 'pix-in')).toMatchObject({ amount: 50_00, repaid: 50_00 })
       expect(await refused(owe('r3', 'Carla', 1))).toBe('over_expense')
       expect(await refused(owe('r3', 'Carla', 1, 'pix-in'))).toBe('not_expense')
       expect(await refused(owe('r3', 'Carla', 1, 'nope'))).toBe('not_found')

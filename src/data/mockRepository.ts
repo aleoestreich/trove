@@ -2,6 +2,7 @@ import type { Repository } from './repository'
 import { DEMO_SUBCATEGORIES, buildSeed } from './seed'
 import { applyEdit, checkBulk, defaultCategories, withAccountNames } from './edits'
 import { filterTransactions } from './transactionFilter'
+import { withReceivables } from './receivables'
 import { DEFAULT_CATEGORIES } from './categoryCatalog'
 import type { Category, IncomeFilter, ProjectionSettings, RecurringOverride, Snapshot, Subcategory, TransferOverride } from './types'
 
@@ -91,7 +92,7 @@ function initialOwner(seed: Snapshot): DemoOwner {
 /** The seed with the stored categories; guesses only point at categories that still exist. */
 function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
   const known = new Set(owner.categories.map((c) => c.id))
-  return withAccountNames({
+  return withReceivables(withAccountNames({
     ...seed,
     accountNames: owner.accountNames,
     cardDays: owner.cardDays,
@@ -119,7 +120,7 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
       if (s) return { ...t, categoryId: s.categoryId, subcategoryId: s.subcategoryId, hidden: s.hidden || undefined }
       return t.categoryId && !known.has(t.categoryId) ? { ...t, categoryId: null } : t
     }),
-  })
+  }))
 }
 
 /** Demo data. Categories and edits are kept in this browser's localStorage. */

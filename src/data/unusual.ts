@@ -11,7 +11,7 @@
 //   under R$ 100 are left out. Hidden transactions never count; refunds
 //   reduce spending.
 
-import { kindOf } from './categories.js'
+import { countedAmount, kindOf } from './categories.js'
 import { daysInMonth, lastMonths, monthKey } from '../lib/dates.js'
 import type { Category, Cents, Transaction } from './types.js'
 
@@ -99,7 +99,8 @@ export function unusualCategories(transactions: Transaction[], categories: Categ
     if (!inScope.has(m) || t.hidden || !t.categoryId || t.date > today) continue
     const category = categoriesById.get(t.categoryId)
     if (!category || category.type !== 'expense' || kindOf(t, categoriesById) !== 'expense') continue
-    const spent = -t.amount
+    const spent = -countedAmount(t)
+    if (spent === 0) continue
     const w = whole.get(category.id) ?? new Map<string, Cents>()
     w.set(m, (w.get(m) ?? 0) + spent)
     whole.set(category.id, w)

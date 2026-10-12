@@ -12,7 +12,7 @@ import { NO_PENSION, PENSION_MAX, PLAN_NAME_MAX, PLAN_TYPES, sortPensionEntries,
 import { SPENDING_GROUPS, isTarget } from './spendingBalance.js'
 import { isLayout, normalizeLayout } from './overviewLayout.js'
 import { isExtraPay, normalizeExtraPay } from './extraPay.js'
-import { PERSON_MAX, RECEIVABLE_MAX, canBeOwed, canRepay, owedOf, received, sortPayments, usedOf, type Receivable } from './receivables.js'
+import { PERSON_MAX, RECEIVABLE_MAX, canBeOwed, canRepay, owedOf, received, sortPayments, usedOf, withReceivables, type Receivable } from './receivables.js'
 import type { BalanceTarget, Category, ExtraPay, OverviewLayout, CategoryType, IncomeFilter, ProjectionHorizon, ProjectionSettings, Snapshot, SpendingGroup, Subcategory, Transaction, TransferOverride } from './types.js'
 
 export type Edit =
@@ -532,7 +532,7 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
     case 'saveReceivablePayment':
     case 'deleteReceivablePayment': {
       const byId = new Map(s.transactions.map((t) => [t.id, t]))
-      return { ...s, receivables: applyReceivableEdit(s.receivables ?? [], e, (id) => byId.get(id)) }
+      return withReceivables({ ...s, receivables: applyReceivableEdit(s.receivables ?? [], e, (id) => byId.get(id)) })
     }
     case 'recurringAction': {
       const overrides = s.recurringOverrides ?? {}

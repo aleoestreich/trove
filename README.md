@@ -159,8 +159,12 @@ between accounts, and card bill payments.
   devolução" in its details, or the receivable's suggestions, the matching
   amounts first) or typed in by hand. The page lists who owes what, most
   owed first, and the ones already paid back; a card on the Overview shows
-  the total while someone owes something. Totals don't change: the expense
-  and the money that came back count as the banks report them.
+  the total while someone owes something. Only your part counts: what
+  others owe is left out of spending (every total, chart, average and the
+  Equilíbrio), and the money they pay back is left out of income; the
+  transaction's details show "Sua parte". Balances, bills, the transaction
+  list and the month-end projection (a cash forecast) keep the bank's
+  amounts.
 - **Overview layout:** "Personalizar" (the sliders icon in the phone
   header, a button next to the desktop title) moves each card up or down
   and hides the ones not wanted; "Restaurar padrão" brings back the default.

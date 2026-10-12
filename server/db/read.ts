@@ -10,6 +10,7 @@ import { readBalanceTarget, readExtraPay, readOverviewLayout, readCategories, re
 import { withAccountNames } from '../../src/data/edits.js'
 import type { Db } from './connection.js'
 import { readReceivables } from './receivables.js'
+import { withReceivables } from '../../src/data/receivables.js'
 import { HISTORY_START } from './sync.js'
 import { filterTransactions, type TransactionQuery } from '../../src/data/transactionFilter.js'
 import { addDays, daysInMonth } from '../../src/lib/dates.js'
@@ -84,7 +85,7 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string, to: 
     },
   })
   const estimates = await readEstimatedCardDays(db, snapshot.accounts.filter((a) => a.creditData && !a.creditData.balanceCloseDate).map((a) => a.id))
-  return withAccountNames({
+  return withReceivables(withAccountNames({
     ...snapshot,
     accounts: snapshot.accounts.map((a) => (a.creditData && estimates.has(a.id) ? { ...a, creditData: { ...a.creditData, estimatedDays: estimates.get(a.id) } } : a)),
     transactions: snapshot.transactions.filter((t) => t.date >= from && (!to || t.date <= to)),
@@ -101,7 +102,7 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string, to: 
     overviewLayout: await readOverviewLayout(db),
     extraPay: await readExtraPay(db),
     receivables: await readReceivables(db),
-  })
+  }))
 }
 
 /**

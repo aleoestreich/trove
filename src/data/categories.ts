@@ -39,6 +39,16 @@ export function fromGuess(guess: string, known?: Set<string>): Pick<Transaction,
 }
 
 /**
+ * What a transaction counts for in income and spending: its amount, less the
+ * part of an expense others owe ("A receber", `shared`) and the part of money
+ * in that pays someone's debt back (`repaid`). Balances, bills and lists keep
+ * the bank's amount.
+ */
+export function countedAmount(t: Pick<Transaction, 'amount' | 'shared' | 'repaid'>): number {
+  return t.amount + (t.shared ?? 0) - (t.repaid ?? 0)
+}
+
+/**
  * What a transaction counts as: a transfer between connected accounts, else
  * its category's type, else (uncategorized) income when money came in and an
  * expense when it went out.

@@ -8,7 +8,7 @@
 // when read). The average covers the complete months among the last 6
 // (from the first month with any data); the current month is only compared.
 
-import { kindOf } from './categories.js'
+import { countedAmount, kindOf } from './categories.js'
 import type { Category, Cents, IncomeFilter, Subcategory, Transaction } from './types.js'
 
 /** Complete months in the average. */
@@ -87,7 +87,7 @@ export function incomeByMonth(
     const month = monthOf(t.date)
     if (!sums.has(month)) continue
     const slot = slotOf(t, categoriesById, subcategoriesById)
-    if (slot && counts(slot, filter)) sums.set(month, sums.get(month)! + t.amount)
+    if (slot && counts(slot, filter)) sums.set(month, sums.get(month)! + countedAmount(t))
   }
   return months.map((month) => ({ month, total: sums.get(month)! }))
 }
@@ -154,18 +154,19 @@ export function incomeOptions(transactions: Transaction[], categories: Category[
     if (i === undefined) continue
     const slot = slotOf(t, categoriesById, subcategoriesById)
     if (!slot) continue
+    const amount = countedAmount(t)
     if (!slot.categoryId) {
-      uncategorized[i] += t.amount
+      uncategorized[i] += amount
       continue
     }
     const c = perCategory.get(slot.categoryId)
     if (!c) continue // income in a category of the other type: not an option
-    c.total[i] += t.amount
+    c.total[i] += amount
     if (slot.subcategoryId) {
       const s = perSub.get(slot.subcategoryId) ?? zeros()
-      s[i] += t.amount
+      s[i] += amount
       perSub.set(slot.subcategoryId, s)
-    } else c.unassigned[i] += t.amount
+    } else c.unassigned[i] += amount
   }
   const amounts = (totals: Cents[]): IncomeOptionAmounts => ({ average: averageOf(totals), totals })
   return {

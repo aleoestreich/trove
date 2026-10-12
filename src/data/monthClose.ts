@@ -6,7 +6,7 @@
 // goal the app keeps. Hidden transactions never count, as everywhere.
 // Shared by the app and the server, so it imports only types, data and date math.
 
-import { kindOf } from './categories.js'
+import { countedAmount, kindOf } from './categories.js'
 import { DEFAULT_TARGET, balanceStatus, hasGroups, monthBalance, roundedShares, type BalanceStatus, type MonthBalance } from './spendingBalance.js'
 import { unusualCategories, type CategoryComparison } from './unusual.js'
 import { NO_FILTER } from './incomeAverage.js'
@@ -81,8 +81,8 @@ function figuresOf(txs: Transaction[], categoriesById: Map<string, Category>): F
   for (const t of txs) {
     if (t.hidden) continue
     const kind = kindOf(t, categoriesById)
-    if (kind === 'income') income += t.amount
-    else if (kind === 'expense') expenses -= t.amount
+    if (kind === 'income') income += countedAmount(t)
+    else if (kind === 'expense') expenses -= countedAmount(t)
   }
   return { income, expenses, net: income - expenses }
 }
@@ -93,7 +93,7 @@ function spendingByCategory(txs: Transaction[], categoriesById: Map<string, Cate
   for (const t of txs) {
     if (t.hidden || kindOf(t, categoriesById) !== 'expense') continue
     const key = t.categoryId && categoriesById.has(t.categoryId) ? t.categoryId : null
-    out.set(key, (out.get(key) ?? 0) - t.amount)
+    out.set(key, (out.get(key) ?? 0) - countedAmount(t))
   }
   return out
 }
@@ -146,8 +146,8 @@ export function monthClose(input: MonthCloseInput, month: string): MonthClose | 
     .slice(0, CLOSE_TOP)
     .map(([categoryId, amount]) => ({ categoryId, amount, share: spent > 0 ? (amount / spent) * 100 : 0 }))
   const biggest = own
-    .filter((t) => t.amount < 0 && kindOf(t, categoriesById) === 'expense')
-    .sort((a, b) => a.amount - b.amount || a.id.localeCompare(b.id))
+    .filter((t) => countedAmount(t) < 0 && kindOf(t, categoriesById) === 'expense')
+    .sort((a, b) => countedAmount(a) - countedAmount(b) || a.id.localeCompare(b.id))
     .slice(0, CLOSE_TOP)
 
   // As seen on the 1st of the next month: the closed month against the 6 before it.

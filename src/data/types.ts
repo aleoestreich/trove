@@ -181,6 +181,13 @@ export interface Transaction {
   transferOverride?: TransferOverride
   /** Hidden: left out of every total, chart, average and the list. */
   hidden?: boolean
+  /**
+   * "A receber": the part of this expense others owe (positive), left out of
+   * spending (countedAmount). Set on read from the receivables.
+   */
+  shared?: Cents
+  /** "A receber": the part of this money in that pays someone's debt back, left out of income. */
+  repaid?: Cents
   status: 'POSTED' | 'PENDING'
   /**
    * Credit-card installment purchase ("parcelado"), mirroring Pluggy's

@@ -28,7 +28,7 @@
 //   that far, so Futuro is only what's left beyond the targets, not all the
 //   income not spent yet.
 
-import { kindOf } from './categories.js'
+import { countedAmount, kindOf } from './categories.js'
 import { incomeAverage, incomeByMonth } from './incomeAverage.js'
 import { daysInMonth, lastMonths, monthKey } from '../lib/dates.js'
 import type { BalanceTarget, Category, Cents, IncomeFilter, SpendingGroup, Subcategory, Transaction } from './types.js'
@@ -225,7 +225,7 @@ export function monthBalances(
   }
   for (const t of transactions) {
     if (t.hidden || kindOf(t, categoriesById) !== 'expense') continue
-    add(monthKey(t.date), t, -t.amount, false)
+    add(monthKey(t.date), t, -countedAmount(t), false)
   }
   // The month in progress: what's still expected in it. An income category's charge isn't spending.
   const expectedIn = current ? expected.filter((e) => monthKey(e.date) === current && categoriesById.get(e.categoryId ?? '')?.type !== 'income') : []

@@ -7,7 +7,7 @@ import { Card } from '../components/ui'
 import { CategoryBadge } from '../components/CategoryBadge'
 import { GroupSwatch } from '../components/balance/parts'
 import { hasGroups, suggestGroup } from '../data/spendingBalance'
-import { kindOf } from '../data/categories'
+import { countedAmount, kindOf } from '../data/categories'
 import type { Category, SpendingGroup } from '../data/types'
 import { lastMonths, monthKey } from '../lib/dates'
 import { formatWholeMoney } from '../lib/money'
@@ -156,7 +156,7 @@ function Review({ categories, suggest }: { categories: Category[]; suggest: bool
     const sums = new Map<string, number>()
     for (const tx of allTransactions) {
       if (tx.hidden || !tx.categoryId || !months.has(monthKey(tx.date)) || kindOf(tx, categoriesById) !== 'expense') continue
-      sums.set(tx.categoryId, (sums.get(tx.categoryId) ?? 0) - tx.amount)
+      sums.set(tx.categoryId, (sums.get(tx.categoryId) ?? 0) - countedAmount(tx))
     }
     return new Map([...sums].map(([id, v]) => [id, Math.max(0, Math.round(v / AVERAGE_MONTHS))]))
   }, [allTransactions, categoriesById, today])

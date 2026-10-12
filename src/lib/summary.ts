@@ -1,5 +1,5 @@
 import type { Account, Category, Cents, Transaction } from '../data/types'
-import { kindOf } from '../data/categories'
+import { countedAmount, kindOf } from '../data/categories'
 import { monthKey } from './dates'
 
 export interface Totals {
@@ -28,8 +28,8 @@ export function totals(transactions: Transaction[], categoriesById: Map<string, 
   for (const t of transactions) {
     if (t.hidden) continue
     const kind = kindOf(t, categoriesById)
-    if (kind === 'income') income += t.amount
-    else if (kind === 'expense') expenses -= t.amount
+    if (kind === 'income') income += countedAmount(t)
+    else if (kind === 'expense') expenses -= countedAmount(t)
   }
   return { income, expenses, net: income - expenses }
 }
@@ -50,7 +50,7 @@ export function expensesByCategory(transactions: Transaction[], categoriesById: 
   for (const t of transactions) {
     if (t.hidden || kindOf(t, categoriesById) !== 'expense') continue
     const key = t.categoryId && categoriesById.has(t.categoryId) ? t.categoryId : null
-    sums.set(key, (sums.get(key) ?? 0) - t.amount)
+    sums.set(key, (sums.get(key) ?? 0) - countedAmount(t))
   }
   return [...sums]
     .map(([id, amount]) => ({ category: id ? categoriesById.get(id)! : null, amount }))
@@ -75,7 +75,7 @@ export function expensesBySubcategory(transactions: Transaction[], categoryId: s
     if (t.hidden || t.transfer || t.categoryId !== categoryId) continue
     if (t.subcategoryId) anySub = true
     const key = t.subcategoryId ?? null
-    sums.set(key, (sums.get(key) ?? 0) - t.amount)
+    sums.set(key, (sums.get(key) ?? 0) - countedAmount(t))
   }
   if (!anySub) return []
   return [...sums]

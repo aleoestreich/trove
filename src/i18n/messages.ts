@@ -363,6 +363,9 @@ export interface Messages {
     installment: string
     installmentEnds: (n: number, total: number, month: string) => string
     purchaseTotal: string
+    /** "A receber": what a shared expense or a repayment counts for in the totals. */
+    yourShare: string
+    countsAsIncome: string
     status: string
     transferNote: string
     /** Row line 2 for a transaction without a category. */
@@ -1497,6 +1500,8 @@ export const messages: Messages = {
     installment: 'Parcela',
     installmentEnds: (n, total, month) => `${n} de ${total} · termina ${month}`,
     purchaseTotal: 'Total da compra',
+    yourShare: 'Sua parte (conta nos gastos)',
+    countsAsIncome: 'Conta como receita',
     status: 'Situação',
     transferNote: 'Transferências não contam como receita nem despesa.',
     uncategorizedTap: 'Sem categoria · toque para escolher',
@@ -1723,10 +1728,10 @@ export const messages: Messages = {
     sheet: {
       section: 'A receber',
       add: 'Paguei por alguém',
-      addNote: 'Acompanhe até a pessoa te devolver. Os totais não mudam.',
+      addNote: 'Acompanhe até a pessoa te devolver. Só a sua parte conta nos gastos.',
       addMore: 'Mais alguém vai devolver',
       repay: 'É uma devolução',
-      repayNote: 'Abate do que alguém te deve',
+      repayNote: 'Abate do que alguém te deve e não conta como receita',
       repaidBy: (person) => `Devolução de ${person}`,
     },
     form: {

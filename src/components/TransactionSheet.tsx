@@ -6,6 +6,7 @@ import { newId } from '../data/edits'
 import { addMonths, formatDayHeading, formatMonthYear } from '../lib/dates'
 import { formatMoney, formatRate } from '../lib/money'
 import { kindOf } from '../lib/summary'
+import { countedAmount } from '../data/categories'
 import { Icon } from './Icon'
 import { CategoryBadge, TransactionBadge, catInk, catTint, catVar } from './CategoryBadge'
 import { useAccountLabel } from './TransactionRow'
@@ -59,6 +60,9 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
     details.push({ label: t.transactions.purchaseTotal, value: formatMoney(inst.totalAmount) })
   }
   if (current.status === 'PENDING') details.push({ label: t.transactions.status, value: t.pending })
+  // "A receber": only your part counts in spending; money paid back doesn't count as income.
+  if (current.shared) details.push({ label: t.transactions.yourShare, value: formatMoney(-countedAmount(current)) })
+  if (current.repaid) details.push({ label: t.transactions.countsAsIncome, value: formatMoney(countedAmount(current)) })
 
   // Categories of the transaction's type (money in: income; out: expense), plus its own if it's of the other type.
   const type = current.amount > 0 ? 'income' : 'expense'

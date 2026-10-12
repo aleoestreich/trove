@@ -1,11 +1,13 @@
 // "A receber": money paid on someone else's behalf (a purchase or a Pix),
 // tracked until they pay it back. Each receivable points at the expense it
 // came from; its payments point at the money that came in (a Pix received)
-// or were typed in by hand (cash, another account). Totals are unchanged: the
-// expense still counts as the bank charged it. Shared by the app and the
-// server (src/data/edits.ts, server/db/receivables.ts), so it imports types only.
+// or were typed in by hand (cash, another account). Totals count only what's
+// yours: the part of an expense others owe is left out of spending, and the
+// money that pays it back out of income (withReceivables, countedAmount).
+// Shared by the app and the server (src/data/edits.ts,
+// server/db/receivables.ts), so it imports types only.
 
-import type { Cents, Transaction } from './types.js'
+import type { Cents, Snapshot, Transaction } from './types.js'
 
 export interface ReceivablePayment {
   id: string
@@ -115,4 +117,30 @@ export function repaymentCandidates(list: Receivable[], r: Receivable, transacti
     .map((tx) => ({ tx, free: tx.amount - usedOf(list, tx.id) }))
     .filter((x) => x.free > 0)
     .sort((a, b) => Number(b.free === owed) - Number(a.free === owed) || b.tx.date.localeCompare(a.tx.date) || a.tx.id.localeCompare(b.tx.id))
+}
+
+/**
+ * The transactions with what "A receber" takes out of the totals: each
+ * expense's part others owe (`shared`), and each incoming transaction's part
+ * that pays a debt back (`repaid`); none where nothing is (an old mark is
+ * cleared). Balances, bills and lists keep the bank's amount.
+ */
+export function withReceivables(s: Snapshot): Snapshot {
+  const shared = new Map<string, Cents>()
+  const repaid = new Map<string, Cents>()
+  for (const r of s.receivables ?? []) {
+    shared.set(r.transactionId, (shared.get(r.transactionId) ?? 0) + r.amount)
+    for (const p of r.payments) if (p.transactionId) repaid.set(p.transactionId, (repaid.get(p.transactionId) ?? 0) + p.amount)
+  }
+  let changed = false
+  const transactions = s.transactions.map((t) => {
+    // Never more than the transaction itself: a later change of rate can shrink its amount in BRL.
+    const owed = t.amount < 0 ? Math.min(shared.get(t.id) ?? 0, -t.amount) : 0
+    const back = t.amount > 0 ? Math.min(repaid.get(t.id) ?? 0, t.amount) : 0
+    if ((t.shared ?? 0) === owed && (t.repaid ?? 0) === back) return t
+    changed = true
+    const { shared: _s, repaid: _r, ...rest } = t
+    return { ...rest, ...(owed ? { shared: owed } : {}), ...(back ? { repaid: back } : {}) }
+  })
+  return changed ? { ...s, transactions } : s
 }

@@ -524,8 +524,12 @@ Money paid on someone else's behalf, tracked until it's paid back
   what's owed; a payment from a transaction is money in, not a transfer, and
   the payments from one transaction add up to at most what came in. A
   refused edit answers 400 with a `reason`.
-- Totals are unchanged: the expense still counts as the bank charged it,
-  and the money that came in still counts as income.
+- Totals count only the owner's part. On read (`withReceivables`), each
+  expense is marked with the part others owe (`shared`) and each incoming
+  transaction with the part that pays a debt back (`repaid`), capped at
+  its amount; income and spending everywhere use `countedAmount` (amount +
+  shared − repaid). Balances, bills, the lists and the month-end projection
+  (a cash forecast) keep the bank's amount. Nothing new is stored.
 
 ## Equilíbrio do mês
 
