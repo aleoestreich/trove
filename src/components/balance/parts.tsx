@@ -36,7 +36,7 @@ export function GroupSwatch({ part, size = 12, className = '' }: { part: Part | 
   )
 }
 
-/** The month the card (and the page, by default) shows: the current one once income came in, else the last closed one with income. */
+/** The month the card (and the page, by default) shows: the current one when income is expected (or came in), else the last closed one with income. */
 export function defaultBalanceMonth(today: string, hasIncome: (month: string) => boolean): string {
   const current = monthKey(today)
   const [y, m] = current.split('-').map(Number)
@@ -50,7 +50,7 @@ export function defaultBalanceMonth(today: string, hasIncome: (month: string) =>
 export function useMonthBalance(month?: string): { balance: MonthBalance; status: BalanceStatus; target: BalanceTarget; month: string } {
   const { allTransactions, categories, subcategories, incomeFilter, balanceTarget, today } = useData()
   return useMemo(() => {
-    const of = (m: string) => monthBalance(allTransactions, categories, subcategories, incomeFilter ?? NO_FILTER, m)
+    const of = (m: string) => monthBalance(allTransactions, categories, subcategories, incomeFilter ?? NO_FILTER, m, today)
     const shown = month ?? defaultBalanceMonth(today, (m) => of(m).income > 0)
     const balance = of(shown)
     return { balance, status: balanceStatus(balance, balanceTarget, today), target: balanceTarget, month: shown }

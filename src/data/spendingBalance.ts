@@ -7,7 +7,10 @@
 //   none yet ("Sem grupo"). A subcategory may be in another group than its
 //   category; otherwise it follows it.
 // - Income: the month's income under the average income's filter (the same
-//   "renda" as Renda média).
+//   "renda" as Renda média). For the month in progress it's the income
+//   expected: the average of the last 3 complete months (or what already
+//   came in, when that's more), since some income only arrives at the end
+//   of the month.
 // - Spending: expenses (kindOf), not hidden, so own transfers and card bill
 //   payments never count, refunds reduce them, and an installment counts in
 //   the month it's charged. Uncategorized expenses and those of a category
@@ -65,7 +68,12 @@ export interface BalanceItem {
 
 export interface MonthBalance {
   month: string
+  /** The income the split is measured against: what came in, or for the month in progress the income expected. */
   income: Cents
+  /** What came in during the month (so far). */
+  received: Cents
+  /** The month in progress: the income expected (average of the last 3 complete months); null for other months. */
+  expected: Cents | null
   essential: Cents
   lifestyle: Cents
   /** "Sem grupo": inside the Futuro until classified. */
@@ -89,15 +97,33 @@ export function bucketOf(t: Pick<Transaction, 'categoryId' | 'subcategoryId'>, c
   return category.group ?? 'ungrouped'
 }
 
-/** One month's split. */
+/** Complete months averaged for the income expected in the month in progress. */
+export const EXPECTED_INCOME_MONTHS = 3
+
+/**
+ * The income expected in `month`: the average of up to 3 complete months
+ * before it (from the first month with any data); 0 without any.
+ */
+export function expectedIncome(transactions: Transaction[], categories: Category[], subcategories: Subcategory[], filter: IncomeFilter, month: string): Cents {
+  const first = transactions.reduce((min, t) => (!t.hidden && t.date < min ? t.date : min), '9999-12')
+  const before = lastMonths(month, EXPECTED_INCOME_MONTHS + 1)
+    .slice(0, -1)
+    .filter((m) => m >= monthKey(first))
+  if (!before.length) return 0
+  const totals = incomeByMonth(transactions, categories, subcategories, filter, before).map((m) => m.total)
+  return Math.round(totals.reduce((s, x) => s + x, 0) / totals.length)
+}
+
+/** One month's split. `today` (ISO date): the month in progress is measured against the income expected. */
 export function monthBalance(
   transactions: Transaction[],
   categories: Category[],
   subcategories: Subcategory[],
   filter: IncomeFilter,
   month: string,
+  today?: string,
 ): MonthBalance {
-  return monthBalances(transactions, categories, subcategories, filter, [month])[0]
+  return monthBalances(transactions, categories, subcategories, filter, [month], today)[0]
 }
 
 /** The split of each of `months`. */
@@ -107,10 +133,12 @@ export function monthBalances(
   subcategories: Subcategory[],
   filter: IncomeFilter,
   months: string[],
+  today?: string,
 ): MonthBalance[] {
   const categoriesById = byId(categories)
   const subcategoriesById = byId(subcategories)
   const incomes = new Map(incomeByMonth(transactions, categories, subcategories, filter, months).map((m) => [m.month, m.total]))
+  const current = today ? monthKey(today) : null
   // month → bucket → row key → row
   const rows = new Map(months.map((m) => [m, new Map<Bucket, Map<string, BalanceItem>>()]))
   for (const t of transactions) {
@@ -133,13 +161,17 @@ export function monthBalances(
     const perBucket = rows.get(month)!
     const sum = (b: Bucket) => [...(perBucket.get(b)?.values() ?? [])].reduce((s, i) => s + i.amount, 0)
     const list = (b: Bucket) => [...(perBucket.get(b)?.values() ?? [])].filter((i) => i.amount > 0).sort((a, b) => b.amount - a.amount)
-    const income = incomes.get(month) ?? 0
+    const received = incomes.get(month) ?? 0
+    const expected = month === current ? expectedIncome(transactions, categories, subcategories, filter, month) : null
+    const income = expected === null ? received : Math.max(received, expected)
     const essential = Math.max(0, sum('essential'))
     const lifestyle = Math.max(0, sum('lifestyle'))
     const ungrouped = Math.max(0, sum('ungrouped'))
     return {
       month,
       income,
+      received,
+      expected,
       essential,
       lifestyle,
       ungrouped,

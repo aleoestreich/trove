@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit, defaultCategories, EditError, validateEdit } from './edits'
 import { NO_FILTER } from './incomeAverage'
-import { DEFAULT_TARGET, balanceStatus, hasGroups, isTarget, monthBalance, monthBalances, roundedShares, suggestGroup, worstDeviation } from './spendingBalance'
+import { DEFAULT_TARGET, expectedIncome, balanceStatus, hasGroups, isTarget, monthBalance, monthBalances, roundedShares, suggestGroup, worstDeviation } from './spendingBalance'
 import type { Category, Snapshot, Subcategory, Transaction } from './types'
 
 const defaults = defaultCategories((c, i) => `${c}-${i}`)
@@ -74,6 +74,30 @@ describe('Equilíbrio do mês', () => {
     expect(b.future).toBe(-400_00)
     expect(b.overIncome).toBe(700_00)
     expect(balanceStatus(b, DEFAULT_TARGET, '2026-10-12')).toEqual({ kind: 'overIncome', amount: 700_00 })
+  })
+
+  it('measures the month in progress against the income expected, not what came in so far', () => {
+    // July to September: R$ 8.000, 10.000 and 12.000; October so far: R$ 4.000 (the rest comes at the end of the month).
+    const history = [
+      tx('jul', '2026-07-30', 8_000_00, { categoryId: 'salary' }),
+      tx('aug', '2026-08-31', 10_000_00, { categoryId: 'salary' }),
+      ...september,
+      tx('sep-2', '2026-09-30', 2_000_00, { categoryId: 'salary' }),
+      tx('oct-1', '2026-10-15', 4_000_00, { categoryId: 'salary' }),
+      tx('oct-rent', '2026-10-06', -4_000_00, { categoryId: 'home' }),
+    ]
+    expect(expectedIncome(history, categories, subcategories, NO_FILTER, '2026-10')).toBe(10_000_00)
+    const october = monthBalance(history, categories, subcategories, NO_FILTER, '2026-10', '2026-10-16')
+    expect(october).toMatchObject({ income: 10_000_00, received: 4_000_00, expected: 10_000_00, essential: 4_000_00, future: 6_000_00, overIncome: 0 })
+    expect(roundedShares(october)).toEqual({ essential: 40, lifestyle: 0, future: 60 })
+    // More than usual already came in: that's the income.
+    const bonus = monthBalance([...history, tx('oct-bonus', '2026-10-16', 9_000_00, { categoryId: 'salary' })], categories, subcategories, NO_FILTER, '2026-10', '2026-10-16')
+    expect(bonus.income).toBe(13_000_00)
+    // Closed months keep what came in; without `today`, the month in progress too.
+    expect(monthBalance(history, categories, subcategories, NO_FILTER, '2026-09', '2026-10-16')).toMatchObject({ income: 12_000_00, expected: null })
+    expect(monthBalance(history, categories, subcategories, NO_FILTER, '2026-10').income).toBe(4_000_00)
+    // No history: nothing expected.
+    expect(expectedIncome([tx('only', '2026-10-02', -100_00)], categories, subcategories, NO_FILTER, '2026-10')).toBe(0)
   })
 
   it('tells each state apart', () => {

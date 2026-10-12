@@ -67,7 +67,7 @@ function FilledBalanceCard() {
   const sub =
     status.kind === 'noIncome'
       ? b.subNoIncome(monthLabel(balance.month), soFar)
-      : (soFar ? b.subSoFar : b.sub)(monthLabel(balance.month), formatMoney(balance.income))
+      : (balance.expected !== null ? b.subSoFar : b.sub)(monthLabel(balance.month), formatMoney(balance.income))
 
   const tiles: { part: Part; label: string; value: string; note?: string; critical?: boolean }[] = shares
     ? [

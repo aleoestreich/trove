@@ -568,6 +568,8 @@ export interface Messages {
       legendIncome: string
       legendOver: string
       base: (income: string) => string
+      baseExpected: (income: string) => string
+      expectedNote: (received: string) => string
       baseAll: string
       baseNote: (included: string, excluded: string | null) => string
       change: string
@@ -1432,7 +1434,7 @@ export const messages: Messages = {
     status: { onTarget: 'Dentro da meta', attention: 'Atenção', overIncome: 'Acima da renda', partial: 'Em andamento', incomplete: 'Incompleto', noIncome: 'Sem renda' },
     open: (status) => `Equilíbrio do mês: ${status}. Abrir detalhes`,
     sub: (month, income) => `${month} · sobre ${income} de renda`,
-    subSoFar: (month, income) => `${month} até agora · sobre ${income} de renda`,
+    subSoFar: (month, income) => `${month} até agora · sobre ${income} de renda prevista`,
     subNoIncome: (month, soFar) => (soFar ? `${month} até agora · nenhuma renda ainda` : `${month} · nenhuma renda`),
     onTarget: 'Os três grupos estão perto da meta.',
     above: (group, points) => `${group} está ${points} ${points === 1 ? 'ponto' : 'pontos'} acima da meta.`,
@@ -1458,6 +1460,8 @@ export const messages: Messages = {
       legendIncome: 'Renda',
       legendOver: 'Acima da renda',
       base: (income) => `Sobre ${income} de renda`,
+      baseExpected: (income) => `Sobre ${income} de renda prevista`,
+      expectedNote: (received) => `Média dos últimos 3 meses; já entraram ${received}.`,
       baseAll: 'Toda a renda do mês.',
       baseNote: (included, excluded) => (excluded ? `${included}. ${excluded} ficam fora.` : `${included}.`),
       change: 'Alterar',
