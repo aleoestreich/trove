@@ -18,6 +18,12 @@ roadmap and `README.md` for how to run it.
   is merged.
 - **PRs:** fill in every section of `pull_request_template.md`, keeping its
   headings.
+- **Commit author:** every commit is authored as the repository owner,
+  Alessandra Oestreich, with the same name and email as her own commits
+  (`git log --format='%an <%ae>' origin/main`); set `user.name` and
+  `user.email` before the first commit. No `Co-Authored-By` trailers either:
+  Vercel's Hobby plan blocks deploying a commit with any other author or
+  co-author.
 - **Writing tone:** titles, descriptions, commit messages, docs, READMEs and
   comments are impersonal and technical. Describe the system and the change
   ("Sync never overwrites stored categories"), not a person ("the owner",
