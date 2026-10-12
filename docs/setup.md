@@ -139,6 +139,8 @@ Follow [pluggy-setup.md](pluggy-setup.md) steps 1–4:
      hide anything Pluggy guessed wrong (a sync never undoes it).
    - **Visão geral → Equilíbrio do mês → Organizar categorias:** put the
      expense categories in Essencial or Estilo de vida.
+   - **Visão geral → Personalizar** (the sliders icon on phones): the
+     order of the cards and which ones show, shared by every device.
    - **Contas:** FGTS and previdência privada balances can be tracked by
      hand, if wanted.
 

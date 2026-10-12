@@ -27,6 +27,8 @@ interface DemoOwner {
   pension?: Snapshot['pension']
   /** The "Equilíbrio do mês" target (app_settings too). */
   balanceTarget?: Snapshot['balanceTarget']
+  /** The Visão geral's layout (app_settings too). */
+  overviewLayout?: Snapshot['overviewLayout']
 }
 
 function read(): DemoOwner | null {
@@ -69,6 +71,7 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
     fgts: owner.fgts,
     pension: owner.pension,
     balanceTarget: owner.balanceTarget,
+    overviewLayout: owner.overviewLayout,
     categories: owner.categories,
     subcategories: owner.subcategories,
     incomeFilter: owner.incomeFilter,
@@ -126,6 +129,7 @@ export function createMockRepository(today: Date = new Date()): Repository {
         fgts: next.fgts,
         pension: next.pension,
         balanceTarget: next.balanceTarget,
+        overviewLayout: next.overviewLayout,
       })
       return previous && { updated: previous.length, previous }
     },

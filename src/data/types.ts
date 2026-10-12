@@ -104,6 +104,26 @@ export interface BalanceTarget {
   future: number
 }
 
+/** A card of the Visão geral. */
+export type OverviewSection =
+  | 'netWorth'
+  | 'balance'
+  | 'projection'
+  | 'unusual'
+  | 'recurring'
+  | 'whereMoney'
+  | 'comingUp'
+  | 'incomeVsExpenses'
+  | 'spendingByCategory'
+  | 'averageIncome'
+  | 'monthInDetail'
+
+/** The Visão geral's cards in order (every one), and the hidden ones. */
+export interface OverviewLayout {
+  order: OverviewSection[]
+  hidden: OverviewSection[]
+}
+
 /** A hand-set answer to "is this a transfer (own accounts, or a card bill payment)?". */
 export type TransferOverride = 'own' | 'card-payment' | 'none'
 
@@ -188,6 +208,8 @@ export interface Snapshot {
   pension?: Pension
   /** The "Equilíbrio do mês" target (50/30/20 when absent). */
   balanceTarget?: BalanceTarget
+  /** The Visão geral's order and hidden cards (the default when absent). */
+  overviewLayout?: OverviewLayout
 }
 
 /** What the month-end projection counts. */
