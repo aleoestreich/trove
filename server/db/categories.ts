@@ -6,8 +6,9 @@ import { EditError, checkBulk, checkIncomeFilter, defaultCategories, type BulkRe
 import { NO_FILTER, pruneIncomeFilter } from '../../src/data/incomeAverage.js'
 import { DEFAULT_PROJECTION_SETTINGS } from '../../src/data/projection.js'
 import { applyRecurringAction } from '../../src/data/recurring.js'
-import type { BalanceTarget, Category, IncomeFilter, ProjectionSettings, RecurringOverride, SpendingGroup, Subcategory } from '../../src/data/types.js'
+import type { BalanceTarget, Category, OverviewLayout, IncomeFilter, ProjectionSettings, RecurringOverride, SpendingGroup, Subcategory } from '../../src/data/types.js'
 import { DEFAULT_TARGET, isTarget } from '../../src/data/spendingBalance.js'
+import { DEFAULT_LAYOUT, normalizeLayout } from '../../src/data/overviewLayout.js'
 import { inTransaction, type Db } from './connection.js'
 import { readSnapshot } from './read.js'
 import { sortFgts, type Fgts } from '../../src/data/fgts.js'
@@ -168,6 +169,14 @@ export async function readBalanceTarget(db: Db): Promise<BalanceTarget> {
   const r = await db.query<{ value: unknown }>(`SELECT value FROM app_settings WHERE key = $1`, [BALANCE_TARGET_KEY])
   const v = r.rows[0]?.value
   return isTarget(v) ? { essential: v.essential, lifestyle: v.lifestyle, future: v.future } : DEFAULT_TARGET
+}
+
+/** The Visão geral's order and hidden cards, in app_settings under `overview_layout`. Nothing stored: the default. */
+const OVERVIEW_LAYOUT_KEY = 'overview_layout'
+
+export async function readOverviewLayout(db: Db): Promise<OverviewLayout> {
+  const r = await db.query<{ value: unknown }>(`SELECT value FROM app_settings WHERE key = $1`, [OVERVIEW_LAYOUT_KEY])
+  return r.rows[0] ? normalizeLayout(r.rows[0].value) : DEFAULT_LAYOUT
 }
 
 async function writeSetting(db: Db, key: string, value: unknown): Promise<void> {
@@ -385,6 +394,9 @@ async function run(db: Db, e: Edit, itemIds: string[] | undefined): Promise<Edit
     }
     case 'setBalanceTarget':
       await writeSetting(db, BALANCE_TARGET_KEY, e.target)
+      return null
+    case 'setOverviewLayout':
+      await writeSetting(db, OVERVIEW_LAYOUT_KEY, e.layout)
       return null
     case 'setCardDays':
       // Their own columns too; cards only, as in the app.

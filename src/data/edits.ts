@@ -10,7 +10,8 @@ import { RECURRING_ACTIONS, applyRecurringAction, type RecurringAction } from '.
 import { FGTS_MAX, NO_FGTS, sortFgts, type FgtsEntry } from './fgts.js'
 import { NO_PENSION, PENSION_MAX, PLAN_NAME_MAX, PLAN_TYPES, sortPensionEntries, type Pension, type PlanType } from './pension.js'
 import { SPENDING_GROUPS, isTarget } from './spendingBalance.js'
-import type { BalanceTarget, Category, CategoryType, IncomeFilter, ProjectionHorizon, ProjectionSettings, Snapshot, SpendingGroup, Subcategory, TransferOverride } from './types.js'
+import { isLayout, normalizeLayout } from './overviewLayout.js'
+import type { BalanceTarget, Category, OverviewLayout, CategoryType, IncomeFilter, ProjectionHorizon, ProjectionSettings, Snapshot, SpendingGroup, Subcategory, TransferOverride } from './types.js'
 
 export type Edit =
   /** Sets a transaction's category and subcategory (null: uncategorized / none). */
@@ -71,6 +72,8 @@ export type Edit =
   | { op: 'setSubcategoryGroup'; id: string; group: SpendingGroup | null }
   /** The "Equilíbrio do mês" target (whole percents that add up to 100). */
   | { op: 'setBalanceTarget'; target: BalanceTarget }
+  /** The Visão geral's order and hidden cards (every card listed once in `order`). */
+  | { op: 'setOverviewLayout'; layout: OverviewLayout }
 
 /** A transaction's category before a bulk change. `editedAt`: when it was last set by hand (server only). */
 export interface PreviousCategory {
@@ -287,6 +290,10 @@ export function validateEdit(e: unknown): Edit {
       const t = x.target as BalanceTarget
       return { op: 'setBalanceTarget', target: { essential: t.essential, lifestyle: t.lifestyle, future: t.future } }
     }
+    case 'setOverviewLayout': {
+      if (!isLayout(x.layout)) bad('layout')
+      return { op: 'setOverviewLayout', layout: normalizeLayout(x.layout) }
+    }
     case 'setCardDays': {
       if (x.days === null) return { op: 'setCardDays', accountId: id(x.accountId, 'account'), days: null }
       const d = (x.days ?? {}) as Record<string, unknown>
@@ -458,6 +465,8 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
     }
     case 'setBalanceTarget':
       return { ...s, balanceTarget: e.target }
+    case 'setOverviewLayout':
+      return { ...s, overviewLayout: e.layout }
     case 'setCardDays': {
       if (!s.accounts.some((a) => a.id === e.accountId && a.type === 'CREDIT')) fail('not_found', 'card')
       const { [e.accountId]: _old, ...others } = s.cardDays ?? {}

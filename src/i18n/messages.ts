@@ -3,7 +3,7 @@
 // Transaction descriptions and account names are not translated: they are
 // data from the banks (via Pluggy) and shown as the bank sends them.
 
-import type { SyncPeriod } from '../data/types.js'
+import type { OverviewSection, SyncPeriod } from '../data/types.js'
 
 export interface Messages {
   nav: {
@@ -284,6 +284,23 @@ export interface Messages {
     nextMonthPurchases: (month: string, n: number) => string
     spendingByCategory: string
     monthInDetail: string
+    /** "Personalizar": the order of the cards and the hidden ones, shared by every device. */
+    layout: {
+      open: string
+      title: string
+      sub: string
+      sections: Record<OverviewSection, string>
+      moveUp: (name: string) => string
+      moveDown: (name: string) => string
+      show: (name: string) => string
+      hiddenTag: string
+      shownCount: (n: number, total: number) => string
+      reset: string
+      cancel: string
+      save: string
+      failed: string
+      allHidden: string
+    }
     /** Under the month picker: "Mês atual · até hoje, 8 out." or "Mês fechado". */
     currentMonth: (day: string) => string
     closedMonth: string
@@ -1199,6 +1216,34 @@ export const messages: Messages = {
     nextMonthPurchases: (month, n) => `${month} · ${n} ${n === 1 ? 'compra' : 'compras'}`,
     spendingByCategory: 'Gastos por categoria',
     monthInDetail: 'Mês em detalhe',
+    layout: {
+      open: 'Personalizar',
+      title: 'Personalizar visão geral',
+      sub: 'Ordem e cartões visíveis. Vale em todos os aparelhos.',
+      sections: {
+        netWorth: 'Patrimônio líquido',
+        balance: 'Equilíbrio do mês',
+        projection: 'Previsão do fim do mês',
+        unusual: 'Fora do padrão',
+        recurring: 'Recorrentes',
+        whereMoney: 'Onde está seu dinheiro',
+        comingUp: 'Próximos pagamentos',
+        incomeVsExpenses: 'Receitas vs. despesas',
+        spendingByCategory: 'Gastos por categoria',
+        averageIncome: 'Renda média',
+        monthInDetail: 'Mês em detalhe',
+      },
+      moveUp: (name) => `Subir ${name}`,
+      moveDown: (name) => `Descer ${name}`,
+      show: (name) => `Mostrar ${name}`,
+      hiddenTag: 'Oculto',
+      shownCount: (n, total) => `${n} de ${total} visíveis`,
+      reset: 'Restaurar padrão',
+      cancel: 'Cancelar',
+      save: 'Salvar',
+      failed: 'Não foi possível salvar. Tente de novo.',
+      allHidden: 'Todos os cartões estão ocultos. Use Personalizar para mostrar algum.',
+    },
     currentMonth: (day) => `Mês atual · até hoje, ${day}`,
     closedMonth: 'Mês fechado',
     fetchingMonth: (month) => `Buscando ${month}…`,

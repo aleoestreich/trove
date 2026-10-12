@@ -121,6 +121,11 @@ between accounts, and card bill payments.
 - **Average income** (Overview) averages the last 6 complete months of
   income in the categories chosen on its card (all by default; the choice is
   saved in the database and shared between devices).
+- **Overview layout:** "Personalizar" (the sliders icon in the phone
+  header, a button next to the desktop title) moves each card up or down
+  and hides the ones not wanted; "Restaurar padrão" brings back the default.
+  Saved in the database, so every device shows the same page. On desktop a
+  custom order fills each row to the full width.
 - **Overview periods:** the multi-month charts (income vs expenses, spending
   by category) show 3 months, 6 months (default) or 1 year,
   chosen at the top of the Overview (kept in the address, `?r=3|6|12`). The

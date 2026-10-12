@@ -1,7 +1,10 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useData, useSync } from '../state'
-import type { Transaction } from '../data/types'
+import type { OverviewSection, Transaction } from '../data/types'
+import { fillRows, isDefaultLayout, shownSections } from '../data/overviewLayout'
+import { CustomizeButton, OverviewLayoutSheet } from '../components/OverviewLayout'
 import { balances, expensesByCategory, inMonth, totals, visible } from '../lib/summary'
 import { incomeAverage, NO_FILTER } from '../data/incomeAverage'
 import { CategoryBadge, catVar } from '../components/CategoryBadge'
@@ -30,11 +33,26 @@ import { messages } from '../i18n/messages'
 import { shownName } from '../lib/accountLabel'
 
 const TOP_CATEGORIES = 5
+/** Each card's usual width on desktop, of 12 columns (a custom layout fills its rows from these). */
+const DESKTOP_SPAN: Record<OverviewSection | 'trend', number> = {
+  netWorth: 8,
+  comingUp: 4,
+  projection: 7,
+  unusual: 5,
+  balance: 12,
+  recurring: 12,
+  trend: 12,
+  incomeVsExpenses: 6,
+  spendingByCategory: 6,
+  averageIncome: 12,
+  whereMoney: 4,
+  monthInDetail: 8,
+}
 /** Complete months in the average income. */
 const CURRENCY_COLORS: Record<string, string> = { BRL: 'var(--series-1)', USD: 'var(--series-3)', EUR: 'var(--series-4)' }
 
 export function Dashboard() {
-  const { accounts, transactions, allTransactions, categories, subcategories, incomeFilter, categoriesById, institutionsById, insights, storedMonths, loadedFrom } = useData()
+  const { accounts, transactions, allTransactions, categories, subcategories, incomeFilter, categoriesById, institutionsById, insights, storedMonths, loadedFrom, overviewLayout } = useData()
   const isDesktop = useIsDesktop()
   const [params, setParams] = useSearchParams()
   const { t, categoryName } = useI18n()
@@ -44,6 +62,10 @@ export function Dashboard() {
   const range = parseRange(params.get('r'))
   const months = useMemo(() => lastMonths(latest, range), [latest, range])
   const [selected, setSelected] = useState<Transaction | null>(null)
+  const [customizing, setCustomizing] = useState(false)
+  // "Personalizar" goes in the app's mobile header.
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null)
+  useEffect(() => setHeaderSlot(document.getElementById('header-actions')), [])
 
   const bal = balances(accounts)
 
@@ -130,280 +152,305 @@ export function Dashboard() {
   const setMonth = (m: string) => setParam('m', m)
   const setRange = (r: Range) => setParam('r', String(r))
 
-  return (
-    <>
-      <PageHeader title={t.nav.overview} subtitle={t.overview.subtitle(formatFullDate(toISO(new Date())))} />
-      <SyncBar className="mb-3" />
-      <BalancesReminder className="mb-3 lg:mb-5" />
-
-      {/* Phones: one column in reading order. Desktop: a 12-column grid, reordered. */}
-      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-12 lg:gap-5">
-        {/* 1. Net worth today: the accounts' balances minus the open card bills, as the banks report them */}
-        <NetWorthCard className="lg:order-1 lg:col-span-8 lg:self-start" />
-
-        {/* Equilíbrio do mês: how the income splits between Essencial, Estilo de vida and Futuro (desktop: above the recurring charges) */}
-        <BalanceCard />
-
-        {/* Insights: month-end projection, unusual categories, recurring charges (desktop: right below net worth) */}
-        <ProjectionCard projection={insights.projection} />
-        <UnusualCard unusual={insights.unusual} />
-        <RecurringCard summary={insights.recurring} />
-
-        {/* 2. Where the money is */}
-        <Card className="flex flex-col gap-4 lg:order-9 lg:col-span-4">
-          <CardTitle subtitle={t.overview.balancesNote}>{t.overview.whereMoney}</CardTitle>
-          <div className="flex flex-col gap-2">
-            <Overline className="lg:hidden">{t.overview.byCurrency}</Overline>
-            <div data-progress className="flex h-3 gap-0.5 overflow-hidden rounded-xs" aria-hidden>
-              {byCurrency.map((c) => (
-                <div key={c.id} style={{ flexGrow: c.amount, flexBasis: 0, background: CURRENCY_COLORS[c.id] ?? 'var(--series-6)' }} />
-              ))}
-            </div>
-            <div className="flex justify-between gap-3">
-              {byCurrency.map((c, i) => (
-                <div key={c.id} className={`flex min-w-0 flex-col gap-0.5 ${i > 0 ? 'items-end text-right' : ''}`}>
-                  <span className="flex items-center gap-1.5 text-[13px] text-ink-2">
-                    <Swatch color={CURRENCY_COLORS[c.id] ?? 'var(--series-6)'} />
-                    {c.id} · <span className="tabular">{formatPercent(bal.cash > 0 ? (c.amount / bal.cash) * 100 : 0)}</span>
-                  </span>
-                  <span className="tabular text-[15px] font-medium text-ink lg:text-sm">
-                    {c.id === 'BRL' ? formatMoney(c.amount) : formatMoney(foreignBalance(c.id), c.id as 'USD')}
-                  </span>
-                  {c.id !== 'BRL' && <span className="tabular text-xs text-muted">≈ {formatMoney(c.amount)}</span>}
-                </div>
-              ))}
-            </div>
+  // Each card of the page, by its key in the layout (src/data/overviewLayout.ts).
+  const sections: Record<OverviewSection, ReactNode> = {
+    // Net worth today: the accounts' balances minus the open card bills, as the banks report them
+    netWorth: <NetWorthCard className="lg:order-1 lg:col-span-8 lg:self-start" />,
+    // How the income splits between Essencial, Estilo de vida and Futuro (desktop: above the recurring charges)
+    balance: <BalanceCard />,
+    // Insights: month-end projection, unusual categories, recurring charges (desktop: right below net worth)
+    projection: <ProjectionCard projection={insights.projection} />,
+    unusual: <UnusualCard unusual={insights.unusual} />,
+    recurring: <RecurringCard summary={insights.recurring} />,
+    whereMoney: (
+      <Card className="flex flex-col gap-4 lg:order-9 lg:col-span-4">
+        <CardTitle subtitle={t.overview.balancesNote}>{t.overview.whereMoney}</CardTitle>
+        <div className="flex flex-col gap-2">
+          <Overline className="lg:hidden">{t.overview.byCurrency}</Overline>
+          <div data-progress className="flex h-3 gap-0.5 overflow-hidden rounded-xs" aria-hidden>
+            {byCurrency.map((c) => (
+              <div key={c.id} style={{ flexGrow: c.amount, flexBasis: 0, background: CURRENCY_COLORS[c.id] ?? 'var(--series-6)' }} />
+            ))}
           </div>
-          <div className="flex flex-col lg:border-t lg:border-line lg:pt-3">
-            <Overline className="mb-1 lg:hidden">{t.overview.byBank}</Overline>
-            {byInstitution.map((s) => {
-              const share = bal.cash > 0 ? (s.amount / bal.cash) * 100 : 0
-              return (
-                <div key={s.id} className="flex min-h-[60px] items-center gap-3 lg:min-h-[52px]">
-                  <InstitutionBadge institution={institutionsById.get(s.id)!} size={isDesktop ? 32 : 36} />
-                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate text-[15px] font-medium text-ink lg:text-sm">
-                        {s.label} <span className="tabular text-[13px] font-normal text-muted lg:text-xs">{formatPercent(share)}</span>
-                      </span>
-                      <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink lg:text-sm">{formatMoney(s.amount)}</span>
-                    </div>
-                    <Progress value={share} height={4} tone="bar" />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-
-        {/* 4. Coming up */}
-        <Card className="flex flex-col gap-2 lg:order-2 lg:col-span-4">
-          <CardTitle subtitle={t.overview.openCardBills}>{t.overview.comingUp}</CardTitle>
-          {cards.map((c) => {
-            // The bill from the billing cycle; the balance only when the bank gives no closing date.
-            const bill = currentBill(c, transactions, plans)
-            const dueDate = bill ? bill.dueDate : c.creditData?.balanceDueDate
-            return (
-              <Link key={c.id} to={bill ? `/transactions?bill=${c.id}` : `/transactions?m=all&a=${c.id}`} className="flex min-h-[60px] items-center gap-3 border-b border-line active:bg-track">
-                <InstitutionBadge institution={institutionsById.get(c.institutionId)!} size={36} />
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate text-[15px] font-medium text-ink lg:text-sm">{shownName(c, t.cardOf(institutionsById.get(c.institutionId)!.name))}</span>
-                  {dueDate && <span className="text-[13px] text-muted">{t.overview.due(formatShortDate(dueDate))}</span>}
+          <div className="flex justify-between gap-3">
+            {byCurrency.map((c, i) => (
+              <div key={c.id} className={`flex min-w-0 flex-col gap-0.5 ${i > 0 ? 'items-end text-right' : ''}`}>
+                <span className="flex items-center gap-1.5 text-[13px] text-ink-2">
+                  <Swatch color={CURRENCY_COLORS[c.id] ?? 'var(--series-6)'} />
+                  {c.id} · <span className="tabular">{formatPercent(bal.cash > 0 ? (c.amount / bal.cash) * 100 : 0)}</span>
                 </span>
-                <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(bill ? bill.amount : c.balance)}</span>
-              </Link>
+                <span className="tabular text-[15px] font-medium text-ink lg:text-sm">
+                  {c.id === 'BRL' ? formatMoney(c.amount) : formatMoney(foreignBalance(c.id), c.id as 'USD')}
+                </span>
+                {c.id !== 'BRL' && <span className="tabular text-xs text-muted">≈ {formatMoney(c.amount)}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col lg:border-t lg:border-line lg:pt-3">
+          <Overline className="mb-1 lg:hidden">{t.overview.byBank}</Overline>
+          {byInstitution.map((s) => {
+            const share = bal.cash > 0 ? (s.amount / bal.cash) * 100 : 0
+            return (
+              <div key={s.id} className="flex min-h-[60px] items-center gap-3 lg:min-h-[52px]">
+                <InstitutionBadge institution={institutionsById.get(s.id)!} size={isDesktop ? 32 : 36} />
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-[15px] font-medium text-ink lg:text-sm">
+                      {s.label} <span className="tabular text-[13px] font-normal text-muted lg:text-xs">{formatPercent(share)}</span>
+                    </span>
+                    <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink lg:text-sm">{formatMoney(s.amount)}</span>
+                  </div>
+                  <Progress value={share} height={4} tone="bar" />
+                </div>
+              </div>
             )
           })}
-          <Link to="/installments" className="flex min-h-16 items-center gap-3 active:bg-track lg:mt-auto lg:rounded-md lg:bg-page lg:p-3.5">
-            <IconDisc icon="installments" size="sm" tone="accent" />
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-[15px] font-medium text-ink lg:text-sm">{t.overview.installmentsNextMonth}</span>
-              <span className="text-[13px] text-muted">{t.overview.nextMonthPurchases(formatMonthName(nextMonthKey), nextMonthPurchases)}</span>
+        </div>
+      </Card>
+    ),
+    comingUp: (
+      <Card className="flex flex-col gap-2 lg:order-2 lg:col-span-4">
+        <CardTitle subtitle={t.overview.openCardBills}>{t.overview.comingUp}</CardTitle>
+        {cards.map((c) => {
+          // The bill from the billing cycle; the balance only when the bank gives no closing date.
+          const bill = currentBill(c, transactions, plans)
+          const dueDate = bill ? bill.dueDate : c.creditData?.balanceDueDate
+          return (
+            <Link key={c.id} to={bill ? `/transactions?bill=${c.id}` : `/transactions?m=all&a=${c.id}`} className="flex min-h-[60px] items-center gap-3 border-b border-line active:bg-track">
+              <InstitutionBadge institution={institutionsById.get(c.institutionId)!} size={36} />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-[15px] font-medium text-ink lg:text-sm">{shownName(c, t.cardOf(institutionsById.get(c.institutionId)!.name))}</span>
+                {dueDate && <span className="text-[13px] text-muted">{t.overview.due(formatShortDate(dueDate))}</span>}
+              </span>
+              <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(bill ? bill.amount : c.balance)}</span>
+            </Link>
+          )
+        })}
+        <Link to="/installments" className="flex min-h-16 items-center gap-3 active:bg-track lg:mt-auto lg:rounded-md lg:bg-page lg:p-3.5">
+          <IconDisc icon="installments" size="sm" tone="accent" />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-[15px] font-medium text-ink lg:text-sm">{t.overview.installmentsNextMonth}</span>
+            <span className="text-[13px] text-muted">{t.overview.nextMonthPurchases(formatMonthName(nextMonthKey), nextMonthPurchases)}</span>
+          </span>
+          <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(nextMonthInstallments)}</span>
+        </Link>
+      </Card>
+    ),
+    incomeVsExpenses: (
+      <Card className="flex flex-col gap-3.5 lg:order-6 lg:col-span-6 lg:gap-4">
+        <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
+          <CardTitle subtitle={t.overview.lastMonths(range)}>{t.overview.incomeVsExpenses}</CardTitle>
+          <div data-legend className="flex flex-wrap gap-x-4 gap-y-1.5 lg:pt-0.5">
+            <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-2">
+              <Swatch color="var(--income)" />
+              {t.income}
             </span>
-            <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink">{formatMoney(nextMonthInstallments)}</span>
-          </Link>
-        </Card>
-
-        {/* Trend: the period of the multi-month charts, right above them */}
-        <section aria-labelledby="trend-title" className="mt-3 flex flex-col gap-3 lg:order-6 lg:col-span-12 lg:mt-0 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-baseline justify-between gap-3 px-1 lg:flex-col lg:items-start lg:gap-0.5 lg:px-0">
-            <h2 id="trend-title" className="text-lg leading-6 font-medium text-ink">
-              {t.overview.trend}
-            </h2>
-            <span className="text-[13px] leading-[18px] text-ink-2">{spanLabel(months)}</span>
+            <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-2">
+              <Swatch color="var(--ink-2)" />
+              {t.expenses}
+            </span>
           </div>
-          <div className="lg:w-[330px]">
-            <RangeSwitcher value={range} onChange={setRange} />
+        </div>
+        <CashFlowChart data={flow} label={t.overview.incomeVsExpenses} />
+        <div className="grid grid-cols-2 gap-3 border-t border-line pt-3 lg:grid-cols-3 lg:pt-3.5">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs leading-4 text-muted">
+              {t.income} · {thisMonth.label}
+            </span>
+            <span className="tabular text-base font-medium text-income lg:text-[17px]">{formatMoney(thisMonth.income, 'BRL', { signed: true })}</span>
           </div>
-          {shortHistory && (
-            <p className="flex items-start gap-2.5 px-1 text-[13px] leading-[18px] text-ink-2 lg:hidden">
-              <Icon name="info" className="mt-px size-[18px] shrink-0 text-ink-2" />
-              {t.overview.shortHistory(`${formatMonthShort(firstMonth)} ${firstMonth.slice(0, 4)}`)}
-            </p>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs leading-4 text-muted">
+              {t.expenses} · {thisMonth.label}
+            </span>
+            <span className="tabular text-base font-medium text-ink lg:text-[17px]">{formatMoney(-thisMonth.expenses, 'BRL', { signed: true })}</span>
+          </div>
+          {keptPct !== null && (
+            <div className="hidden flex-col gap-0.5 lg:flex">
+              <span className="text-xs leading-4 text-muted">{t.overview.keptShort}</span>
+              <span className={`tabular text-[17px] font-bold ${keptPct >= 0 ? 'text-ink' : 'text-critical'}`}>{formatPercent(keptPct)}</span>
+            </div>
           )}
-        </section>
+        </div>
+        {keptPct !== null && (
+          <div className="flex items-center gap-3.5 rounded-md bg-page p-3 lg:hidden">
+            <span className={`tabular text-[28px] leading-8 font-bold tracking-[-0.02em] ${keptPct >= 0 ? 'text-ink' : 'text-critical'}`}>
+              {formatPercent(keptPct)}
+            </span>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <span className="text-[13px] leading-[18px] text-ink-2">{t.overview.kept}</span>
+              <Progress value={keptPct} height={6} tone="income" />
+            </div>
+          </div>
+        )}
+      </Card>
+    ),
+    spendingByCategory: (
+      <Card className="flex flex-col gap-3.5 lg:order-7 lg:col-span-6 lg:gap-4">
+        <CardTitle subtitle={t.overview.lastMonths(range)}>{t.overview.spendingByCategory}</CardTitle>
+        <StackedMonthChart data={trendData} series={trendSeries} colors={trendColors} label={t.overview.spendingByCategory} months={months} empty={empty} />
+        <ul data-legend className="flex flex-wrap gap-x-3.5 gap-y-2 lg:gap-x-4 lg:border-t lg:border-line lg:pt-3.5">
+          {trendSeries.map((s, i) => (
+            <li key={s.key} className="inline-flex items-center gap-1.5 text-[13px] leading-[18px] text-ink-2">
+              <Swatch color={trendColors[i]} />
+              {s.name}
+            </li>
+          ))}
+        </ul>
+      </Card>
+    ),
+    // Desktop: full width after the two monthly charts
+    averageIncome: avgIncome && (
+      <Card className="lg:order-8 lg:col-span-12">
+        <AverageIncomeCard average={avgIncome} />
+      </Card>
+    ),
+    // Any stored month (older ones fetched), its totals, top categories and latest transactions
+    monthInDetail: (
+      <Card className="flex flex-col gap-3 !pb-2 lg:order-10 lg:col-span-8 lg:!pb-5">
+        <CardTitle>{t.overview.monthInDetail}</CardTitle>
+        <MonthPicker month={month} months={pickable} latest={latest} today={toISO(new Date())} counts={counts} onChange={setMonth} />
+        {stored.status === 'loading' ? (
+          <div className="flex flex-col gap-3" aria-busy>
+            <p role="status" className="flex items-center gap-2.5 py-1 text-[13px] leading-[18px] text-ink-2">
+              <Icon name="refresh" className="size-[18px] text-accent motion-safe:animate-spin" strokeWidth={2} />
+              {t.overview.fetchingMonth(monthTitle(month))}
+            </p>
+            <div className="grid grid-cols-3 gap-2" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-14 rounded-md bg-track" />
+              ))}
+            </div>
+            <div className="flex flex-col gap-3 pb-3" aria-hidden>
+              <div className="h-3 w-4/5 rounded-full bg-track" />
+              <div className="h-3 w-3/5 rounded-full bg-track" />
+              <div className="h-3 w-1/2 rounded-full bg-track" />
+            </div>
+          </div>
+        ) : stored.status === 'error' ? (
+          <div role="alert" className="mb-2 flex items-center gap-3 rounded-md border border-critical/30 bg-critical-soft py-1.5 pr-1.5 pl-3 text-[13px] leading-[18px] text-ink">
+            <Icon name="alert" className="size-[18px] shrink-0 text-critical" />
+            <span className="min-w-0 flex-1">{t.overview.fetchMonthFailed(monthTitle(month))}</span>
+            <button type="button" onClick={stored.retry} className="h-11 shrink-0 rounded-sm px-2 text-sm font-medium text-accent hover:bg-accent-faint">
+              {t.tryAgain}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2 lg:gap-3">
+              <Tile label={t.income} value={formatWhole(monthTotals.income)} tone="text-income" />
+              <Tile label={t.expenses} value={formatWhole(-monthTotals.expenses)} tone="text-ink" />
+              <Tile label={t.net} value={formatWhole(monthTotals.net)} tone={monthTotals.net >= 0 ? 'text-ink' : 'text-critical'} />
+            </div>
+
+            <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:gap-7">
+              <div className="flex flex-col">
+                <Overline className="mt-1 mb-1">{t.overview.topCategories}</Overline>
+                {byCategory.length === 0 && <p className="text-sm text-muted">{t.overview.noExpenses}</p>}
+                {byCategory.map(({ category, amount }) => {
+                  const share = monthTotals.expenses > 0 ? (amount / monthTotals.expenses) * 100 : 0
+                  const key = category?.id ?? 'none'
+                  return (
+                    <Link
+                      key={key}
+                      to={`/transactions?m=${month}&c=${key}`}
+                      className="-mx-1 flex min-h-14 items-center gap-3 rounded-sm px-1 active:bg-track lg:hover:bg-track"
+                    >
+                      <CategoryBadge category={category ?? null} size={32} />
+                      <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className="truncate text-[15px] text-ink lg:text-sm">{categoryName(category)}</span>
+                          <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink lg:text-sm">{formatMoney(amount)}</span>
+                        </span>
+                        <Progress value={share} height={6} tone={keyColor(key)} />
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
+
+              <div className="flex flex-col">
+                <div className="mt-1 mb-1 flex items-baseline justify-between">
+                  <Overline>{t.overview.latestTransactions}</Overline>
+                  <Link to={`/transactions?m=${month}`} className="hidden text-[13px] font-medium text-accent hover:underline lg:inline">
+                    {t.seeAll}
+                  </Link>
+                </div>
+                <div className="lg:divide-y lg:divide-line">
+                  {monthTxs.slice(0, 5).map((tx) => (
+                    <TransactionRow key={tx.id} tx={tx} onSelect={setSelected} showDate className="lg:min-h-[52px]" />
+                  ))}
+                </div>
+                <div className="lg:hidden">
+                  <SeeAll to={`/transactions?m=${month}`}>{t.seeAll}</SeeAll>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </Card>
+    ),
+  }
+  // The period of the multi-month charts, right above the first of them.
+  const trend = (
+    <>
+      <section aria-labelledby="trend-title" className="mt-3 flex flex-col gap-3 lg:order-6 lg:col-span-12 lg:mt-0 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-baseline justify-between gap-3 px-1 lg:flex-col lg:items-start lg:gap-0.5 lg:px-0">
+          <h2 id="trend-title" className="text-lg leading-6 font-medium text-ink">
+            {t.overview.trend}
+          </h2>
+          <span className="text-[13px] leading-[18px] text-ink-2">{spanLabel(months)}</span>
+        </div>
+        <div className="lg:w-[330px]">
+          <RangeSwitcher value={range} onChange={setRange} />
+        </div>
         {shortHistory && (
-          <p className="hidden items-center gap-2.5 text-[13px] leading-[18px] text-ink-2 lg:order-6 lg:col-span-12 lg:-mt-2 lg:flex">
-            <Icon name="info" className="size-[18px] shrink-0" />
+          <p className="flex items-start gap-2.5 px-1 text-[13px] leading-[18px] text-ink-2 lg:hidden">
+            <Icon name="info" className="mt-px size-[18px] shrink-0 text-ink-2" />
             {t.overview.shortHistory(`${formatMonthShort(firstMonth)} ${firstMonth.slice(0, 4)}`)}
           </p>
         )}
+      </section>
+      {shortHistory && (
+        <p className="hidden items-center gap-2.5 text-[13px] leading-[18px] text-ink-2 lg:order-6 lg:col-span-12 lg:-mt-2 lg:flex">
+          <Icon name="info" className="size-[18px] shrink-0" />
+          {t.overview.shortHistory(`${formatMonthShort(firstMonth)} ${firstMonth.slice(0, 4)}`)}
+        </p>
+      )}
+    </>
+  )
+  // Cards with nothing to show yet (no comparison, no complete month of income) take no place.
+  const shown = shownSections(overviewLayout).filter((x) => (x === 'unusual' ? !!insights.unusual : x === 'averageIncome' ? !!avgIncome : true))
+  const firstTrend = shown.find((x) => x === 'incomeVsExpenses' || x === 'spendingByCategory')
+  // A custom layout on desktop: the cards (and the period above the charts) in its order, rows filled.
+  const custom = !isDefaultLayout(overviewLayout)
+  const items = shown.flatMap((x) => (x === firstTrend ? (['trend', x] as const) : ([x] as const)))
+  const spans = fillRows(items.map((x) => DESKTOP_SPAN[x]))
+  const render = (x: OverviewSection | 'trend') => (x === 'trend' ? trend : sections[x])
 
-        {/* 3. Income vs expenses */}
-        <Card className="flex flex-col gap-3.5 lg:order-6 lg:col-span-6 lg:gap-4">
-          <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
-            <CardTitle subtitle={t.overview.lastMonths(range)}>{t.overview.incomeVsExpenses}</CardTitle>
-            <div data-legend className="flex flex-wrap gap-x-4 gap-y-1.5 lg:pt-0.5">
-              <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-2">
-                <Swatch color="var(--income)" />
-                {t.income}
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-2">
-                <Swatch color="var(--ink-2)" />
-                {t.expenses}
-              </span>
-            </div>
-          </div>
-          <CashFlowChart data={flow} label={t.overview.incomeVsExpenses} />
-          <div className="grid grid-cols-2 gap-3 border-t border-line pt-3 lg:grid-cols-3 lg:pt-3.5">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs leading-4 text-muted">
-                {t.income} · {thisMonth.label}
-              </span>
-              <span className="tabular text-base font-medium text-income lg:text-[17px]">{formatMoney(thisMonth.income, 'BRL', { signed: true })}</span>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs leading-4 text-muted">
-                {t.expenses} · {thisMonth.label}
-              </span>
-              <span className="tabular text-base font-medium text-ink lg:text-[17px]">{formatMoney(-thisMonth.expenses, 'BRL', { signed: true })}</span>
-            </div>
-            {keptPct !== null && (
-              <div className="hidden flex-col gap-0.5 lg:flex">
-                <span className="text-xs leading-4 text-muted">{t.overview.keptShort}</span>
-                <span className={`tabular text-[17px] font-bold ${keptPct >= 0 ? 'text-ink' : 'text-critical'}`}>{formatPercent(keptPct)}</span>
-              </div>
-            )}
-          </div>
-          {keptPct !== null && (
-            <div className="flex items-center gap-3.5 rounded-md bg-page p-3 lg:hidden">
-              <span className={`tabular text-[28px] leading-8 font-bold tracking-[-0.02em] ${keptPct >= 0 ? 'text-ink' : 'text-critical'}`}>
-                {formatPercent(keptPct)}
-              </span>
-              <div className="flex flex-1 flex-col gap-1.5">
-                <span className="text-[13px] leading-[18px] text-ink-2">{t.overview.kept}</span>
-                <Progress value={keptPct} height={6} tone="income" />
-              </div>
-            </div>
-          )}
-        </Card>
+  return (
+    <>
+      <PageHeader title={t.nav.overview} subtitle={t.overview.subtitle(formatFullDate(toISO(new Date())))}>
+        {isDesktop && <CustomizeButton onClick={() => setCustomizing(true)} />}
+      </PageHeader>
+      {!isDesktop && headerSlot && createPortal(<CustomizeButton compact onClick={() => setCustomizing(true)} />, headerSlot)}
+      <SyncBar className="mb-3" />
+      <BalancesReminder className="mb-3 lg:mb-5" />
 
-        {/* 5. Spending trend */}
-        <Card className="flex flex-col gap-3.5 lg:order-7 lg:col-span-6 lg:gap-4">
-          <CardTitle subtitle={t.overview.lastMonths(range)}>{t.overview.spendingByCategory}</CardTitle>
-          <StackedMonthChart data={trendData} series={trendSeries} colors={trendColors} label={t.overview.spendingByCategory} months={months} empty={empty} />
-          <ul data-legend className="flex flex-wrap gap-x-3.5 gap-y-2 lg:gap-x-4 lg:border-t lg:border-line lg:pt-3.5">
-            {trendSeries.map((s, i) => (
-              <li key={s.key} className="inline-flex items-center gap-1.5 text-[13px] leading-[18px] text-ink-2">
-                <Swatch color={trendColors[i]} />
-                {s.name}
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        {/* 3b. Average income (desktop: full width after the two monthly charts) */}
-        {avgIncome && (
-          <Card className="lg:order-8 lg:col-span-12">
-            <AverageIncomeCard average={avgIncome} />
-          </Card>
-        )}
-
-        {/* 6. One month in detail: any stored month (older ones fetched), its totals, top categories and latest transactions */}
-        <Card className="flex flex-col gap-3 !pb-2 lg:order-10 lg:col-span-8 lg:!pb-5">
-          <CardTitle>{t.overview.monthInDetail}</CardTitle>
-          <MonthPicker month={month} months={pickable} latest={latest} today={toISO(new Date())} counts={counts} onChange={setMonth} />
-          {stored.status === 'loading' ? (
-            <div className="flex flex-col gap-3" aria-busy>
-              <p role="status" className="flex items-center gap-2.5 py-1 text-[13px] leading-[18px] text-ink-2">
-                <Icon name="refresh" className="size-[18px] text-accent motion-safe:animate-spin" strokeWidth={2} />
-                {t.overview.fetchingMonth(monthTitle(month))}
-              </p>
-              <div className="grid grid-cols-3 gap-2" aria-hidden>
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-14 rounded-md bg-track" />
-                ))}
+      {/* Phones: one column in the saved order. Desktop: a 12-column grid; the default layout arranged for it, a custom one in its own order. */}
+      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-12 lg:gap-5">
+        {custom
+          ? items.map((x, i) => (
+              <div key={x} className="flex flex-col gap-3 lg:gap-5 lg:[&>*]:flex-1 lg:[&>*]:!self-stretch" style={isDesktop ? { gridColumn: `span ${spans[i]}` } : undefined}>
+                {render(x)}
               </div>
-              <div className="flex flex-col gap-3 pb-3" aria-hidden>
-                <div className="h-3 w-4/5 rounded-full bg-track" />
-                <div className="h-3 w-3/5 rounded-full bg-track" />
-                <div className="h-3 w-1/2 rounded-full bg-track" />
-              </div>
-            </div>
-          ) : stored.status === 'error' ? (
-            <div role="alert" className="mb-2 flex items-center gap-3 rounded-md border border-critical/30 bg-critical-soft py-1.5 pr-1.5 pl-3 text-[13px] leading-[18px] text-ink">
-              <Icon name="alert" className="size-[18px] shrink-0 text-critical" />
-              <span className="min-w-0 flex-1">{t.overview.fetchMonthFailed(monthTitle(month))}</span>
-              <button type="button" onClick={stored.retry} className="h-11 shrink-0 rounded-sm px-2 text-sm font-medium text-accent hover:bg-accent-faint">
-                {t.tryAgain}
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-3 gap-2 lg:gap-3">
-                <Tile label={t.income} value={formatWhole(monthTotals.income)} tone="text-income" />
-                <Tile label={t.expenses} value={formatWhole(-monthTotals.expenses)} tone="text-ink" />
-                <Tile label={t.net} value={formatWhole(monthTotals.net)} tone={monthTotals.net >= 0 ? 'text-ink' : 'text-critical'} />
-              </div>
-
-              <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:gap-7">
-                <div className="flex flex-col">
-                  <Overline className="mt-1 mb-1">{t.overview.topCategories}</Overline>
-                  {byCategory.length === 0 && <p className="text-sm text-muted">{t.overview.noExpenses}</p>}
-                  {byCategory.map(({ category, amount }) => {
-                    const share = monthTotals.expenses > 0 ? (amount / monthTotals.expenses) * 100 : 0
-                    const key = category?.id ?? 'none'
-                    return (
-                      <Link
-                        key={key}
-                        to={`/transactions?m=${month}&c=${key}`}
-                        className="-mx-1 flex min-h-14 items-center gap-3 rounded-sm px-1 active:bg-track lg:hover:bg-track"
-                      >
-                        <CategoryBadge category={category ?? null} size={32} />
-                        <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                          <span className="flex items-baseline justify-between gap-2">
-                            <span className="truncate text-[15px] text-ink lg:text-sm">{categoryName(category)}</span>
-                            <span className="tabular text-[15px] font-medium whitespace-nowrap text-ink lg:text-sm">{formatMoney(amount)}</span>
-                          </span>
-                          <Progress value={share} height={6} tone={keyColor(key)} />
-                        </span>
-                      </Link>
-                    )
-                  })}
-                </div>
-
-                <div className="flex flex-col">
-                  <div className="mt-1 mb-1 flex items-baseline justify-between">
-                    <Overline>{t.overview.latestTransactions}</Overline>
-                    <Link to={`/transactions?m=${month}`} className="hidden text-[13px] font-medium text-accent hover:underline lg:inline">
-                      {t.seeAll}
-                    </Link>
-                  </div>
-                  <div className="lg:divide-y lg:divide-line">
-                    {monthTxs.slice(0, 5).map((tx) => (
-                      <TransactionRow key={tx.id} tx={tx} onSelect={setSelected} showDate className="lg:min-h-[52px]" />
-                    ))}
-                  </div>
-                  <div className="lg:hidden">
-                    <SeeAll to={`/transactions?m=${month}`}>{t.seeAll}</SeeAll>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </Card>
+            ))
+          : items.map((x) => <Fragment key={x}>{render(x)}</Fragment>)}
+        {shown.length === 0 && <p className="px-1 py-6 text-center text-sm leading-5 text-muted lg:col-span-12">{t.overview.layout.allHidden}</p>}
       </div>
 
+      {customizing && <OverviewLayoutSheet onClose={() => setCustomizing(false)} />}
       {selected && <TransactionSheet key={selected.id} tx={selected} onClose={() => setSelected(null)} />}
     </>
   )

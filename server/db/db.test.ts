@@ -14,6 +14,8 @@ import { ALL_HISTORY, HISTORY_START, periodFrom, save, syncFrom, type Fetched } 
 import { needsWorker, readJob, runJob, startJob } from './syncJobs.js'
 import { edits, incomeAverageRoute, incomeRoutes, incomeCategoriesRoute, saveIncomeFilterRoute, startSync, syncStatus } from './handlers.js'
 import { previewAverage } from '../../src/data/incomeAverage.js'
+import { DEFAULT_LAYOUT, OVERVIEW_SECTIONS } from '../../src/data/overviewLayout.js'
+import type { OverviewLayout } from '../../src/data/types.js'
 import { insightRoutes } from './insights.js'
 import { PluggyClient, type PluggyConfig } from '../pluggy/client.js'
 
@@ -712,6 +714,19 @@ suite('database', () => {
     await applyEditSql(pool, { op: 'setSubcategoryGroup', id: fuel, group: 'lifestyle' })
     await applyEditSql(pool, { op: 'linkSubcategory', id: fuel, categoryId: 'salary' })
     expect((await read()).subcategories.find((x) => x.id === fuel)!.group).toBeNull()
+  })
+
+  it('keeps the Visão geral layout, through syncs, made whole when read', async () => {
+    await sync([tx('t1')])
+    const read = async () => (await readSnapshot(pool, ['item-1'], '2026-09-01'))!.overviewLayout
+    expect(await read()).toEqual(DEFAULT_LAYOUT)
+    const layout = { order: ['balance', ...OVERVIEW_SECTIONS.filter((x) => x !== 'balance')], hidden: ['unusual'] } as OverviewLayout
+    await applyEditSql(pool, { op: 'setOverviewLayout', layout })
+    await sync([tx('t1')])
+    expect(await read()).toEqual(layout)
+    // A card the stored layout doesn't know (added later) shows at its default place; an unknown one is dropped.
+    await pool.query(`UPDATE app_settings SET value = $1 WHERE key = 'overview_layout'`, [JSON.stringify({ order: ['balance', 'gone', 'netWorth'], hidden: ['unusual'] })])
+    expect(await read()).toEqual({ order: ['balance', ...OVERVIEW_SECTIONS.slice(2), 'netWorth'], hidden: ['unusual'] })
   })
 
   it('migration 012 can run again', async () => {

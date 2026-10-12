@@ -7,7 +7,8 @@ import { NO_PENSION, type Pension } from './data/pension'
 import { applyCardDays, deviceCardDays, forgetDeviceCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
 import { DEFAULT_TARGET } from './data/spendingBalance'
-import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type BalanceTarget, type SpendingGroup, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type SyncOptions, type Transaction } from './data/types'
+import { DEFAULT_LAYOUT } from './data/overviewLayout'
+import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type BalanceTarget, type OverviewLayout, type SpendingGroup, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type SyncOptions, type Transaction } from './data/types'
 import { computeInsights, type Insights } from './data/insights'
 import type { TransactionQuery } from './data/transactionFilter'
 import type { RecurringAction } from './data/recurring'
@@ -82,6 +83,10 @@ interface AppData extends Snapshot {
   saveCategoryGroups(groups: { categoryId: string; group: SpendingGroup | null }[]): Promise<void>
   /** Puts a subcategory in a group of its own (null: it follows its category), server first. */
   saveSubcategoryGroup(id: string, group: SpendingGroup | null): Promise<void>
+  /** The Visão geral's order and hidden cards (src/data/overviewLayout.ts), shared by every device. */
+  overviewLayout: OverviewLayout
+  /** Saves the layout, server first; rejects with a message for the UI. */
+  saveOverviewLayout(layout: OverviewLayout): Promise<void>
 }
 
 /** The previdência privada edits saved from its sheets. */
@@ -269,6 +274,12 @@ export function DataProvider({ repository, children }: { repository: Repository;
   const saveBalanceTarget = useCallback(
     async (target: BalanceTarget) => {
       await save({ op: 'setBalanceTarget', target })
+    },
+    [save],
+  )
+  const saveOverviewLayout = useCallback(
+    async (layout: OverviewLayout) => {
+      await save({ op: 'setOverviewLayout', layout })
     },
     [save],
   )
@@ -472,8 +483,10 @@ export function DataProvider({ repository, children }: { repository: Repository;
       saveBalanceTarget,
       saveCategoryGroups,
       saveSubcategoryGroup,
+      overviewLayout: snapshot.overviewLayout ?? DEFAULT_LAYOUT,
+      saveOverviewLayout,
     }
-  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, setFgtsTracking, saveFgts, setPensionTracking, savePension, saveBalanceTarget, saveCategoryGroups, saveSubcategoryGroup, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
+  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, setFgtsTracking, saveFgts, setPensionTracking, savePension, saveBalanceTarget, saveCategoryGroups, saveSubcategoryGroup, saveOverviewLayout, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

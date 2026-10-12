@@ -425,6 +425,22 @@ Previdência privada plans are tracked by hand too (`src/data/pension.ts`):
 - A plan's balance is due for an update when it has none, or its latest is
   more than a month old; Visão geral reminds about those plans.
 
+## Visão geral layout
+
+The order of the Visão geral's cards and the hidden ones ("Personalizar",
+`src/data/overviewLayout.ts`), the same on every device:
+
+- Stored in `app_settings` `overview_layout`
+  (`{ "order": [every card, once], "hidden": [cards] }`, card keys such as
+  `netWorth`, `balance`, `projection`); the default order with every card
+  shown when absent. No migration: `app_settings` already exists.
+- Edit, through `POST /api/edits`: `setOverviewLayout` (`layout`, every
+  card listed once in `order`). Read with the snapshot (`overviewLayout`).
+  Syncs never touch it.
+- Read back made whole: unknown cards are dropped, and a card added to the
+  app later shows at its default place (after the card before it by
+  default).
+
 ## Equilíbrio do mês
 
 How each month's income splits between Essencial, Estilo de vida and
