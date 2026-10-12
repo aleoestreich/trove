@@ -740,7 +740,8 @@ suite('database', () => {
     expect(await read()).toEqual(layout)
     // A card the stored layout doesn't know (added later) shows at its default place; an unknown one is dropped.
     await pool.query(`UPDATE app_settings SET value = $1 WHERE key = 'overview_layout'`, [JSON.stringify({ order: ['balance', 'gone', 'netWorth'], hidden: ['unusual'] })])
-    expect(await read()).toEqual({ order: ['balance', ...OVERVIEW_SECTIONS.slice(2), 'netWorth'], hidden: ['unusual'] })
+    // "Fechamento do mês" (added after it) follows net worth wherever it was moved.
+    expect(await read()).toEqual({ order: ['balance', ...OVERVIEW_SECTIONS.slice(3), 'netWorth', 'monthClose'], hidden: ['unusual'] })
   })
 
   it('migration 012 can run again', async () => {

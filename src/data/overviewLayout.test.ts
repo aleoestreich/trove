@@ -14,7 +14,7 @@ describe('Visão geral layout', () => {
 
   it('moves a card up or down, never past the ends', () => {
     const up = moveSection(DEFAULT_LAYOUT, 'projection', -1)
-    expect(up.order.slice(0, 3)).toEqual(['netWorth', 'projection', 'balance'])
+    expect(up.order.slice(0, 4)).toEqual(['netWorth', 'monthClose', 'projection', 'balance'])
     expect(moveSection(up, 'projection', 1)).toEqual(DEFAULT_LAYOUT)
     expect(moveSection(DEFAULT_LAYOUT, 'netWorth', -1)).toBe(DEFAULT_LAYOUT)
     expect(moveSection(DEFAULT_LAYOUT, 'monthInDetail', 1)).toBe(DEFAULT_LAYOUT)
@@ -32,7 +32,7 @@ describe('Visão geral layout', () => {
 
   it('makes a stored layout whole: unknown and repeated cards dropped, missing ones at their default place', () => {
     expect(normalizeLayout({ order: ['monthInDetail', 'old', 'netWorth', 'netWorth'], hidden: ['old', 'unusual', 'unusual'] })).toEqual({
-      order: ['monthInDetail', 'netWorth', 'balance', 'projection', 'extraPay', 'receivables', 'unusual', 'recurring', 'whereMoney', 'comingUp', 'incomeVsExpenses', 'spendingByCategory', 'averageIncome'],
+      order: ['monthInDetail', 'netWorth', 'monthClose', 'balance', 'projection', 'extraPay', 'receivables', 'unusual', 'recurring', 'whereMoney', 'comingUp', 'incomeVsExpenses', 'spendingByCategory', 'averageIncome'],
       hidden: ['unusual'],
     })
     expect(normalizeLayout({ order: 'x', hidden: null })).toEqual(DEFAULT_LAYOUT)

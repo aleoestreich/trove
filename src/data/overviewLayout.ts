@@ -10,6 +10,7 @@ export type { OverviewLayout, OverviewSection }
 /** Every card of the Visão geral, in the default (phone) order. */
 export const OVERVIEW_SECTIONS: readonly OverviewSection[] = [
   'netWorth',
+  'monthClose',
   'balance',
   'projection',
   'extraPay',

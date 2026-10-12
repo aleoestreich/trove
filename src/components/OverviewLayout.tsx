@@ -4,6 +4,8 @@ import { useI18n } from '../i18n/I18nProvider'
 import { Icon } from './Icon'
 import { Sheet } from './insights/parts'
 import { owedTotal } from '../data/receivables'
+import { showsClose } from '../data/monthClose'
+import { toISO } from '../lib/dates'
 import { DEFAULT_LAYOUT, isDefaultLayout, moveSection, setSectionHidden, shownSections, type OverviewLayout } from '../data/overviewLayout'
 
 const sameLayout = (a: OverviewLayout, b: OverviewLayout) => a.order.join() === b.order.join() && a.hidden.join() === b.hidden.join()
@@ -127,6 +129,7 @@ export function OverviewLayoutSheet({ onClose }: { onClose(): void }) {
                     <>
                       {x === 'extraPay' && !extraPay.enabled && <span className="text-xs leading-4 text-muted">{l.extraPayOff}</span>}
                       {x === 'receivables' && owedTotal(receivables) === 0 && <span className="text-xs leading-4 text-muted">{l.receivablesNone}</span>}
+                      {x === 'monthClose' && !showsClose(toISO(new Date())) && <span className="text-xs leading-4 text-muted">{l.monthCloseOff}</span>}
                     </>
                   )}
                 </span>
