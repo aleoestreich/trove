@@ -5,7 +5,8 @@ income and expenses. Mobile-first; installable on Android.
 
 **Status:** the deployed site is private (Auth0 login) and reads its data from
 a Postgres database filled from Meu Pluggy on Sync. Local development runs on
-demo data. Roadmap: [PLAN.md](PLAN.md).
+demo data. Roadmap: [PLAN.md](PLAN.md). Setting it up from zero (Vercel,
+Auth0, Neon, Meu Pluggy, in order): [docs/setup.md](docs/setup.md).
 
 ## Run
 
