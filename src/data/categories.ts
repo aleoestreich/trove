@@ -4,8 +4,9 @@
 //
 // The guessing rules (server/pluggy/map.ts) still use a fixed set of IDs
 // ("food", "housing"…). Those that match a default category map to it; the
-// rest stay uncategorized until one is chosen; transfers and card bill
-// payments become transfers, which have no category.
+// rest stay uncategorized until one is chosen; transfers, card bill payments
+// and money moved into or out of investments become transfers, which have no
+// category.
 
 import type { Category, CategoryKind, Transaction } from './types.js'
 
@@ -20,14 +21,19 @@ const TO_DEFAULT: Record<string, string> = {
   subscriptions: 'subscriptions',
   health: 'health',
   travel: 'travel',
+  education: 'education',
+  leisure: 'leisure',
+  taxes: 'taxes',
   salary: 'salary',
   freelance: 'freelance',
+  'investment-income': 'yields',
 }
 
 /** A guess as a category, or a transfer. `known`: the category IDs that exist (deleted ones aren't used). */
 export function fromGuess(guess: string, known?: Set<string>): Pick<Transaction, 'categoryId' | 'transfer'> {
   if (guess === 'transfer') return { categoryId: null, transfer: 'own' }
   if (guess === 'card-payment') return { categoryId: null, transfer: 'card-payment' }
+  if (guess === 'investment') return { categoryId: null, transfer: 'investment' }
   const id = TO_DEFAULT[guess] ?? null
   return { categoryId: id && (!known || known.has(id)) ? id : null }
 }

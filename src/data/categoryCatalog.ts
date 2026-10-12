@@ -207,6 +207,78 @@ export const DEFAULT_CATEGORIES: DefaultCategory[] = [
     ]
   },
   {
+    "id": "education",
+    "type": "expense",
+    "color": "indigo",
+    "icon": "book",
+    "name": {
+      "en": "Education",
+      "pt": "Educação"
+    },
+    "subcategories": [
+      {
+        "en": "Courses",
+        "pt": "Cursos"
+      },
+      {
+        "en": "School",
+        "pt": "Escola"
+      },
+      {
+        "en": "Books",
+        "pt": "Livros"
+      }
+    ]
+  },
+  {
+    "id": "leisure",
+    "type": "expense",
+    "color": "magenta",
+    "icon": "film",
+    "name": {
+      "en": "Leisure",
+      "pt": "Lazer"
+    },
+    "subcategories": [
+      {
+        "en": "Shows and cinema",
+        "pt": "Shows e cinema"
+      },
+      {
+        "en": "Games",
+        "pt": "Jogos"
+      },
+      {
+        "en": "Bars",
+        "pt": "Bares"
+      }
+    ]
+  },
+  {
+    "id": "taxes",
+    "type": "expense",
+    "color": "slate",
+    "icon": "receipt",
+    "name": {
+      "en": "Taxes and fees",
+      "pt": "Impostos e tarifas"
+    },
+    "subcategories": [
+      {
+        "en": "Bank fees",
+        "pt": "Tarifas bancárias"
+      },
+      {
+        "en": "Taxes",
+        "pt": "Impostos"
+      },
+      {
+        "en": "Interest and fines",
+        "pt": "Juros e multas"
+      }
+    ]
+  },
+  {
     "id": "salary",
     "type": "income",
     "color": "mint",
@@ -239,6 +311,26 @@ export const DEFAULT_CATEGORIES: DefaultCategory[] = [
       {
         "en": "Clients",
         "pt": "Clientes"
+      }
+    ]
+  },
+  {
+    "id": "yields",
+    "type": "income",
+    "color": "forest",
+    "icon": "chart",
+    "name": {
+      "en": "Investment income",
+      "pt": "Rendimentos"
+    },
+    "subcategories": [
+      {
+        "en": "Interest",
+        "pt": "Juros"
+      },
+      {
+        "en": "Dividends",
+        "pt": "Dividendos"
       }
     ]
   }

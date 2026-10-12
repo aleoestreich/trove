@@ -31,7 +31,7 @@ export function CategoryLine({ tx, compact = false }: { tx: Transaction; compact
   if (tx.transfer)
     return (
       <span className="truncate text-[13px] leading-[18px] text-muted">
-        {tx.transfer === 'card-payment' ? t.transactions.cardPaymentRow : t.transactions.transferRow}
+        {tx.transfer === 'card-payment' ? t.transactions.cardPaymentRow : tx.transfer === 'investment' ? t.transactions.investmentRow : t.transactions.transferRow}
       </span>
     )
   const category = tx.categoryId ? categoriesById.get(tx.categoryId) : undefined

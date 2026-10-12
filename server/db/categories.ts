@@ -3,6 +3,7 @@
 
 import type pg from 'pg'
 import { EditError, checkBulk, checkIncomeFilter, defaultCategories, type BulkResult, type Edit } from '../../src/data/edits.js'
+import { DEFAULT_CATEGORIES } from '../../src/data/categoryCatalog.js'
 import { applyReceivableSql } from './receivables.js'
 import { NO_FILTER, pruneIncomeFilter } from '../../src/data/incomeAverage.js'
 import { DEFAULT_PROJECTION_SETTINGS } from '../../src/data/projection.js'
@@ -19,11 +20,13 @@ import { sortPensionEntries, type Pension, type PlanType } from '../../src/data/
 /**
  * Seeds the default categories and subcategories (pt-BR names),
  * the first time the app reads the database. Only once: deleting them all
- * later doesn't bring them back.
+ * later doesn't bring them back. Defaults added to the app later are added
+ * once to a database seeded before them (addNewDefaults).
  */
 export async function ensureSeeded(pool: pg.Pool): Promise<void> {
-  const done = await pool.query(`SELECT 1 FROM app_settings WHERE key = 'categories_seeded'`)
-  if (done.rowCount) return
+  const done = await pool.query<{ key: string }>(`SELECT key FROM app_settings WHERE key = ANY($1::text[])`, [['categories_seeded', DEFAULTS_KEY]])
+  if (done.rowCount === 2) return
+  if (done.rows.some((r) => r.key === 'categories_seeded')) return addNewDefaults(pool)
   await inTransaction(pool, async (db) => {
     // Whoever inserts the marker seeds; a request racing it does nothing.
     const won = await db.query(
@@ -32,21 +35,58 @@ export async function ensureSeeded(pool: pg.Pool): Promise<void> {
     )
     if (!won.rowCount) return
     const { categories, subcategories } = defaultCategories(() => crypto.randomUUID())
-    await db.query(
-      `INSERT INTO categories (id, name, type, color, icon, sort_order)
-       SELECT id, name, type, color, icon, sort_order FROM jsonb_to_recordset($1::jsonb)
-         AS r(id text, name text, type text, color text, icon text, sort_order int)
-       ON CONFLICT DO NOTHING`,
-      [JSON.stringify(categories.map((c) => ({ ...c, sort_order: c.sortOrder })))],
-    )
-    await db.query(
-      `INSERT INTO subcategories (id, category_id, name, sort_order)
-       SELECT id, category_id, name, sort_order FROM jsonb_to_recordset($1::jsonb)
-         AS r(id text, category_id text, name text, sort_order int)
-       ON CONFLICT DO NOTHING`,
-      [JSON.stringify(subcategories.map((s) => ({ id: s.id, category_id: s.categoryId, name: s.name, sort_order: s.sortOrder })))],
-    )
+    await insertDefaults(db, categories, subcategories)
+    await writeSetting(db, DEFAULTS_KEY, { ids: DEFAULT_CATEGORIES.map((c) => c.id) })
   })
+}
+
+/** The default categories already offered to this database (each is added once), in app_settings. */
+const DEFAULTS_KEY = 'default_categories_offered'
+/** The defaults of the first version: a database seeded before DEFAULTS_KEY existed was offered these. */
+const FIRST_DEFAULTS = ['home', 'groceries', 'restaurants', 'transport', 'shopping', 'subscriptions', 'health', 'travel', 'salary', 'freelance']
+
+/**
+ * Adds the defaults this database hasn't been offered yet (e.g. Educação,
+ * Lazer, Impostos e tarifas, Rendimentos), after the categories it has. One
+ * with an ID or a name already in use is skipped; either way it counts as
+ * offered, so deleting it later doesn't bring it back.
+ */
+async function addNewDefaults(pool: pg.Pool): Promise<void> {
+  await inTransaction(pool, async (db) => {
+    await db.query(`INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`, [DEFAULTS_KEY, JSON.stringify({ ids: FIRST_DEFAULTS })])
+    const r = await db.query<{ value: { ids?: string[] } }>(`SELECT value FROM app_settings WHERE key = $1 FOR UPDATE`, [DEFAULTS_KEY])
+    const offered = new Set(r.rows[0]?.value?.ids ?? FIRST_DEFAULTS)
+    const all = defaultCategories(() => crypto.randomUUID())
+    const missing = all.categories.filter((c) => !offered.has(c.id))
+    if (missing.length === 0) return
+    const next = await db.query<{ n: number }>(`SELECT coalesce(max(sort_order) + 1, 0)::int AS n FROM categories`)
+    const ids = new Set(missing.map((c) => c.id))
+    await insertDefaults(
+      db,
+      missing.map((c, i) => ({ ...c, sortOrder: next.rows[0].n + i })),
+      all.subcategories.filter((x) => ids.has(x.categoryId)),
+    )
+    await writeSetting(db, DEFAULTS_KEY, { ids: [...offered, ...missing.map((c) => c.id)] })
+  })
+}
+
+/** Inserts categories and their subcategories; one whose ID or name is taken is skipped, with its subcategories. */
+async function insertDefaults(db: Db, categories: Category[], subcategories: Subcategory[]): Promise<void> {
+  const added = await db.query<{ id: string }>(
+    `INSERT INTO categories (id, name, type, color, icon, sort_order)
+     SELECT id, name, type, color, icon, sort_order FROM jsonb_to_recordset($1::jsonb)
+       AS r(id text, name text, type text, color text, icon text, sort_order int)
+     ON CONFLICT DO NOTHING RETURNING id`,
+    [JSON.stringify(categories.map((c) => ({ ...c, sort_order: c.sortOrder })))],
+  )
+  const ids = new Set(added.rows.map((r) => r.id))
+  await db.query(
+    `INSERT INTO subcategories (id, category_id, name, sort_order)
+     SELECT id, category_id, name, sort_order FROM jsonb_to_recordset($1::jsonb)
+       AS r(id text, category_id text, name text, sort_order int)
+     ON CONFLICT DO NOTHING`,
+    [JSON.stringify(subcategories.filter((x) => ids.has(x.categoryId)).map((x) => ({ id: x.id, category_id: x.categoryId, name: x.name, sort_order: x.sortOrder })))],
+  )
 }
 
 export async function readCategories(db: Db): Promise<{ categories: Category[]; subcategories: Subcategory[] }> {

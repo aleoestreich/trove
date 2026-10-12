@@ -109,6 +109,19 @@ between accounts, and card bill payments.
   debit with the card credit; any transaction can also be marked (or
   unmarked) as one in its details, or as a transfer between own accounts
   (e.g. money moved in from an account that isn't connected).
+- **Money moved into or out of an investment is neither income nor an
+  expense** either: an aplicação, a resgate, a caixinha or a CDB is a
+  transfer ("Investimento · aplicação ou resgate"), recognised by Pluggy's
+  investment categories or the bank's wording, and can be marked or
+  unmarked by hand ("Marcar como investimento"). What an investment pays
+  (rendimentos, juros, dividendos) is income, under "Rendimentos"; interest
+  charged on a card or overdraft is an expense, under "Impostos e tarifas".
+- **Default categories:** Moradia, Mercado, Restaurantes, Transporte,
+  Compras, Assinaturas, Saúde, Viagem, Educação, Lazer and Impostos e
+  tarifas (expenses), Salário, Freelance and Rendimentos (income). A
+  database seeded before a default existed gets it once (a deleted one is
+  never brought back), and an uncategorized transaction that was never
+  edited shows today's guess, so it lands in a new default at once.
 - A transaction counts as income or an expense by its category's type;
   uncategorized ones count by sign.
 - **Bulk categorization:** many transactions can get one category and

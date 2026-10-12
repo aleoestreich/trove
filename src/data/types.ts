@@ -148,8 +148,8 @@ export interface OverviewLayout {
   hidden: OverviewSection[]
 }
 
-/** A hand-set answer to "is this a transfer (own accounts, or a card bill payment)?". */
-export type TransferOverride = 'own' | 'card-payment' | 'none'
+/** A hand-set answer to "is this a transfer (own accounts, a card bill payment, or into or out of an investment)?". */
+export type TransferOverride = 'own' | 'card-payment' | 'investment' | 'none'
 
 export interface Transaction {
   id: string
@@ -166,15 +166,17 @@ export interface Transaction {
   /** Always one of `categoryId`'s subcategories. */
   subcategoryId?: string | null
   /**
-   * Money moving between connected accounts: "own" (a transfer or a
-   * currency conversion) or "card-payment" (paying a card's bill). Never
+   * Money moving between own accounts: "own" (a transfer or a currency
+   * conversion), "card-payment" (paying a card's bill) or "investment" (into
+   * or out of an investment: an aplicação, a resgate, a caixinha). Never
    * income or an expense, and never categorized.
    */
-  transfer?: 'own' | 'card-payment'
+  transfer?: 'own' | 'card-payment' | 'investment'
   /**
    * Set by hand in the transaction's details: "own" marks it as a transfer
-   * between own accounts, "card-payment" as a card bill payment; "none" says
-   * it is neither (overrides detection).
+   * between own accounts, "card-payment" as a card bill payment,
+   * "investment" as money into or out of an investment; "none" says it is
+   * none of them (overrides detection).
    */
   transferOverride?: TransferOverride
   /** Hidden: left out of every total, chart, average and the list. */

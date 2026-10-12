@@ -370,6 +370,7 @@ export interface Messages {
     uncategorized: string
     transferRow: string
     cardPaymentRow: string
+    investmentRow: string
     /** Text button next to the result count. */
     hiddenLink: (n: number) => string
     hiddenTitle: string
@@ -389,6 +390,10 @@ export interface Messages {
     markCardPayment: string
     markCardPaymentNote: string
     notCardPayment: string
+    markInvestment: string
+    markInvestmentNote: string
+    notInvestment: string
+    investmentNote: string
     /** Clears the category and subcategory. */
     removeCategory: string
     uncategorizedNote: string
@@ -1498,6 +1503,7 @@ export const messages: Messages = {
     uncategorized: 'Sem categoria',
     transferRow: 'Transferência entre suas contas',
     cardPaymentRow: 'Pagamento de fatura',
+    investmentRow: 'Investimento · aplicação ou resgate',
     hiddenLink: (n) => `Ocultas (${n})`,
     hiddenTitle: 'Transações ocultas',
     hiddenNote: 'Transações ocultas ficam fora de todos os totais, gráficos e médias. Reexiba uma para ela voltar a contar.',
@@ -1516,6 +1522,10 @@ export const messages: Messages = {
     markCardPayment: 'Marcar como pagamento de fatura',
     markCardPaymentNote: 'Não conta como despesa: as compras do cartão já contam.',
     notCardPayment: 'Não é pagamento de fatura',
+    markInvestment: 'Marcar como investimento',
+    markInvestmentNote: 'Aplicação ou resgate: não conta como receita nem despesa, o dinheiro continua seu.',
+    notInvestment: 'Não é investimento',
+    investmentNote: 'Aplicações e resgates não contam como receita nem despesa: o dinheiro só mudou de lugar. Continua no saldo da conta.',
     removeCategory: 'Remover categoria',
     uncategorizedNote: 'Esta transação está sem categoria. Escolha uma acima quando quiser.',
     categoryRemoved: 'Categoria removida',

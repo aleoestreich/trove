@@ -61,6 +61,36 @@ suite('database', () => {
     expect((await pool.query(`SELECT count(*)::int AS n FROM categories`)).rows[0].n).toBe(0)
   })
 
+  it('adds defaults that came later once to a database seeded before them, never bringing back a deleted one', async () => {
+    // As seeded by the first version: its 10 defaults, no record of what was offered; "Lazer" already made by hand.
+    await pool.query(`DELETE FROM categories WHERE id IN ('education', 'leisure', 'taxes', 'yields')`)
+    await pool.query(`DELETE FROM app_settings WHERE key = 'default_categories_offered'`)
+    await pool.query(`INSERT INTO categories (id, name, type, color, icon) VALUES ('mine', 'Lazer', 'expense', 'pink', 'film')`)
+    await pool.query(`DELETE FROM categories WHERE id = 'travel'`)
+    await ensureSeeded(pool)
+    const ids = async () => (await pool.query(`SELECT id FROM categories ORDER BY sort_order, id`)).rows.map((r) => r.id)
+    const after = await ids()
+    expect(after).toEqual(expect.arrayContaining(['education', 'taxes', 'yields', 'mine']))
+    expect(after).not.toContain('leisure') // the name is taken
+    expect(after).not.toContain('travel') // deleted before: not brought back
+    expect(after.slice(-3)).toEqual(['education', 'taxes', 'yields'])
+    expect((await pool.query(`SELECT count(*)::int AS n FROM subcategories WHERE category_id = 'education'`)).rows[0].n).toBe(3)
+    // Once: deleting a new one keeps it deleted.
+    await pool.query(`DELETE FROM categories WHERE id = 'education'`)
+    await ensureSeeded(pool)
+    expect(await ids()).not.toContain('education')
+  })
+
+  it('shows today\'s guess for an uncategorized transaction that was never edited', async () => {
+    await sync([tx('t1', { category: 'Education' }), tx('t2', { category: 'Education' })])
+    // Stored uncategorized, as a first sync before the Educação default would have left it; t2 was set to none by hand.
+    await pool.query(`UPDATE transactions SET category_id = NULL`)
+    await applyEditSql(pool, { op: 'categorize', transactionId: 't2', categoryId: null, subcategoryId: null })
+    const s = (await readSnapshot(pool, ['item-1'], '2026-09-01'))!
+    expect(s.transactions.find((t) => t.id === 't1')!.categoryId).toBe('education')
+    expect(s.transactions.find((t) => t.id === 't2')!.categoryId).toBeNull()
+  })
+
   it('saves new transactions with the guess, and counts new and updated ones', async () => {
     const first = await sync([tx('t1', { category: 'Supermarkets' }), tx('t2')])
     expect(first).toMatchObject({ connectionId: 'item-1', name: 'Banco Exemplo', inserted: 2, updated: 0, removed: 0 })
@@ -242,7 +272,7 @@ suite('database', () => {
       expect(saved.status).toBe(200)
       const body = await saved.json()
       expect(body.average).toBe(previewAverage(options, chosen))
-      expect(body).toMatchObject({ average: 1000_00, allAverage: 1100_00, filter: { label: 'Salário, Freelance', included: 2, total: 3 } })
+      expect(body).toMatchObject({ average: 1000_00, allAverage: 1100_00, filter: { label: 'Salário, Freelance, Rendimentos', included: 3, total: 4 } })
       // Stored, and part of the app's data.
       expect((await readSnapshot(pool, ['item-1'], '2026-04-01'))!.incomeFilter).toEqual(chosen)
     })
@@ -263,7 +293,7 @@ suite('database', () => {
 
     it('refuses a filter with nothing selected', async () => {
       await income()
-      const res = await put({ excludedCategoryIds: ['salary', 'freelance'], excludedSubcategoryIds: [], excludeUncategorized: true })
+      const res = await put({ excludedCategoryIds: ['salary', 'freelance', 'yields'], excludedSubcategoryIds: [], excludeUncategorized: true })
       expect(res.status).toBe(400)
       expect(await res.json()).toMatchObject({ reason: 'nothing_selected', message: 'Selecione pelo menos uma categoria' })
       expect((await put({ ...none, excludedCategoryIds: ['groceries'] })).status).toBe(400)
@@ -301,6 +331,17 @@ suite('database', () => {
       transfer_override: 'own',
     })
     expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.transactions.find((t) => t.id === 't1')).toMatchObject({ transfer: 'own', categoryId: null })
+    // Or money into or out of an investment.
+    await applyEditSql(pool, { op: 'setTransferOverride', transactionId: 't1', value: 'investment' })
+    expect((await readSnapshot(pool, ['item-1'], '2026-09-01'))!.transactions.find((t) => t.id === 't1')).toMatchObject({ transfer: 'investment', transferOverride: 'investment' })
+  })
+
+  it('migration 014 can run again', async () => {
+    const migration = readFileSync(new URL('../../db/migrations/014_investment_transfers.sql', import.meta.url), 'utf8')
+    await pool.query(migration)
+    await pool.query(migration)
+    await sync([tx('t1')])
+    await expect(pool.query(`UPDATE transactions SET transfer_override = 'other'`)).rejects.toThrow()
   })
 
   it('records how far back a connection was fetched, and never removes stored transactions older than what Pluggy returned', async () => {
@@ -544,7 +585,7 @@ suite('database', () => {
     await applyEditSql(pool, { op: 'hide', transactionId: 't2', hidden: true })
     const s = (await readSnapshot(pool, ['item-1'], '2026-05-01'))!
     expect(s.institutions.map((i) => i.name)).toEqual(['Banco Exemplo'])
-    expect(s.categories).toHaveLength(10)
+    expect(s.categories).toHaveLength(14)
     expect(s.transactions.map((t) => [t.id, t.categoryId, !!t.hidden]).sort()).toEqual([
       ['t1', 'groceries', false],
       ['t2', null, true],

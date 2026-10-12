@@ -37,7 +37,7 @@ export type Edit =
   | { op: 'categorizeMany'; transactionIds: string[]; categoryId: string | null; subcategoryId: string | null }
   /** Puts back what categorizeMany replaced (its BulkResult's `previous`). */
   | { op: 'restoreCategories'; items: PreviousCategory[] }
-  /** Marks a transaction as an own transfer ('own') or a card bill payment ('card-payment'), or says it is neither ('none'). */
+  /** Marks a transaction as an own transfer ('own'), a card bill payment ('card-payment') or an investment move ('investment'), or says it is none of them ('none'). */
   | { op: 'setTransferOverride'; transactionId: string; value: TransferOverride }
   /** Which income categories count in the average income (stored as exclusions). */
   | { op: 'setIncomeFilter'; filter: IncomeFilter }
@@ -225,7 +225,7 @@ export function validateEdit(e: unknown): Edit {
       return { op: 'restoreCategories', items: out }
     }
     case 'setTransferOverride':
-      if (x.value !== 'own' && x.value !== 'card-payment' && x.value !== 'none') bad('value')
+      if (x.value !== 'own' && x.value !== 'card-payment' && x.value !== 'investment' && x.value !== 'none') bad('value')
       return { op: 'setTransferOverride', transactionId: id(x.transactionId, 'transaction'), value: x.value as TransferOverride }
     case 'setIncomeFilter': {
       const f = (x.filter ?? {}) as Record<string, unknown>

@@ -85,6 +85,11 @@ Then run [`db/migrations/013_receivables.sql`](../db/migrations/013_receivables.
 it adds `receivables` and `receivable_payments`, for [A receber](#a-receber).
 Until it runs, every page reports that the tables are out of date.
 
+Then run [`db/migrations/014_investment_transfers.sql`](../db/migrations/014_investment_transfers.sql):
+it lets `transfer_override` be `'investment'`, for
+[investment moves](#investment-moves). Until it runs, marking a transaction
+as an investment fails.
+
 ## 3. Give Vercel the connection string
 
 1. In Neon, open **Connect**, choose the database and role, and turn
@@ -139,7 +144,7 @@ use today can be read later without fetching it again.
 | `account_balances` | (`account_id`, `as_of`) | One balance per account per day. Pluggy only gives the current balance, so this builds the history |
 | `card_bills` | `id` (Pluggy bill ID) → `accounts` | A card's monthly statements: due date, total, minimum payment, finance charges. The card itself is a row in `accounts` |
 | `transactions` | `id` (Pluggy transaction ID) → `accounts` | Date, description, type, amount (and in the account's currency), status, operation type, Pluggy's category, installment *n* of *N*, purchase date and total, merchant, payment method, `card_bill_id`, `provider_id`; edits: `category_id`, `subcategory_id`, `is_hidden`, `category_edited_at`, `transfer_override` |
-| `categories` | `id` | Name, type (expense or income), colour key, icon key, order. The 10 defaults are seeded on first run, with their Portuguese names |
+| `categories` | `id` | Name, type (expense or income), colour key, icon key, order. The 14 defaults are seeded on first run, with their Portuguese names; a default added to the app later is added once to a database seeded before it (`app_settings` `default_categories_offered`) |
 | `subcategories` | `id` → `categories`; unique name per category | Subcategories, deleted with their category |
 | `card_settings` | `account_id` → `accounts` | Closing and due days per card (not used yet: still kept per device) |
 | `exchange_rates` | (`currency_code`, `as_of`) | BRL per unit of a foreign currency, one per day, saved by the sync |
@@ -257,6 +262,10 @@ A category, subcategory or hidden flag set in the app stays as set:
 - **Transfer detection on read:** a transaction whose category was edited
   (`category_edited_at` set) keeps that category even when it would be paired
   as an own transfer or read as a card bill payment.
+- **An empty guess isn't kept:** an uncategorized transaction whose category
+  was never edited shows today's guess on read (e.g. a default category
+  added after its first sync). One left uncategorized by hand
+  (`category_edited_at` set) stays uncategorized.
 
 ### Card bill payments
 
@@ -282,6 +291,31 @@ on read (`server/pluggy/map.ts`), in this order:
    "Pagamento recebido" (refunds, "Estorno"…, excluded).
 5. **Pairing**: a bank debit and a card credit of the same amount up to 5
    days apart, nearest first.
+
+### Investment moves
+
+Money moved into or out of an investment (an aplicação, a resgate, a
+caixinha, a CDB, Tesouro Direto) is the owner's money changing place, so it
+is a transfer (`transfer: 'investment'`): no category, neither income nor
+an expense, still in the account balance. Recognised on read
+(`categoryFor` in `server/pluggy/map.ts`), after own transfers and bill
+payments:
+
+1. **Set by hand**: "Marcar como investimento" (`transfer_override =
+   'investment'`), or "Não é investimento" (`'none'`).
+2. An **edited category** wins over the rules below.
+3. **What an investment pays** comes first: Pluggy's interest, yield or
+   dividend categories, or wording like "Rendimento", "Juros",
+   "Dividendos", "Proventos" on money in, is income under Rendimentos;
+   interest on money out (a card's or an overdraft's) is a fee, under
+   Impostos e tarifas.
+4. **Pluggy's investment categories** ("Investments", "Automatic
+   investment", "Fixed income", "Variable income", "Mutual funds") or
+   **wording** like "Aplicação", "Resgate", "Caixinha", "Cofrinho", "RDB",
+   "CDB", "LCI/LCA", "Tesouro Direto", "Poupança".
+
+Balances of the investments themselves aren't read yet, so net worth still
+counts only the bank accounts and cards.
 
 ### Bulk categorization
 

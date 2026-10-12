@@ -33,7 +33,9 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
   const kindLabel =
     current.transfer === 'card-payment'
       ? t.transactions.cardPaymentRow
-      : kind === 'income'
+      : current.transfer === 'investment'
+        ? t.transactions.investmentRow
+        : kind === 'income'
         ? t.transactions.kindIncome
         : kind === 'transfer'
           ? t.transactions.kindTransfer
@@ -132,6 +134,18 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
             {t.transactions.notCardPayment}
           </button>
         </>
+      ) : current.transfer === 'investment' ? (
+        <>
+          <p className="mt-3 text-[13px] leading-[18px] text-muted">{t.transactions.investmentNote}</p>
+          <button
+            type="button"
+            onClick={() => edit({ op: 'setTransferOverride', transactionId: current.id, value: 'none' })}
+            className="mt-2 inline-flex h-12 items-center gap-2 self-start rounded-md px-3 -ml-3 text-sm font-medium text-accent hover:bg-accent-faint active:bg-track"
+          >
+            <Icon name="close" className="size-[18px]" strokeWidth={2} />
+            {t.transactions.notInvestment}
+          </button>
+        </>
       ) : current.transfer ? (
         <>
           <p className="mt-3 text-[13px] leading-[18px] text-muted">{t.transactions.transferNote}</p>
@@ -193,13 +207,14 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
         </>
       )}
 
-      {/* Neither income nor an expense: mark it as a transfer (own accounts, or a card bill payment). */}
+      {/* Neither income nor an expense: mark it as a transfer (own accounts, a card bill payment, or an investment). */}
       {!current.transfer && (
         <div className="mt-4 divide-y divide-line overflow-hidden rounded-md border border-line">
           {(
             [
               ['own', 'transfer', t.transactions.markOwnTransfer, t.transactions.markOwnTransferNote],
               ['card-payment', 'card', t.transactions.markCardPayment, t.transactions.markCardPaymentNote],
+              ['investment', 'investments', t.transactions.markInvestment, t.transactions.markInvestmentNote],
             ] as const
           ).map(([value, icon, label, note]) => (
             <button

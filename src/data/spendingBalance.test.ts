@@ -228,6 +228,9 @@ describe('Equilíbrio do mês', () => {
       ['subscriptions', 'lifestyle'],
       ['health', 'essential'],
       ['travel', 'lifestyle'],
+      ['education', 'essential'],
+      ['leisure', 'lifestyle'],
+      ['taxes', 'essential'],
     ])
   })
 
