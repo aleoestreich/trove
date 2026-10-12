@@ -288,6 +288,12 @@ describe('month-end projection', () => {
     expect(project(undefined, list).events.filter((e) => e.kind === 'salary').map((e) => e.date)).toEqual(['2026-10-16'])
   })
 
+  it('moves a payday on a national holiday to the working day before', () => {
+    // Paid on the 12th: 12 October (Nossa Senhora Aparecida) is a holiday, and TODAY is before it.
+    const list = [...monthly(months, '12', 10_000_00, { description: 'SALARIO EXEMPLO', categoryId: 'salary' }), ...rent, ...daily, ...cardTxs, ...october]
+    expect(project(undefined, list).events.filter((e) => e.kind === 'salary').map((e) => e.date)).toEqual(['2026-10-09'])
+  })
+
   it('needs 2 months of salary', () => {
     expect(project(undefined, txs.filter((t) => t.categoryId !== 'salary' || t.date >= '2026-09'))).toBeNull()
   })

@@ -9,7 +9,8 @@
 //   complete months, minus what came in this month. It is expected on its
 //   pay schedule, learnt from the last 3 months: each payment's usual day
 //   (counted from the end of the month when it comes in its last days;
-//   a payday on a weekend falls on the Friday before) and
+//   a payday on a weekend or a national bank holiday falls on the working
+//   day before, src/lib/holidays.ts) and
 //   its share of the month, so a salary paid in two parts (e.g. on the 15th
 //   and the last day) is expected in two parts. What already came in this
 //   month covers the earliest parts first. Freelance the same way, when
@@ -31,6 +32,7 @@
 import { currentBill, inBill } from '../lib/bills.js'
 import { installmentPlans } from '../lib/installments.js'
 import { addDays, daysFrom, daysInMonth, fromISO, lastMonths, monthKey } from '../lib/dates.js'
+import { businessDayOnOrBefore } from '../lib/holidays.js'
 import { kindOf } from './categories.js'
 import { merchantKey, type PaymentMethod, type RecurringItem } from './recurring.js'
 import type { Account, Category, Cents, ProjectionSettings, Transaction } from './types.js'
@@ -191,15 +193,15 @@ function paySchedule(byMonth: Map<string, Transaction[]>, months: string[]): Pay
 }
 
 /**
- * A payday's date in `month` (YYYY-MM). On a Saturday or Sunday it falls on
- * the working day before (Friday), within the month.
+ * A payday's date in `month` (YYYY-MM). On a weekend or a national bank
+ * holiday it falls on the working day before, within the month (a payday on
+ * the 1st that isn't a working day stays on the 1st).
  */
 const paydayIn = (p: Payday, month: string) => {
   const last = daysInMonth(month)
-  const day = p.fromEnd ? last - p.day : Math.min(p.day, last)
-  const weekday = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, day)).getUTCDay()
-  const back = weekday === 6 ? 1 : weekday === 0 ? 2 : 0
-  return `${month}-${String(Math.max(1, day - back)).padStart(2, '0')}`
+  const date = `${month}-${String(p.fromEnd ? last - p.day : Math.min(p.day, last)).padStart(2, '0')}`
+  const before = businessDayOnOrBefore(date)
+  return monthKey(before) === month ? before : `${month}-01`
 }
 
 /** A category's income into the chosen accounts: average, pay schedule, and what came in this month. */
