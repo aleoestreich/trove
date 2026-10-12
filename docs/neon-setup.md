@@ -444,9 +444,11 @@ Futuro, against a target (`src/data/spendingBalance.ts`):
   `setBalanceTarget` (`target`). Read with the snapshot (`categories`,
   `subcategories`, `balanceTarget`). Syncs never touch them.
 - The split itself is computed in the app from the stored transactions:
-  the income is the average income's filter, the spending the expenses that
-  count everywhere else (no hidden ones, transfers or bill payments;
-  installments in the month they're charged). Futuro = income − Essencial −
+  the income is the average income's filter (for the month in progress, the
+  average of the last 3 complete months, or what came in when that's more,
+  since some income only arrives at the end of the month), the spending the
+  expenses that count everywhere else (no hidden ones, transfers or bill
+  payments; installments in the month they're charged). Futuro = income − Essencial −
   Estilo de vida; "Sem grupo" sits inside it until classified.
 
 ## Reads

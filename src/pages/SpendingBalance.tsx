@@ -173,7 +173,7 @@ function SummaryCard({
         <>
           <SplitBar balance={balance} target={target} height={28} />
           <BarLegend target={target} over={balance.overIncome > 0} onEditTarget={onEditTarget} />
-          <IncomeBase income={balance.income} month={balance.month} />
+          <IncomeBase balance={balance} />
           <div className="flex flex-col">
             <ShareRow part="essential" name={b.groups.essential} note={d.rowShare(pct(shares.essential), target.essential)} amount={balance.essential} tag={soFar ? d.soFarTag : points(shares.essential - target.essential)} />
             <ShareRow part="lifestyle" name={b.groups.lifestyle} note={d.rowShare(pct(shares.lifestyle), target.lifestyle)} amount={balance.lifestyle} tag={soFar ? d.soFarTag : points(shares.lifestyle - target.lifestyle)} />
@@ -202,8 +202,13 @@ function SummaryCard({
   )
 }
 
-/** "Sobre R$ 10.000,00 de renda": which income counts (the average income's categories), with "Alterar". */
-function IncomeBase({ income, month }: { income: number; month: string }) {
+/**
+ * "Sobre R$ 10.000,00 de renda": which income counts (the average income's
+ * categories), with "Alterar". The month in progress: "de renda prevista",
+ * the 3-month average, and what already came in.
+ */
+function IncomeBase({ balance }: { balance: MonthBalance }) {
+  const { income, month } = balance
   const { t } = useI18n()
   const d = t.spendingBalance.detail
   const { categories, subcategories, incomeFilter } = useData()
@@ -216,13 +221,15 @@ function IncomeBase({ income, month }: { income: number; month: string }) {
     ...categories.filter((c) => c.type === 'income' && filter.excludedCategoryIds.includes(c.id)).map((c) => c.name),
     ...(filter.excludeUncategorized ? [t.transactions.uncategorized] : []),
   ]
-  const note = summary.all
+  const which = summary.all
     ? d.baseAll
     : d.baseNote(joinNames(summary.included.map((i) => (i.partial ? `${i.name} ${f.partial}` : i.name)), f.and), excluded.length ? joinNames(excluded, f.and) : null)
+  const expected = balance.expected !== null
+  const note = expected ? `${d.expectedNote(formatMoney(balance.received))} ${which}` : which
   return (
     <div className="flex items-center gap-2 rounded-md bg-page py-2 pr-2.5 pl-3">
       <span className="flex min-w-0 flex-1 flex-col gap-px">
-        <span className="tabular text-sm leading-5 font-medium text-ink">{d.base(formatMoney(income))}</span>
+        <span className="tabular text-sm leading-5 font-medium text-ink">{(expected ? d.baseExpected : d.base)(formatMoney(income))}</span>
         <span className="text-xs leading-4 text-muted">{note}</span>
       </span>
       <button ref={button} type="button" onClick={() => setOpen(true)} className="h-10 shrink-0 rounded-sm px-2 text-sm font-medium text-accent hover:bg-track">
