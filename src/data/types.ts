@@ -127,19 +127,19 @@ export interface ExtraPay {
 
 /** A card of the Visão geral. */
 export type OverviewSection =
+  /** Patrimônio: net worth, and where the money is (by bank and currency). */
   | 'netWorth'
+  /** Fechamento do mês: the month just closed (the 1st to the 10th). */
   | 'monthClose'
-  | 'balance'
-  | 'projection'
-  | 'extraPay'
-  | 'receivables'
-  | 'unusual'
-  | 'recurring'
-  | 'whereMoney'
+  /** Este mês: the month-end projection, the Equilíbrio do mês and 13º e férias. */
+  | 'thisMonth'
+  /** Alertas: unusual categories, recurring charges to review, A receber. */
+  | 'alerts'
+  /** Compromissos: card bills, next month's installments, recurring charges. */
   | 'comingUp'
-  | 'incomeVsExpenses'
-  | 'spendingByCategory'
-  | 'averageIncome'
+  /** Tendências: income vs expenses (with Renda média) and spending by category. */
+  | 'trends'
+  /** Mês em detalhe: the month in progress. */
   | 'monthInDetail'
 
 /** The Visão geral's cards in order (every one), and the hidden ones. */

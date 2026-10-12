@@ -70,17 +70,23 @@ export interface CashFlowPoint {
   empty?: boolean
 }
 
-/** Income vs expenses per month, side by side, with a dashed top line for scale. */
-export function CashFlowChart({ data, label }: { data: CashFlowPoint[]; label: string }) {
-  const max = Math.max(1, ...data.flatMap((d) => [d.income, d.expenses]))
+/**
+ * Income vs expenses per month, side by side, with a dashed top line for
+ * scale. `reference`: a dashed line across at a value (Renda média), with
+ * its label at the right end.
+ */
+export function CashFlowChart({ data, label, reference }: { data: CashFlowPoint[]; label: string; reference?: { value: number; label: string } }) {
+  const max = Math.max(1, ...data.flatMap((d) => [d.income, d.expenses]), reference?.value ?? 0)
   // Round the scale up to a tidy number of thousands of reais.
   const step = 5_000_00
   const top = Math.ceil(max / step) * step
   const dense = data.length > 6
+  const refShare = reference ? Math.min(1, reference.value / top) : 0
   return (
-    <div role="img" data-chart aria-label={label}>
+    <div role="img" data-chart aria-label={reference ? `${label}. ${reference.label}` : label}>
       <div className="relative h-32 lg:h-44">
-        <span className="absolute top-0 right-0 text-[11px] leading-[14px] lg:text-xs text-muted">{formatCompact(reais(top))}</span>
+        {/* The scale's top value; with a reference line, that line's label gives the scale instead. */}
+        {!(reference && reference.value > 0) && <span className="absolute top-0 right-0 text-[11px] leading-[14px] lg:text-xs text-muted">{formatCompact(reais(top))}</span>}
         <div className="absolute inset-x-0 top-4 border-t border-dashed border-line" />
         <div className="absolute inset-x-0 top-4 bottom-0 flex items-end border-b border-line">
           {data.map((d, i) => (
@@ -96,6 +102,17 @@ export function CashFlowChart({ data, label }: { data: CashFlowPoint[]; label: s
             </div>
           ))}
         </div>
+        {reference && reference.value > 0 && (
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-4 bottom-0">
+            <div className="absolute inset-x-0 border-t-[1.5px] border-dashed border-ink-2" style={{ bottom: `${refShare * 100}%` }} />
+            <span
+              className="tabular absolute right-0 mb-0.5 rounded-[6px] bg-surface px-1.5 py-px text-[11px] leading-[14px] font-medium text-ink lg:text-xs lg:leading-4"
+              style={{ bottom: `${refShare * 100}%` }}
+            >
+              {reference.label}
+            </span>
+          </div>
+        )}
       </div>
       <MonthLabels labels={data.map((d) => d.label)} months={data.every((d) => d.month) ? data.map((d) => d.month!) : undefined} />
     </div>

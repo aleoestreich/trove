@@ -488,15 +488,18 @@ The order of the Visão geral's cards and the hidden ones ("Personalizar",
 `src/data/overviewLayout.ts`), the same on every device:
 
 - Stored in `app_settings` `overview_layout`
-  (`{ "order": [every card, once], "hidden": [cards] }`, card keys such as
-  `netWorth`, `balance`, `projection`); the default order with every card
+  (`{ "order": [every card, once], "hidden": [cards] }`, card keys
+  `netWorth`, `monthClose`, `thisMonth`, `alerts`, `comingUp`, `trends`,
+  `monthInDetail`); the default order with every card
   shown when absent. No migration: `app_settings` already exists.
 - Edit, through `POST /api/edits`: `setOverviewLayout` (`layout`, every
   card listed once in `order`). Read with the snapshot (`overviewLayout`).
   Syncs never touch it.
 - Read back made whole: unknown cards are dropped, and a card added to the
   app later shows at its default place (after the card before it by
-  default).
+  default). A layout that names a card from before the seven (e.g.
+  `balance`, `projection`, `unusual`) starts from the default order and
+  keeps only which of today's cards it hid.
 
 ## A receber
 

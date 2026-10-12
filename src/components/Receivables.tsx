@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 import { useData } from '../state'
 import { useI18n } from '../i18n/I18nProvider'
 import { newId, type ReceivableEdit } from '../data/edits'
@@ -9,9 +8,7 @@ import {
   canRepay,
   isSettled,
   knownPeople,
-  owedByPerson,
   owedOf,
-  owedTotal,
   paymentsIn,
   received,
   receivablesOf,
@@ -24,7 +21,7 @@ import type { Cents, Transaction } from '../data/types'
 import { formatDay, formatDayYear } from '../lib/dates'
 import { formatMoney, moneyInput, parseMoney } from '../lib/money'
 import { Icon } from './Icon'
-import { Card, Progress } from './ui'
+import { Progress } from './ui'
 import { Sheet } from './insights/parts'
 import { btn, Confirm, FailedNote, FieldNote, fieldClass } from './ManualBalance'
 
@@ -635,43 +632,5 @@ export function ReceivableSection({ tx }: { tx: Transaction }) {
       {sheet?.kind === 'repay' && <RepaySheet tx={tx} onClose={close} />}
       {sheet?.kind === 'open' && <ReceivableSheet id={sheet.id} onClose={close} />}
     </>
-  )
-}
-
-/** On the Visão geral (only while someone owes something): the total, and who owes most. Opens the page. */
-export function ReceivablesCard() {
-  const { receivables } = useData()
-  const { t } = useI18n()
-  const c = t.receivables.card
-  const people = owedByPerson(receivables)
-  return (
-    <Card className="relative flex flex-col gap-3 lg:order-5 lg:col-span-12">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base leading-[22px] font-medium text-ink">
-          {/* The whole card opens the page. */}
-          <Link to="/receivables" className="after:absolute after:inset-0 after:rounded-lg after:content-['']">
-            {c.title}
-          </Link>
-        </h2>
-        <Icon name="chevronRight" className="size-[18px] shrink-0 text-muted" />
-      </div>
-      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] lg:items-start lg:gap-8">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[13px] leading-[18px] text-muted">
-            {c.total} · {t.receivables.people(people.length)}
-          </span>
-          <span className="tabular text-[28px] leading-9 font-bold tracking-[-0.02em] text-ink">{formatMoney(owedTotal(receivables))}</span>
-        </div>
-        <ul className="flex flex-col border-t border-line lg:border-t-0">
-          {people.slice(0, 3).map((p) => (
-            <li key={p.person} className="flex min-h-11 items-center justify-between gap-3 border-b border-line last:border-b-0">
-              <span className="truncate text-sm leading-[19px] text-ink">{p.person}</span>
-              <span className="tabular text-sm font-medium whitespace-nowrap text-ink">{formatMoney(p.remaining)}</span>
-            </li>
-          ))}
-          {people.length > 3 && <li className="pt-2 text-xs leading-4 text-muted">{c.more(people.length - 3)}</li>}
-        </ul>
-      </div>
-    </Card>
   )
 }

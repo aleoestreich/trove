@@ -775,14 +775,16 @@ suite('database', () => {
     await sync([tx('t1')])
     const read = async () => (await readSnapshot(pool, ['item-1'], '2026-09-01'))!.overviewLayout
     expect(await read()).toEqual(DEFAULT_LAYOUT)
-    const layout = { order: ['balance', ...OVERVIEW_SECTIONS.filter((x) => x !== 'balance')], hidden: ['unusual'] } as OverviewLayout
+    const layout = { order: ['trends', ...OVERVIEW_SECTIONS.filter((x) => x !== 'trends')], hidden: ['alerts'] } as OverviewLayout
     await applyEditSql(pool, { op: 'setOverviewLayout', layout })
     await sync([tx('t1')])
     expect(await read()).toEqual(layout)
     // A card the stored layout doesn't know (added later) shows at its default place; an unknown one is dropped.
-    await pool.query(`UPDATE app_settings SET value = $1 WHERE key = 'overview_layout'`, [JSON.stringify({ order: ['balance', 'gone', 'netWorth'], hidden: ['unusual'] })])
-    // "Fechamento do mês" (added after it) follows net worth wherever it was moved.
-    expect(await read()).toEqual({ order: ['balance', ...OVERVIEW_SECTIONS.slice(3), 'netWorth', 'monthClose'], hidden: ['unusual'] })
+    await pool.query(`UPDATE app_settings SET value = $1 WHERE key = 'overview_layout'`, [JSON.stringify({ order: ['trends', 'gone', 'netWorth'], hidden: ['alerts'] })])
+    expect(await read()).toEqual({ order: ['trends', 'monthInDetail', 'netWorth', 'monthClose', 'thisMonth', 'alerts', 'comingUp'], hidden: ['alerts'] })
+    // One saved before the seven cards (it names a retired one) starts from the default order, keeping what's still hidden.
+    await pool.query(`UPDATE app_settings SET value = $1 WHERE key = 'overview_layout'`, [JSON.stringify({ order: ['balance', 'monthInDetail', 'netWorth'], hidden: ['unusual', 'comingUp'] })])
+    expect(await read()).toEqual({ order: [...OVERVIEW_SECTIONS], hidden: ['comingUp'] })
   })
 
   it('migration 012 can run again', async () => {

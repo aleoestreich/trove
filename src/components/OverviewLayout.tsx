@@ -3,7 +3,6 @@ import { useData } from '../state'
 import { useI18n } from '../i18n/I18nProvider'
 import { Icon } from './Icon'
 import { Sheet } from './insights/parts'
-import { owedTotal } from '../data/receivables'
 import { showsClose } from '../data/monthClose'
 import { toISO } from '../lib/dates'
 import { DEFAULT_LAYOUT, isDefaultLayout, moveSection, setSectionHidden, shownSections, type OverviewLayout } from '../data/overviewLayout'
@@ -40,7 +39,7 @@ export function CustomizeButton({ onClick, compact = false }: { onClick(): void;
 export function OverviewLayoutSheet({ onClose }: { onClose(): void }) {
   const { t } = useI18n()
   const l = t.overview.layout
-  const { overviewLayout, saveOverviewLayout, extraPay, receivables } = useData()
+  const { overviewLayout, saveOverviewLayout } = useData()
   const [layout, setLayout] = useState(overviewLayout)
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -126,11 +125,7 @@ export function OverviewLayoutSheet({ onClose }: { onClose(): void }) {
                   {hidden ? (
                     <span className="text-xs leading-4 text-muted">{l.hiddenTag}</span>
                   ) : (
-                    <>
-                      {x === 'extraPay' && !extraPay.enabled && <span className="text-xs leading-4 text-muted">{l.extraPayOff}</span>}
-                      {x === 'receivables' && owedTotal(receivables) === 0 && <span className="text-xs leading-4 text-muted">{l.receivablesNone}</span>}
-                      {x === 'monthClose' && !showsClose(toISO(new Date())) && <span className="text-xs leading-4 text-muted">{l.monthCloseOff}</span>}
-                    </>
+                    x === 'monthClose' && !showsClose(toISO(new Date())) && <span className="text-xs leading-4 text-muted">{l.monthCloseOff}</span>
                   )}
                 </span>
               </button>
