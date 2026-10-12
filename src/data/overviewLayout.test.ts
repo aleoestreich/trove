@@ -3,7 +3,7 @@ import { applyEdit, EditError, validateEdit } from './edits'
 import { DEFAULT_LAYOUT, fillRows, OVERVIEW_SECTIONS, isDefaultLayout, isLayout, moveSection, normalizeLayout, setSectionHidden, shownSections } from './overviewLayout'
 import type { OverviewLayout, Snapshot } from './types'
 
-const custom = (): OverviewLayout => ({ order: ['balance', ...OVERVIEW_SECTIONS.filter((s) => s !== 'balance')], hidden: ['unusual'] })
+const custom = (): OverviewLayout => ({ order: ['thisMonth', ...OVERVIEW_SECTIONS.filter((s) => s !== 'thisMonth')], hidden: ['alerts'] })
 
 describe('Visão geral layout', () => {
   it('starts in the default order with every card shown', () => {
@@ -13,27 +13,32 @@ describe('Visão geral layout', () => {
   })
 
   it('moves a card up or down, never past the ends', () => {
-    const up = moveSection(DEFAULT_LAYOUT, 'projection', -1)
-    expect(up.order.slice(0, 4)).toEqual(['netWorth', 'monthClose', 'projection', 'balance'])
-    expect(moveSection(up, 'projection', 1)).toEqual(DEFAULT_LAYOUT)
+    const up = moveSection(DEFAULT_LAYOUT, 'alerts', -1)
+    expect(up.order.slice(0, 4)).toEqual(['netWorth', 'monthClose', 'alerts', 'thisMonth'])
+    expect(moveSection(up, 'alerts', 1)).toEqual(DEFAULT_LAYOUT)
     expect(moveSection(DEFAULT_LAYOUT, 'netWorth', -1)).toBe(DEFAULT_LAYOUT)
     expect(moveSection(DEFAULT_LAYOUT, 'monthInDetail', 1)).toBe(DEFAULT_LAYOUT)
   })
 
   it('hides and shows cards, keeping their place', () => {
-    let l = setSectionHidden(DEFAULT_LAYOUT, 'recurring', true)
+    let l = setSectionHidden(DEFAULT_LAYOUT, 'trends', true)
     l = setSectionHidden(l, 'netWorth', true)
-    expect(l.hidden).toEqual(['netWorth', 'recurring'])
+    expect(l.hidden).toEqual(['netWorth', 'trends'])
     expect(l.order).toEqual(DEFAULT_LAYOUT.order)
-    expect(shownSections(l)).not.toContain('recurring')
+    expect(shownSections(l)).not.toContain('trends')
     expect(isDefaultLayout(l)).toBe(false)
-    expect(setSectionHidden(setSectionHidden(l, 'recurring', false), 'netWorth', false)).toEqual(DEFAULT_LAYOUT)
+    expect(setSectionHidden(setSectionHidden(l, 'trends', false), 'netWorth', false)).toEqual(DEFAULT_LAYOUT)
   })
 
   it('makes a stored layout whole: unknown and repeated cards dropped, missing ones at their default place', () => {
-    expect(normalizeLayout({ order: ['monthInDetail', 'old', 'netWorth', 'netWorth'], hidden: ['old', 'unusual', 'unusual'] })).toEqual({
-      order: ['monthInDetail', 'netWorth', 'monthClose', 'balance', 'projection', 'extraPay', 'receivables', 'unusual', 'recurring', 'whereMoney', 'comingUp', 'incomeVsExpenses', 'spendingByCategory', 'averageIncome'],
-      hidden: ['unusual'],
+    expect(normalizeLayout({ order: ['monthInDetail', 'old', 'netWorth', 'netWorth'], hidden: ['old', 'alerts', 'alerts'] })).toEqual({
+      order: ['monthInDetail', 'netWorth', 'monthClose', 'thisMonth', 'alerts', 'comingUp', 'trends'],
+      hidden: ['alerts'],
+    })
+    // A layout saved before the seven cards starts from the default order, keeping the cards it hid that still exist.
+    expect(normalizeLayout({ order: ['comingUp', 'balance', 'netWorth', 'projection', 'monthInDetail', 'unusual'], hidden: ['unusual', 'monthInDetail'] })).toEqual({
+      order: [...OVERVIEW_SECTIONS],
+      hidden: ['monthInDetail'],
     })
     expect(normalizeLayout({ order: 'x', hidden: null })).toEqual(DEFAULT_LAYOUT)
     expect(normalizeLayout(custom())).toEqual(custom())

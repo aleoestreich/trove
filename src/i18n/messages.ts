@@ -238,8 +238,6 @@ export interface Messages {
       current: (amount: string, pct: string, above: boolean) => string
       /** Nothing in yet this month: no comparison. */
       currentNone: (amount: string) => string
-      avgLabel: (amount: string) => string
-      chart: (average: string) => string
       /** The category filter: the card's pill and its picker. */
       filter: {
         all: string
@@ -263,21 +261,12 @@ export interface Messages {
       }
     }
     whereMoney: string
-    balancesNote: string
-    byCurrency: string
-    byBank: string
     incomeVsExpenses: string
-    lastMonths: (months: number) => string
     /** The period of the multi-month charts. */
     range: { label: string; months: (n: number) => string; year: string }
-    /** The section of the multi-month charts, with the period picker. */
-    trend: string
     /** "abr. a set. 2026", "out. 2025 a set. 2026". */
     span: (from: string, to: string) => string
     shortHistory: (month: string) => string
-    kept: string
-    keptShort: string
-    comingUp: string
     openCardBills: string
     due: (date: string) => string
     installmentsNextMonth: string
@@ -295,9 +284,6 @@ export interface Messages {
       show: (name: string) => string
       hiddenTag: string
       /** Under "13º e férias" while it's turned off. */
-      extraPayOff: string
-      /** Under "A receber" while nobody owes anything. */
-      receivablesNone: string
       /** Under "Fechamento do mês" after the 10th. */
       monthCloseOff: string
       shownCount: (n: number, total: number) => string
@@ -310,8 +296,6 @@ export interface Messages {
     /** Under the month picker: "Mês atual · até hoje, 8 out." or "Mês fechado". */
     currentMonth: (day: string) => string
     closedMonth: string
-    fetchingMonth: (month: string) => string
-    fetchMonthFailed: (month: string) => string
     topCategories: string
     /** "Escolher mês": every month stored, by year. */
     monthPicker: {
@@ -322,9 +306,36 @@ export interface Messages {
       count: (n: number) => string
       onServer: string
     }
-    categories: string
     noExpenses: string
     latestTransactions: string
+    /** Mês em detalhe: the month in progress, and the way to the months before. */
+    monthDetail: { sub: (month: string, day: string) => string; previous: string; kept: (pct: string) => string }
+    /** Este mês: the month-end projection, the Equilíbrio do mês and 13º e férias. */
+    thisMonth: {
+      title: string
+      sub: (month: string, day: number, days: number) => string
+      projection: string
+      seeProjection: string
+      seeBalance: string
+      extraPay: (name: string, date: string) => string
+    }
+    /** Alertas: unusual categories, recurring charges to review, A receber. */
+    alerts: {
+      title: string
+      sub: string
+      count: (n: number) => string
+      none: string
+      unusual: (pct: string, above: boolean, avg: string) => string
+      inClose: (month: string, n: number) => string
+      owed: (people: number) => string
+      owedTitle: string
+      seeUnusual: string
+      seeRecurring: string
+    }
+    /** Compromissos: card bills, next month's installments, recurring charges. */
+    commitments: { title: string; sub: string; recurring: string; recurringSub: (n: number) => string; perMonth: string }
+    /** Tendências: income vs expenses (with Renda média) and spending by category. */
+    trends: { title: string; keptLabel: string; keptSub: string; avgLine: (amount: string) => string; legendAvg: string }
   }
   transactions: {
     search: string
@@ -1367,8 +1378,6 @@ export const messages: Messages = {
       range: (lowest, lowMonth, highest, highMonth) => `Menor ${lowest} (${lowMonth}) · Maior ${highest} (${highMonth})`,
       current: (amount, pct, above) => `Este mês: ${amount} · ${pct} ${above ? 'acima' : 'abaixo'} da média`,
       currentNone: (amount) => `Este mês: ${amount}`,
-      avgLabel: (amount) => `média ${amount}`,
-      chart: (average) => `Renda por mês; média ${average}`,
       filter: {
         all: 'Todas as receitas',
         partial: '(parcial)',
@@ -1391,18 +1400,10 @@ export const messages: Messages = {
       },
     },
     whereMoney: 'Onde está seu dinheiro',
-    balancesNote: 'Saldos das contas, antes das faturas',
-    byCurrency: 'Por moeda',
-    byBank: 'Por banco',
     incomeVsExpenses: 'Receitas vs. despesas',
-    lastMonths: (months) => (months === 12 ? 'Últimos 12 meses' : `Últimos ${months} meses`),
     range: { label: 'Período dos gráficos', months: (n) => `${n} meses`, year: '1 ano' },
-    trend: 'Tendência',
     span: (from, to) => `${from} a ${to}`,
     shortHistory: (month) => `Seus dados começam em ${month}. Os meses sem dados aparecem tracejados.`,
-    kept: 'da receita do mês foi guardado',
-    keptShort: 'Guardado no mês',
-    comingUp: 'Próximos pagamentos',
     openCardBills: 'Faturas em aberto',
     due: (date) => `Vence ${date}`,
     installmentsNextMonth: 'Parcelas do próximo mês',
@@ -1414,27 +1415,18 @@ export const messages: Messages = {
       title: 'Personalizar visão geral',
       sub: 'Ordem e cartões visíveis. Vale em todos os aparelhos.',
       sections: {
-        netWorth: 'Patrimônio líquido',
+        netWorth: 'Patrimônio',
         monthClose: 'Fechamento do mês',
-        balance: 'Equilíbrio do mês',
-        projection: 'Previsão do fim do mês',
-        unusual: 'Fora do padrão',
-        recurring: 'Recorrentes',
-        whereMoney: 'Onde está seu dinheiro',
-        comingUp: 'Próximos pagamentos',
-        incomeVsExpenses: 'Receitas vs. despesas',
-        spendingByCategory: 'Gastos por categoria',
-        averageIncome: 'Renda média',
-        extraPay: '13º e férias',
-        receivables: 'A receber',
+        thisMonth: 'Este mês',
+        alerts: 'Alertas',
+        comingUp: 'Compromissos',
+        trends: 'Tendências',
         monthInDetail: 'Mês em detalhe',
       },
       moveUp: (name) => `Subir ${name}`,
       moveDown: (name) => `Descer ${name}`,
       show: (name) => `Mostrar ${name}`,
       hiddenTag: 'Oculto',
-      extraPayOff: 'Aparece quando 13º e férias está ligado',
-      receivablesNone: 'Aparece quando alguém te deve',
       monthCloseOff: 'Aparece nos 10 primeiros dias do mês',
       shownCount: (n, total) => `${n} de ${total} visíveis`,
       reset: 'Restaurar padrão',
@@ -1445,8 +1437,6 @@ export const messages: Messages = {
     },
     currentMonth: (day) => `Mês atual · até hoje, ${day}`,
     closedMonth: 'Mês fechado',
-    fetchingMonth: (month) => `Buscando ${month}…`,
-    fetchMonthFailed: (month) => `Não foi possível buscar ${month}.`,
     topCategories: 'Maiores categorias',
     monthPicker: {
       open: (month) => `Escolher mês, ${month}`,
@@ -1456,9 +1446,47 @@ export const messages: Messages = {
       count: (n) => (n === 1 ? '1 transação' : `${n} transações`),
       onServer: 'Salvo no servidor',
     },
-    categories: 'Categorias',
     noExpenses: 'Nenhuma despesa neste mês.',
     latestTransactions: 'Últimas transações',
+    monthDetail: {
+      sub: (month, day) => `${month[0].toUpperCase()}${month.slice(1)} · até hoje, ${day}`,
+      previous: 'Meses anteriores',
+      kept: (pct) => `${pct} da renda guardada até agora`,
+    },
+    thisMonth: {
+      title: 'Este mês',
+      sub: (month, day, days) => `${month[0].toUpperCase()}${month.slice(1)} · dia ${day} de ${days}`,
+      projection: 'Previsão',
+      seeProjection: 'Ver previsão',
+      seeBalance: 'Ver equilíbrio',
+      extraPay: (name, date) => `${name} · ${date}`,
+    },
+    alerts: {
+      title: 'Alertas',
+      sub: 'O que pede sua atenção',
+      count: (n) => (n === 1 ? '1 alerta' : `${n} alertas`),
+      none: 'Nada fora do normal agora.',
+      unusual: (pct, above, avg) => `${pct} ${above ? 'acima' : 'abaixo'} da média · média ${avg}`,
+      inClose: (month, n) => `${n === 1 ? '1 categoria ficou' : `${n} categorias ficaram`} fora do padrão em ${month}`,
+      owed: (people) => (people === 1 ? 'Te devem · 1 pessoa' : `Te devem · ${people} pessoas`),
+      owedTitle: 'A receber',
+      seeUnusual: 'Fora do padrão',
+      seeRecurring: 'Recorrentes',
+    },
+    commitments: {
+      title: 'Compromissos',
+      sub: 'Faturas, parcelas e recorrentes',
+      recurring: 'Assinaturas e recorrentes',
+      recurringSub: (n) => (n === 1 ? '1 ativa · por mês' : `${n} ativas · por mês`),
+      perMonth: '/mês',
+    },
+    trends: {
+      title: 'Tendências',
+      keptLabel: 'Renda guardada',
+      keptSub: 'Média dos meses completos do período',
+      avgLine: (amount) => `Renda média ${amount}`,
+      legendAvg: 'Renda média',
+    },
   },
 
   transactions: {

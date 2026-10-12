@@ -8,31 +8,24 @@ import type { OverviewLayout, OverviewSection } from './types.js'
 export type { OverviewLayout, OverviewSection }
 
 /** Every card of the Visão geral, in the default (phone) order. */
-export const OVERVIEW_SECTIONS: readonly OverviewSection[] = [
-  'netWorth',
-  'monthClose',
-  'balance',
-  'projection',
-  'extraPay',
-  'receivables',
-  'unusual',
-  'recurring',
-  'whereMoney',
-  'comingUp',
-  'incomeVsExpenses',
-  'spendingByCategory',
-  'averageIncome',
-  'monthInDetail',
-]
+export const OVERVIEW_SECTIONS: readonly OverviewSection[] = ['netWorth', 'monthClose', 'thisMonth', 'alerts', 'comingUp', 'trends', 'monthInDetail']
 
 export const DEFAULT_LAYOUT: OverviewLayout = { order: [...OVERVIEW_SECTIONS], hidden: [] }
 
 export const isSection = (v: unknown): v is OverviewSection => typeof v === 'string' && (OVERVIEW_SECTIONS as readonly string[]).includes(v)
 
+/**
+ * The cards before the seven of today (they were folded into them). A layout
+ * that names any of them was saved before: it starts from the default order,
+ * keeping which cards were hidden.
+ */
+const RETIRED_SECTIONS = ['balance', 'projection', 'extraPay', 'receivables', 'unusual', 'recurring', 'whereMoney', 'incomeVsExpenses', 'spendingByCategory', 'averageIncome']
+
 /** A stored layout made whole: unknown or repeated cards dropped, cards it doesn't list (added later) at their default place. */
 export function normalizeLayout(v: unknown): OverviewLayout {
   const x = (v ?? {}) as { order?: unknown; hidden?: unknown }
-  const order = [...new Set(Array.isArray(x.order) ? x.order.filter(isSection) : [])]
+  const retired = Array.isArray(x.order) && x.order.some((s) => RETIRED_SECTIONS.includes(s as string))
+  const order = retired ? [...OVERVIEW_SECTIONS] : [...new Set(Array.isArray(x.order) ? x.order.filter(isSection) : [])]
   for (const [i, s] of OVERVIEW_SECTIONS.entries()) {
     if (order.includes(s)) continue
     // After the card that comes before it by default, or first.

@@ -118,6 +118,9 @@ No backend, no auth. It runs in the browser on hardcoded data.
 - ✅ Accurate totals: investment moves are transfers; Educação, Lazer,
   Impostos e tarifas and Rendimentos are defaults; the Equilíbrio expects
   Renda média (one reference income).
+- ✅ Visão geral in seven cards (Patrimônio, Fechamento do mês, Este mês,
+  Alertas, Compromissos, Tendências, Mês em detalhe), each answering one
+  question; the overlapping cards were folded into them.
 - Next: read investment balances from Meu Pluggy into net worth.
 - ✅ Fechamento do mês: a summary of each month once it ends (kept, what
   changed, biggest spending, unusual categories, the Equilíbrio's target),

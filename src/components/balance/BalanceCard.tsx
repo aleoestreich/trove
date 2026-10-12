@@ -2,33 +2,33 @@ import { Link } from 'react-router-dom'
 import { useData } from '../../state'
 import { useI18n } from '../../i18n/I18nProvider'
 import { Icon } from '../Icon'
-import { Card } from '../ui'
 import { formatMoney } from '../../lib/money'
 import { monthKey } from '../../lib/dates'
 import { hasGroups, roundedShares } from '../../data/spendingBalance'
 import { GROUP_FILL, GroupSwatch, RESERVE_FILL, SplitBar, pct, StatusPill, monthLabel, useMonthBalance, useStatusText, type Part } from './parts'
 
 /**
- * "Equilíbrio do mês" on the Visão geral: the verdict, the month as one bar
- * against the target, the three shares and a sentence. Opens the page.
- * Before any category is in a group: what it is, and "Organizar categorias".
+ * "Equilíbrio do mês" inside the Visão geral's "Este mês": the verdict, the
+ * month as one bar against the target, the three shares and a sentence;
+ * the block opens the page. Before any category is in a group: what it is,
+ * and "Organizar categorias".
  */
-export function BalanceCard() {
+export function BalanceBlock() {
   const { categories, subcategories } = useData()
-  if (!hasGroups(categories, subcategories)) return <EmptyBalanceCard />
-  return <FilledBalanceCard />
+  if (!hasGroups(categories, subcategories)) return <EmptyBalance />
+  return <FilledBalance />
 }
 
-const cardClass = 'flex flex-col gap-3 lg:order-5 lg:col-span-12'
+const blockClass = 'flex flex-col gap-3'
 
-function EmptyBalanceCard() {
+function EmptyBalance() {
   const { t } = useI18n()
   const b = t.spendingBalance
   const { balanceTarget: target } = useData()
   return (
-    <Card className={cardClass}>
-      <h2 className="text-base leading-[22px] font-medium text-ink">{b.title}</h2>
-      <div className="flex flex-col gap-1.5 lg:max-w-[560px]">
+    <div className={blockClass}>
+      <h3 className="label-caps">{b.title}</h3>
+      <div className="flex flex-col gap-1.5">
         <div aria-hidden className="flex h-3.5 gap-0.5">
           {(['essential', 'lifestyle', 'future'] as const).map((g, i) => (
             <span
@@ -47,16 +47,16 @@ function EmptyBalanceCard() {
       <p className="text-sm leading-5 text-ink-2">{b.emptyText}</p>
       <Link
         to="/balance/organize"
-        className="inline-flex h-12 items-center justify-center rounded-md bg-accent px-5 text-[15px] font-medium text-surface active:opacity-80 lg:self-start"
+        className="inline-flex h-11 items-center justify-center self-start rounded-md border border-line bg-surface px-4 text-sm font-medium text-accent hover:bg-track"
       >
         {b.organize}
       </Link>
       <p className="text-xs leading-4 text-muted">{b.emptyNote}</p>
-    </Card>
+    </div>
   )
 }
 
-function FilledBalanceCard() {
+function FilledBalance() {
   const { t } = useI18n()
   const b = t.spendingBalance
   const { today } = useData()
@@ -82,18 +82,18 @@ function FilledBalanceCard() {
       ]
 
   return (
-    <Card className={`relative ${cardClass}`}>
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base leading-[22px] font-medium text-ink">
-          {/* The whole card opens the page; the "Classificar" button sits above this link. */}
-          <Link to={`/balance?m=${balance.month}`} aria-label={b.open(b.status[status.kind])} className="after:absolute after:inset-0 after:rounded-lg after:content-['']">
+    <div className={`relative ${blockClass}`}>
+      <div className="flex min-h-6 items-center justify-between gap-2">
+        <h3 className="label-caps">
+          {/* The whole block opens the page; the "Classificar" button sits above this link. */}
+          <Link to={`/balance?m=${balance.month}`} aria-label={b.open(b.status[status.kind])} className="after:absolute after:-inset-2 after:rounded-md after:content-['']">
             {b.title}
           </Link>
-        </h2>
+        </h3>
         <StatusPill status={status} />
       </div>
       <p className="-mt-2 tabular text-[13px] leading-[18px] text-muted">{sub}</p>
-      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-center lg:gap-8">
+      <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-3">
           {shares && <SplitBar balance={balance} target={target} />}
           <div className="grid grid-cols-3 gap-2">
@@ -108,7 +108,7 @@ function FilledBalanceCard() {
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 border-t border-line pt-2.5 lg:border-t-0 lg:pt-0">
+          <div className="flex items-center gap-2 border-t border-line pt-2.5">
             <span className="min-w-0 flex-1 text-[13px] leading-[18px] text-ink-2">{text}</span>
             <Icon name="chevronRight" className="size-[18px] shrink-0 text-muted" />
           </div>
@@ -142,6 +142,6 @@ function FilledBalanceCard() {
           )}
         </div>
       </div>
-    </Card>
+    </div>
   )
 }

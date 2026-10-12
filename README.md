@@ -131,8 +131,8 @@ between accounts, and card bill payments.
   categoria" clears the category and subcategory of any selection (also one
   transaction at a time: "Remover categoria" in its details); a sync never
   guesses a category for them again.
-- **Average income** (Overview) averages the last 6 complete months of
-  income in the categories chosen on its card (all by default; the choice is
+- **Average income** (Renda média, in Tendências) averages the last 6 complete months of
+  income in the categories chosen on its pill (all by default; the choice is
   saved in the database and shared between devices). It is the app's one
   reference income: the Equilíbrio do mês measures the month in progress
   against it too. The month-end projection forecasts the salary itself (its
@@ -144,36 +144,55 @@ between accounts, and card bill payments.
   (days off plus a third, and 10 days sold when chosen), and a smaller
   salary in the months with vacation days, already paid in advance. Amounts
   are estimates from the net monthly salary (the projection's median month,
-  or one typed in). A card on the Overview lists the next payments.
+  or one typed in). Este mês shows the next payment while it's on.
 - **Fechamento do mês** (`#/month-close`): the summary of a month once it
   ends: what came in, went out and was kept (and its share of the income),
   compared with the month before and the average of the 6 before it; the
   categories that moved most; the biggest categories and purchases; the
   unusual categories against their own average; and the Equilíbrio do mês
   against its target. A card on the Overview shows the month just closed
-  from the 1st to the 10th; the page goes back to any loaded month.
+  from the 1st to the 10th; the page goes back to any loaded month, and
+  Mês em detalhe leads to it ("Meses anteriores").
 - **A receber** (`#/receivables`): a purchase or Pix paid on someone
   else's behalf is marked in its details ("Paguei por alguém": who, and how
   much of it; several people can share one), then tracked until it's paid
   back. A payment back is recorded from money that came in ("É uma
   devolução" in its details, or the receivable's suggestions, the matching
   amounts first) or typed in by hand. The page lists who owes what, most
-  owed first, and the ones already paid back; a card on the Overview shows
+  owed first, and the ones already paid back; Alertas on the Overview shows
   the total while someone owes something. Only your part counts: what
   others owe is left out of spending (every total, chart, average and the
   Equilíbrio), and the money they pay back is left out of income; the
   transaction's details show "Sua parte". Balances, bills, the transaction
   list and the month-end projection (a cash forecast) keep the bank's
   amounts.
+- **Overview (Visão geral):** seven cards, each answering one question:
+  - **Patrimônio**: net worth today, and where the money is (by bank, and
+    by currency when there's more than one); FGTS and previdência apart.
+  - **Fechamento do mês**: the month just closed (the 1st to the 10th).
+  - **Este mês**: the month-end projection beside the Equilíbrio do mês,
+    and the next 13º or vacation payment when 13º e férias is on.
+  - **Alertas**: unusual categories (left out while the Fechamento shows
+    the same month), recurring charges to review (price increase, new,
+    stopped) and A receber, in one list; links to Fora do padrão and
+    Recorrentes. Says so when there's nothing to flag.
+  - **Compromissos**: each card's bill, next month's installments, and the
+    subscriptions and recurring charges per month.
+  - **Tendências**: the period switcher, income vs expenses with Renda
+    média as a dashed line (its value, filter and range below it), the
+    average share of income kept, and spending by category.
+  - **Mês em detalhe**: the month in progress (totals, top categories,
+    latest transactions); "Meses anteriores" opens the Fechamento.
+  Desktop puts Patrimônio and Compromissos side by side, the rest across.
 - **Overview layout:** "Personalizar" (the sliders icon in the phone
   header, a button next to the desktop title) moves each card up or down
   and hides the ones not wanted; "Restaurar padrão" brings back the default.
   Saved in the database, so every device shows the same page. On desktop a
-  custom order fills each row to the full width.
-- **Overview periods:** the multi-month charts (income vs expenses, spending
-  by category) show 3 months, 6 months (default) or 1 year,
-  chosen at the top of the Overview (kept in the address, `?r=3|6|12`). The
-  month picker belongs to "Mês em detalhe" and changes only that card.
+  custom order fills each row to the full width. A layout saved before the
+  seven cards starts from the default order, keeping the cards it hid.
+- **Overview periods:** Tendências' charts (income vs expenses, spending
+  by category) show 3 months, 6 months (default) or 1 year, chosen on the
+  card (kept in the address, `?r=3|6|12`).
 - **Previsão do fim do mês** (Overview, then its detail page) projects what
   is left in the chosen accounts (checking accounts in BRL by default) on the
   last day of the month: today's balance + the salary still expected (its
