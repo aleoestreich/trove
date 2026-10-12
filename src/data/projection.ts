@@ -8,8 +8,8 @@
 // - Receitas previstas: the salary's monthly average over the last 6
 //   complete months, minus what came in this month. It is expected on its
 //   pay schedule, learnt from the last 3 months: each payment's usual day
-//   (counted from the end of the month when it comes in its last days, then
-//   on the last business day when that's a weekend) and
+//   (counted from the end of the month when it comes in its last days;
+//   a payday on a weekend falls on the Friday before) and
 //   its share of the month, so a salary paid in two parts (e.g. on the 15th
 //   and the last day) is expected in two parts. What already came in this
 //   month covers the earliest parts first. Freelance the same way, when
@@ -190,15 +190,16 @@ function paySchedule(byMonth: Map<string, Transaction[]>, months: string[]): Pay
   return schedule.map((p) => ({ ...p, share: p.share / sum }))
 }
 
-/** A payday's date in `month` (YYYY-MM). One at the month's end falls back to Friday when that day is a weekend (the last business day). */
+/**
+ * A payday's date in `month` (YYYY-MM). On a Saturday or Sunday it falls on
+ * the working day before (Friday), within the month.
+ */
 const paydayIn = (p: Payday, month: string) => {
   const last = daysInMonth(month)
-  let day = p.fromEnd ? last - p.day : Math.min(p.day, last)
-  if (p.fromEnd) {
-    const weekday = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, day)).getUTCDay()
-    day -= weekday === 6 ? 1 : weekday === 0 ? 2 : 0
-  }
-  return `${month}-${String(day).padStart(2, '0')}`
+  const day = p.fromEnd ? last - p.day : Math.min(p.day, last)
+  const weekday = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, day)).getUTCDay()
+  const back = weekday === 6 ? 1 : weekday === 0 ? 2 : 0
+  return `${month}-${String(Math.max(1, day - back)).padStart(2, '0')}`
 }
 
 /** A category's income into the chosen accounts: average, pay schedule, and what came in this month. */

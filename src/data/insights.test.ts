@@ -282,6 +282,12 @@ describe('month-end projection', () => {
     expect(early.events.filter((e) => e.kind === 'salary').map((e) => [e.date, e.amount])).toEqual([['2026-10-30', 6_000_00]])
   })
 
+  it('moves any payday on a weekend to the Friday before', () => {
+    // Paid on the 17th: 17 October 2026 is a Saturday, so Friday the 16th.
+    const list = [...monthly(months, '17', 10_000_00, { description: 'SALARIO EXEMPLO', categoryId: 'salary' }), ...rent, ...daily, ...cardTxs, ...october]
+    expect(project(undefined, list).events.filter((e) => e.kind === 'salary').map((e) => e.date)).toEqual(['2026-10-16'])
+  })
+
   it('needs 2 months of salary', () => {
     expect(project(undefined, txs.filter((t) => t.categoryId !== 'salary' || t.date >= '2026-09'))).toBeNull()
   })
