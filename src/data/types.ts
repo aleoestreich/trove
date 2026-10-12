@@ -81,6 +81,8 @@ export interface Category {
   /** An icon key: a file name in src/assets/icons/categories/. */
   icon: string
   sortOrder: number
+  /** Expense categories: their group in the "Equilíbrio do mês" (src/data/balance.ts); none yet when absent. */
+  group?: SpendingGroup | null
 }
 
 export interface Subcategory {
@@ -88,6 +90,18 @@ export interface Subcategory {
   categoryId: string
   name: string
   sortOrder: number
+  /** A group of its own in the "Equilíbrio do mês"; absent: it follows its category. */
+  group?: SpendingGroup | null
+}
+
+/** A spending group of the "Equilíbrio do mês": Essencial or Estilo de vida (what the income leaves after both is the Futuro). */
+export type SpendingGroup = 'essential' | 'lifestyle'
+
+/** How much of the income goes to each group, in whole percent (they add up to 100). */
+export interface BalanceTarget {
+  essential: number
+  lifestyle: number
+  future: number
 }
 
 /** A hand-set answer to "is this a transfer (own accounts, or a card bill payment)?". */
@@ -172,6 +186,8 @@ export interface Snapshot {
   fgts?: Fgts
   /** The previdência privada plans tracked by hand (off, with none, when absent). */
   pension?: Pension
+  /** The "Equilíbrio do mês" target (50/30/20 when absent). */
+  balanceTarget?: BalanceTarget
 }
 
 /** What the month-end projection counts. */

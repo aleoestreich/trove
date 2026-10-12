@@ -6,7 +6,8 @@ import { NO_FGTS, type Fgts } from './data/fgts'
 import { NO_PENSION, type Pension } from './data/pension'
 import { applyCardDays, deviceCardDays, forgetDeviceCardDays, type CardDays } from './data/cardDays'
 import { applyEdit, EditError, type BulkResult, type Edit, type PreviousCategory } from './data/edits'
-import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type SyncOptions, type Transaction } from './data/types'
+import { DEFAULT_TARGET } from './data/spendingBalance'
+import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Account, type BalanceTarget, type SpendingGroup, type Category, type IncomeFilter, type Institution, type ProjectionSettings, type Snapshot, type Subcategory, type SyncInfo, type SyncJob, type SyncOptions, type Transaction } from './data/types'
 import { computeInsights, type Insights } from './data/insights'
 import type { TransactionQuery } from './data/transactionFilter'
 import type { RecurringAction } from './data/recurring'
@@ -73,6 +74,14 @@ interface AppData extends Snapshot {
   setPensionTracking(tracking: boolean): void
   /** Saves or deletes a plan or one of its balances, server first; rejects with a message for the UI. */
   savePension(e: PensionEdit): Promise<void>
+  /** The "Equilíbrio do mês" target (src/data/spendingBalance.ts). */
+  balanceTarget: BalanceTarget
+  /** Saves the target, server first; rejects with a message for the UI. */
+  saveBalanceTarget(target: BalanceTarget): Promise<void>
+  /** Puts expense categories in groups (null: none), all or none, server first; rejects with a message for the UI. */
+  saveCategoryGroups(groups: { categoryId: string; group: SpendingGroup | null }[]): Promise<void>
+  /** Puts a subcategory in a group of its own (null: it follows its category), server first. */
+  saveSubcategoryGroup(id: string, group: SpendingGroup | null): Promise<void>
 }
 
 /** The previdência privada edits saved from its sheets. */
@@ -257,6 +266,24 @@ export function DataProvider({ repository, children }: { repository: Repository;
     [save],
   )
   const setCardDays = useCallback((accountId: string, days: CardDays | null) => edit({ op: 'setCardDays', accountId, days }), [edit])
+  const saveBalanceTarget = useCallback(
+    async (target: BalanceTarget) => {
+      await save({ op: 'setBalanceTarget', target })
+    },
+    [save],
+  )
+  const saveCategoryGroups = useCallback(
+    async (groups: { categoryId: string; group: SpendingGroup | null }[]) => {
+      if (groups.length) await save({ op: 'setCategoryGroups', groups })
+    },
+    [save],
+  )
+  const saveSubcategoryGroup = useCallback(
+    async (id: string, group: SpendingGroup | null) => {
+      await save({ op: 'setSubcategoryGroup', id, group })
+    },
+    [save],
+  )
 
   // Days an older version kept on this device move to the database once (a
   // card that already has days there keeps them); each leaves the device when saved.
@@ -441,8 +468,12 @@ export function DataProvider({ repository, children }: { repository: Repository;
       pension: snapshot.pension ?? NO_PENSION,
       setPensionTracking,
       savePension,
+      balanceTarget: snapshot.balanceTarget ?? DEFAULT_TARGET,
+      saveBalanceTarget,
+      saveCategoryGroups,
+      saveSubcategoryGroup,
     }
-  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, setFgtsTracking, saveFgts, setPensionTracking, savePension, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
+  }, [snapshot, edit, categorizeMany, restoreCategories, saveIncomeFilter, renameAccount, setCardDays, setFgtsTracking, saveFgts, setPensionTracking, savePension, saveBalanceTarget, saveCategoryGroups, saveSubcategoryGroup, saveProjectionSettings, answerRecurring, dataVersion, fetchTransactions])
 
   const loadState = useMemo<LoadState>(
     () => ({ error, retry: () => setAttempt((n) => n + 1), source: snapshot?.source ?? null }),

@@ -534,6 +534,143 @@ export interface Messages {
     notIncome: string
     http: (status: number) => string
   }
+  spendingBalance: {
+    title: string
+    groups: { essential: string; lifestyle: string; future: string; ungrouped: string }
+    /** Short names for the two-option pickers. */
+    short: { essential: string; lifestyle: string }
+    status: { onTarget: string; attention: string; overIncome: string; partial: string; incomplete: string; noIncome: string }
+    open: (status: string) => string
+    sub: (month: string, income: string) => string
+    subSoFar: (month: string, income: string) => string
+    subNoIncome: (month: string, soFar: boolean) => string
+    onTarget: string
+    above: (group: string, points: number) => string
+    below: (group: string, points: number) => string
+    overIncome: (amount: string) => string
+    partialEarly: string
+    partialLate: string
+    incomplete: (amount: string) => string
+    noIncome: string
+    includesUngrouped: (amount: string) => string
+    classifyAmount: (amount: string) => string
+    target: (pct: number) => string
+    barAria: (e: number, l: number, f: number, te: number, tl: number, tf: number) => string
+    emptyText: string
+    organize: string
+    emptyNote: string
+    detail: {
+      subtitle: string
+      closedMonth: string
+      soFar: (day: number, of: number) => string
+      legendTarget: (e: number, l: number, f: number) => string
+      editTarget: string
+      legendIncome: string
+      legendOver: string
+      base: (income: string) => string
+      baseAll: string
+      baseNote: (included: string, excluded: string | null) => string
+      change: string
+      rowShare: (pct: string, target: number) => string
+      span: (from: string, to: string) => string
+      points: (n: number) => string
+      soFarTag: string
+      insideFuture: (amount: string) => string
+      classify: string
+      overTarget: (amount: string) => string
+      overTargetOf: (target: string) => string
+      underTarget: (amount: string, target: string) => string
+      atTarget: (target: string) => string
+      topShare: (names: string, pct: number) => string
+      shareOfGroup: (pct: number) => string
+      fromCategory: (name: string) => string
+      more: (n: number) => string
+      less: string
+      ungroupedNote: string
+      uncategorized: string
+      txCount: (n: number) => string
+      noGroupYet: string
+      emptyGroup: string
+      trendTitle: string
+      rangeLabel: string
+      months6: string
+      year: string
+      incomeLine: string
+      trendSummary: (lo: number, hi: number) => string
+      trendOver: (month: string, amount: string) => string
+      trendAria: (from: string, to: string) => string
+      trendEmpty: string
+      showTable: string
+      hideTable: string
+      table: { month: string; income: string }
+      noIncomeBanner: string
+      organize: string
+    }
+    org: {
+      title: string
+      introTitle: string
+      introText: string
+      help: { essential: string; lifestyle: string; future: string }
+      suggested: (n: number, total: number) => [string, string, string]
+      seeSuggestions: string
+      oneByOne: string
+      reviewTitle: string
+      reviewSub: (n: number) => string
+      choose: string
+      chosen: string
+      noSuggestion: (n: number) => string
+      suggestedAs: (group: string) => string
+      perMonth: (amount: string) => string
+      left: (n: number) => string
+      allSet: (n: number) => string
+      save: string
+      saving: string
+      saved: string
+      savedN: (n: number) => string
+      undo: string
+      failed: string
+      empty: string
+      back: string
+    }
+    targetSheet: {
+      title: string
+      sub: string
+      presetNotes: [string, string, string]
+      custom: string
+      customNote: string
+      futureNote: string
+      decrease: (name: string) => string
+      increase: (name: string) => string
+      help: string
+      atLimit: string
+      dividers: [string, string]
+      aria: (e: number, l: number, f: number) => string
+      save: string
+      cancel: string
+      failed: string
+    }
+    cats: {
+      targetRow: string
+      edit: string
+      field: string
+      fieldHelp: string
+      none: string
+      followsCategory: string
+      subNote: string
+      otherGroup: (n: number) => string
+      pick: string
+      pickTitle: (name: string) => string
+      pickSub: string
+      subTitle: (name: string) => string
+      subSub: (category: string) => string
+      same: (category: string) => string
+      sameNote: (group: string | null) => string
+      always: (group: string) => string
+      subInfo: (name: string, month: string, amount: string) => string
+      save: string
+      cancel: string
+    }
+  }
   categoriesPage: {
     /** Accessible names of the 54 category icons, by key. */
     iconNames: Record<string, string>
@@ -1284,6 +1421,146 @@ export const messages: Messages = {
     nothingSelected: 'Selecione pelo menos uma categoria',
     notIncome: 'Só categorias de receita entram na renda média.',
     http: (status) => `A requisição falhou (HTTP ${status}).`,
+  },
+  spendingBalance: {
+    title: 'Equilíbrio do mês',
+    groups: { essential: 'Essencial', lifestyle: 'Estilo de vida', future: 'Futuro', ungrouped: 'Sem grupo' },
+    short: { essential: 'Essencial', lifestyle: 'Estilo' },
+    status: { onTarget: 'Dentro da meta', attention: 'Atenção', overIncome: 'Acima da renda', partial: 'Em andamento', incomplete: 'Incompleto', noIncome: 'Sem renda' },
+    open: (status) => `Equilíbrio do mês: ${status}. Abrir detalhes`,
+    sub: (month, income) => `${month} · sobre ${income} de renda`,
+    subSoFar: (month, income) => `${month} até agora · sobre ${income} de renda`,
+    subNoIncome: (month, soFar) => (soFar ? `${month} até agora · nenhuma renda ainda` : `${month} · nenhuma renda`),
+    onTarget: 'Os três grupos estão perto da meta.',
+    above: (group, points) => `${group} está ${points} ${points === 1 ? 'ponto' : 'pontos'} acima da meta.`,
+    below: (group, points) => `${group} está ${points} ${points === 1 ? 'ponto' : 'pontos'} abaixo da meta.`,
+    overIncome: (amount) => `Os gastos passaram a renda em ${amount}.`,
+    partialEarly: 'O mês está no começo: o Futuro costuma diminuir até o fim.',
+    partialLate: 'O mês ainda não acabou: os números mudam até o fim.',
+    incomplete: (amount) => `${amount} ainda sem grupo. Classifique para ver o equilíbrio real.`,
+    noIncome: 'Nenhuma renda entrou ainda, então mostramos só os valores.',
+    includesUngrouped: (amount) => `Inclui ${amount} sem grupo`,
+    classifyAmount: (amount) => `Classificar ${amount}`,
+    target: (pct) => `meta ${pct}%`,
+    barAria: (e, l, f, te, tl, tf) => `Essencial ${e}%, Estilo de vida ${l}%, Futuro ${f}% da renda. Meta ${te}, ${tl} e ${tf}.`,
+    emptyText: 'Separe seus gastos em Essencial e Estilo de vida e veja, mês a mês, quanto da renda sobra para o Futuro.',
+    organize: 'Organizar categorias',
+    emptyNote: 'Sugerimos um grupo para cada categoria. Você revisa antes de salvar.',
+    detail: {
+      subtitle: 'Como a renda se divide entre os grupos',
+      closedMonth: 'Mês fechado',
+      soFar: (day, of) => `Até agora · ${day} de ${of} dias`,
+      legendTarget: (e, l, f) => `Meta ${e} · ${l} · ${f}`,
+      editTarget: 'Editar meta',
+      legendIncome: 'Renda',
+      legendOver: 'Acima da renda',
+      base: (income) => `Sobre ${income} de renda`,
+      baseAll: 'Toda a renda do mês.',
+      baseNote: (included, excluded) => (excluded ? `${included}. ${excluded} ficam fora.` : `${included}.`),
+      change: 'Alterar',
+      rowShare: (pct, target) => `${pct} da renda · meta ${target}%`,
+      span: (from, to) => `${from} a ${to}`,
+      points: (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)} ${Math.abs(n) === 1 ? 'ponto' : 'pontos'}`,
+      soFarTag: 'até agora',
+      insideFuture: (amount) => `${amount} · dentro do Futuro`,
+      classify: 'Classificar',
+      overTarget: (amount) => `${amount} acima da meta`,
+      overTargetOf: (target) => ` de ${target}.`,
+      underTarget: (amount, target) => `${amount} abaixo da meta de ${target}.`,
+      atTarget: (target) => `Na meta de ${target}.`,
+      topShare: (names, pct) => ` ${names} somam ${pct}% do grupo.`,
+      shareOfGroup: (pct) => `${pct}% do grupo`,
+      fromCategory: (name) => `de ${name}`,
+      more: (n) => `Mais ${n} ${n === 1 ? 'categoria' : 'categorias'}`,
+      less: 'Mostrar menos',
+      ungroupedNote: 'Enquanto não têm grupo, esses gastos ficam dentro do Futuro e o deixam maior do que é.',
+      uncategorized: 'Sem categoria',
+      txCount: (n) => `${n} ${n === 1 ? 'transação' : 'transações'}`,
+      noGroupYet: 'Categoria ainda sem grupo',
+      emptyGroup: 'Nenhum gasto neste grupo no mês.',
+      trendTitle: 'Ao longo dos meses',
+      rangeLabel: 'Período do gráfico',
+      months6: '6 meses',
+      year: '1 ano',
+      incomeLine: 'renda',
+      trendSummary: (lo, hi) => (lo === hi ? `O Essencial ficou em ${lo}% da renda.` : `O Essencial ficou entre ${lo}% e ${hi}% da renda.`),
+      trendOver: (month, amount) => ` Em ${month}, os gastos passaram a renda em ${amount}.`,
+      trendAria: (from, to) => `Divisão da renda por mês, de ${from} a ${to}.`,
+      trendEmpty: 'Ainda não há meses fechados com renda para comparar.',
+      showTable: 'Ver em tabela',
+      hideTable: 'Ocultar tabela',
+      table: { month: 'Mês', income: 'Renda' },
+      noIncomeBanner: 'Sem renda no mês, os percentuais e a meta ficam de fora. Eles voltam quando a renda entrar.',
+      organize: 'Organizar categorias',
+    },
+    org: {
+      title: 'Organizar categorias',
+      introTitle: 'Separe seus gastos em grupos',
+      introText: 'Assim dá para ver, mês a mês, quanto da renda vai para o essencial, para o estilo de vida e para o futuro.',
+      help: {
+        essential: 'Moradia, contas da casa, mercado, saúde, transporte para o trabalho, escola.',
+        lifestyle: 'Restaurantes, delivery, compras, viagens, assinaturas, hobbies.',
+        future: 'O que sobra da renda depois dos outros dois. Não precisa escolher nada.',
+      },
+      suggested: (n, total) => ['Já sugerimos um grupo para ', `${n} das suas ${total} ${total === 1 ? 'categoria' : 'categorias'}`, ' pelo nome. Você confere tudo numa lista só antes de salvar.'],
+      seeSuggestions: 'Ver sugestões',
+      oneByOne: 'Prefiro escolher uma por uma',
+      reviewTitle: 'Revisar grupos',
+      reviewSub: (n) => `${n} ${n === 1 ? 'categoria' : 'categorias'} de despesa. Toque para trocar o grupo.`,
+      choose: 'Escolha um grupo',
+      chosen: 'Escolhidas por você',
+      noSuggestion: (n) => `${n} sem sugestão`,
+      suggestedAs: (group) => `Sugeridas como ${group}`,
+      perMonth: (amount) => `${amount}/mês`,
+      left: (n) => (n === 1 ? 'A 1 sem grupo fica em “Sem grupo” se você salvar agora.' : `As ${n} sem grupo ficam em “Sem grupo” se você salvar agora.`),
+      allSet: (n) => (n === 1 ? 'A categoria tem grupo.' : `Todas as ${n} categorias têm grupo.`),
+      save: 'Salvar grupos',
+      saving: 'Salvando…',
+      saved: 'Grupos salvos',
+      savedN: (n) => `${n} ${n === 1 ? 'categoria organizada' : 'categorias organizadas'}`,
+      undo: 'Desfazer',
+      failed: 'Não foi possível salvar os grupos. Tente de novo.',
+      empty: 'Nenhuma categoria de despesa ainda. Crie uma na aba Categorias.',
+      back: 'Equilíbrio do mês',
+    },
+    targetSheet: {
+      title: 'Meta do equilíbrio',
+      sub: 'Quanto da renda vai para cada grupo',
+      presetNotes: ['A mais conhecida', 'Mais espaço para o essencial', 'Para quando o custo fixo é alto'],
+      custom: 'Personalizada',
+      customNote: 'Você define os números',
+      futureNote: 'Fica com o que sobra',
+      decrease: (name) => `Diminuir ${name}`,
+      increase: (name) => `Aumentar ${name}`,
+      help: 'Arraste as divisões na barra ou use − e +. Passos de 5 pontos; toque e segure para ir de 1 em 1. A soma fica sempre em 100%.',
+      atLimit: 'O Futuro chegou a 0%. Para aumentar um grupo, diminua o outro.',
+      dividers: ['Divisão entre Essencial e Estilo de vida', 'Divisão entre Estilo de vida e Futuro'],
+      aria: (e, l, f) => `Meta: Essencial ${e}%, Estilo de vida ${l}%, Futuro ${f}%`,
+      save: 'Salvar meta',
+      cancel: 'Cancelar',
+      failed: 'Não foi possível salvar a meta. Tente de novo.',
+    },
+    cats: {
+      targetRow: 'Meta do equilíbrio',
+      edit: 'Editar',
+      field: 'Grupo no equilíbrio',
+      fieldHelp: 'Os gastos desta categoria entram nesse grupo.',
+      none: 'Sem grupo',
+      followsCategory: 'Segue a categoria',
+      subNote: 'Uma subcategoria pode ir para outro grupo. Ex.: Apps de corrida em Estilo de vida.',
+      otherGroup: (n) => `${n} em outro grupo`,
+      pick: 'Escolher',
+      pickTitle: (name) => `Grupo de ${name}`,
+      pickSub: 'Os gastos desta categoria entram nesse grupo.',
+      subTitle: (name) => `Grupo de ${name}`,
+      subSub: (category) => `Subcategoria de ${category}`,
+      same: (category) => `Igual a ${category}`,
+      sameNote: (group) => (group ? `Hoje, ${group}. Muda junto se a categoria mudar.` : 'Hoje, sem grupo. Muda junto se a categoria mudar.'),
+      always: (group) => `Sempre ${group}`,
+      subInfo: (name, month, amount) => `Só os gastos marcados como ${name} mudam de grupo. Em ${month} foram ${amount}.`,
+      save: 'Salvar',
+      cancel: 'Cancelar',
+    },
   },
   categoriesPage: {
     iconNames: {

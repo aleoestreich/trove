@@ -9,7 +9,8 @@ import { hasSelection, normalizeIncomeFilter, pruneIncomeFilter } from './income
 import { RECURRING_ACTIONS, applyRecurringAction, type RecurringAction } from './recurring.js'
 import { FGTS_MAX, NO_FGTS, sortFgts, type FgtsEntry } from './fgts.js'
 import { NO_PENSION, PENSION_MAX, PLAN_NAME_MAX, PLAN_TYPES, sortPensionEntries, type Pension, type PlanType } from './pension.js'
-import type { Category, CategoryType, IncomeFilter, ProjectionSettings, Snapshot, Subcategory, TransferOverride } from './types.js'
+import { SPENDING_GROUPS, isTarget } from './spendingBalance.js'
+import type { BalanceTarget, Category, CategoryType, IncomeFilter, ProjectionSettings, Snapshot, SpendingGroup, Subcategory, TransferOverride } from './types.js'
 
 export type Edit =
   /** Sets a transaction's category and subcategory (null: uncategorized / none). */
@@ -61,6 +62,15 @@ export type Edit =
   /** Adds a plan's balance, or corrects one with the same ID. */
   | { op: 'savePensionBalance'; planId: string; entry: FgtsEntry }
   | { op: 'deletePensionBalance'; planId: string; id: string }
+  /**
+   * Puts expense categories in a group of the "Equilíbrio do mês" (null: none
+   * yet), all or none. Organizing them all at once, and its undo.
+   */
+  | { op: 'setCategoryGroups'; groups: { categoryId: string; group: SpendingGroup | null }[] }
+  /** Puts a subcategory of an expense category in a group of its own (null: it follows its category). */
+  | { op: 'setSubcategoryGroup'; id: string; group: SpendingGroup | null }
+  /** The "Equilíbrio do mês" target (whole percents that add up to 100). */
+  | { op: 'setBalanceTarget'; target: BalanceTarget }
 
 /** A transaction's category before a bulk change. `editedAt`: when it was last set by hand (server only). */
 export interface PreviousCategory {
@@ -117,6 +127,7 @@ export function validateEdit(e: unknown): Edit {
   const type = (v: unknown) => (v === 'expense' || v === 'income' ? v : bad('type'))
   const color = (v: unknown) => ((CATEGORY_COLORS as readonly unknown[]).includes(v) ? (v as string) : bad('color'))
   const icon = (v: unknown) => ((CATEGORY_ICONS as readonly unknown[]).includes(v) ? (v as string) : bad('icon'))
+  const spendingGroup = (v: unknown) => (v === null ? null : (SPENDING_GROUPS as readonly unknown[]).includes(v) ? (v as SpendingGroup) : bad('group'))
   if (!e || typeof e !== 'object') return bad('body')
   const x = e as Record<string, unknown>
   switch (x.op) {
@@ -255,6 +266,23 @@ export function validateEdit(e: unknown): Edit {
     }
     case 'deletePensionBalance':
       return { op: 'deletePensionBalance', planId: id(x.planId, 'plan'), id: id(x.id, 'id') }
+    case 'setCategoryGroups': {
+      const list = Array.isArray(x.groups) ? x.groups : bad('groups')
+      if (list.length === 0 || list.length > GROUPS_MAX) bad('groups')
+      const groups = list.map((v) => {
+        const g = (v ?? {}) as Record<string, unknown>
+        return { categoryId: id(g.categoryId, 'category'), group: spendingGroup(g.group) }
+      })
+      if (new Set(groups.map((g) => g.categoryId)).size !== groups.length) bad('groups')
+      return { op: 'setCategoryGroups', groups }
+    }
+    case 'setSubcategoryGroup':
+      return { op: 'setSubcategoryGroup', id: id(x.id, 'id'), group: spendingGroup(x.group) }
+    case 'setBalanceTarget': {
+      if (!isTarget(x.target)) bad('target')
+      const t = x.target as BalanceTarget
+      return { op: 'setBalanceTarget', target: { essential: t.essential, lifestyle: t.lifestyle, future: t.future } }
+    }
     case 'setCardDays': {
       if (x.days === null) return { op: 'setCardDays', accountId: id(x.accountId, 'account'), days: null }
       const d = (x.days ?? {}) as Record<string, unknown>
@@ -265,6 +293,9 @@ export function validateEdit(e: unknown): Edit {
       return bad('op')
   }
 }
+
+/** The most categories one setCategoryGroups may set. */
+export const GROUPS_MAX = 500
 
 const nextOrder = (items: { sortOrder: number }[]) => items.reduce((m, i) => Math.max(m, i.sortOrder), -1) + 1
 
@@ -303,7 +334,13 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
     case 'updateCategory': {
       cat(e.id)
       if (e.changes.name) freeCategoryName(e.changes.name, e.id)
-      return { ...s, categories: s.categories.map((c) => (c.id === e.id ? { ...c, ...e.changes } : c)) }
+      // An income category has no group, nor do its subcategories.
+      const income = e.changes.type === 'income'
+      return {
+        ...s,
+        categories: s.categories.map((c) => (c.id === e.id ? { ...c, ...e.changes, ...(income ? { group: null } : {}) } : c)),
+        subcategories: income ? s.subcategories.map((x) => (x.categoryId === e.id ? { ...x, group: null } : x)) : s.subcategories,
+      }
     }
     case 'deleteCategory': {
       cat(e.id)
@@ -341,7 +378,10 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
       const siblings = s.subcategories.filter((y) => y.categoryId === e.categoryId)
       return {
         ...s,
-        subcategories: s.subcategories.map((y) => (y.id === e.id ? { ...y, categoryId: e.categoryId, sortOrder: nextOrder(siblings) } : y)),
+        // Under an income category it has no group.
+        subcategories: s.subcategories.map((y) =>
+          y.id === e.id ? { ...y, categoryId: e.categoryId, sortOrder: nextOrder(siblings), ...(cat(e.categoryId).type === 'income' ? { group: null } : {}) } : y,
+        ),
         transactions: mapTx((t) => (t.subcategoryId === e.id ? { ...t, categoryId: e.categoryId } : t)),
       }
     }
@@ -403,6 +443,17 @@ export function applyEdit(s: Snapshot, e: Edit): Snapshot {
         if (!entries.some((x) => x.id === e.id)) fail('not_found', 'balance')
         return entries.filter((x) => x.id !== e.id)
       })
+    case 'setCategoryGroups': {
+      const groups = new Map(e.groups.map((g) => [g.categoryId, g.group]))
+      for (const id of groups.keys()) if (cat(id).type !== 'expense') fail('invalid', 'group of an income category')
+      return { ...s, categories: s.categories.map((c) => (groups.has(c.id) ? { ...c, group: groups.get(c.id)! } : c)) }
+    }
+    case 'setSubcategoryGroup': {
+      if (cat(sub(e.id).categoryId).type !== 'expense') fail('invalid', 'group of an income subcategory')
+      return { ...s, subcategories: s.subcategories.map((x) => (x.id === e.id ? { ...x, group: e.group } : x)) }
+    }
+    case 'setBalanceTarget':
+      return { ...s, balanceTarget: e.target }
     case 'setCardDays': {
       if (!s.accounts.some((a) => a.id === e.accountId && a.type === 'CREDIT')) fail('not_found', 'card')
       const { [e.accountId]: _old, ...others } = s.cardDays ?? {}

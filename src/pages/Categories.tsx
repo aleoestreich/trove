@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useData } from '../state'
-import type { Category, CategoryType } from '../data/types'
+import type { Category, CategoryType, SpendingGroup, Subcategory } from '../data/types'
 import { CATEGORY_COLORS, CATEGORY_COLOR_NAMES, CATEGORY_ICONS } from '../data/categoryCatalog'
 import { cleanName, newId } from '../data/edits'
 import { CategoryBadge, catInk, catTint, catVar } from '../components/CategoryBadge'
@@ -9,6 +9,9 @@ import { CategoryIcon, Icon } from '../components/Icon'
 import { PageHeader } from '../components/ui'
 import { useI18n } from '../i18n/I18nProvider'
 import { useIsDesktop } from '../lib/useIsDesktop'
+import { GroupSwatch } from '../components/balance/parts'
+import { TargetSheet } from '../components/balance/TargetSheet'
+import { CategoryGroupSheet, SubcategoryGroupSheet } from '../components/balance/GroupSheets'
 
 /**
  * Categories tab: categories by type, each opening to its
@@ -16,14 +19,17 @@ import { useIsDesktop } from '../lib/useIsDesktop'
  * on phones and beside the list on desktop.
  */
 export function Categories() {
-  const { categories, subcategories } = useData()
+  const { categories, subcategories, balanceTarget } = useData()
   const { t } = useI18n()
+  const g = t.spendingBalance
   const desktop = useIsDesktop()
   const [params, setParams] = useSearchParams()
   const type: CategoryType = params.get('type') === 'income' ? 'income' : 'expense'
   const editing = params.get('edit')
   const creating = params.has('new')
   const [open, setOpen] = useState<string | null>(null)
+  const [targetOpen, setTargetOpen] = useState(false)
+  const [picking, setPicking] = useState<Category | null>(null)
 
   const setParam = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams(params)
@@ -83,27 +89,70 @@ export function Categories() {
             ))}
           </div>
 
-          <div className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface">
-            {list.length === 0 && <p className="p-4 text-sm text-muted">{t.categoriesPage.empty}</p>}
-            {list.map((c, i) => (
-              <CategoryRow
-                key={c.id}
-                category={c}
-                subs={subcategories.filter((s) => s.categoryId === c.id)}
-                expanded={open === c.id}
-                selected={c.id === editing}
-                first={i === 0}
-                onToggle={() => setOpen(open === c.id ? null : c.id)}
-                onEdit={() => setParam({ edit: c.id, new: null })}
-              />
+          {type === 'expense' && (
+            <button
+              type="button"
+              onClick={() => setTargetOpen(true)}
+              className="flex min-h-16 items-center gap-3 rounded-lg border border-line bg-surface py-3 pr-2 pl-4 text-left hover:bg-track"
+            >
+              <span className="flex min-w-0 flex-1 flex-col gap-px">
+                <span className="text-sm leading-5 text-ink">{g.cats.targetRow}</span>
+                <span className="tabular text-xs leading-4 text-muted">{`${balanceTarget.essential} · ${balanceTarget.lifestyle} · ${balanceTarget.future}`}</span>
+              </span>
+              <span className="flex h-10 items-center px-2 text-sm font-medium text-accent">{g.cats.edit}</span>
+            </button>
+          )}
+
+          {list.length === 0 && (
+            <div className="rounded-lg border border-line bg-surface">
+              <p className="p-4 text-sm text-muted">{t.categoriesPage.empty}</p>
+            </div>
+          )}
+          {(type === 'expense'
+            ? ([null, 'essential', 'lifestyle'] as const).map((group) => ({ group, items: list.filter((c) => (c.group ?? null) === group) }))
+            : [{ group: undefined, items: list }]
+          )
+            .filter((x) => x.items.length > 0)
+            .map(({ group, items }) => (
+              <section key={group ?? String(group)} className="flex flex-col gap-2">
+                {group !== undefined && (
+                  <div className="flex items-center justify-between gap-2 px-1 pt-1">
+                    <h2 className="flex items-center gap-2 text-[15px] leading-5 font-medium text-ink">
+                      <GroupSwatch part={group ?? 'ungrouped'} />
+                      {group ? g.groups[group] : g.groups.ungrouped}
+                    </h2>
+                    <span className="tabular text-xs text-muted">{items.length}</span>
+                  </div>
+                )}
+                <div className={`flex flex-col overflow-hidden rounded-lg bg-surface ${group === null ? 'border-[1.5px] border-dashed border-line' : 'border border-line'}`}>
+                  {items.map((c, i) => {
+                    const subs = subcategories.filter((s) => s.categoryId === c.id)
+                    return (
+                      <CategoryRow
+                        key={c.id}
+                        category={c}
+                        subs={subs}
+                        otherGroup={c.type === 'expense' ? subs.filter((s) => s.group && s.group !== (c.group ?? null)).length : 0}
+                        expanded={open === c.id}
+                        selected={c.id === editing}
+                        first={i === 0}
+                        onToggle={() => setOpen(open === c.id ? null : c.id)}
+                        onEdit={() => setParam({ edit: c.id, new: null })}
+                        onPick={group === null ? () => setPicking(c) : undefined}
+                      />
+                    )
+                  })}
+                </div>
+              </section>
             ))}
-          </div>
           <p className="px-1 text-[13px] leading-[18px] text-muted">
             {t.categoriesPage.listNote}
           </p>
         </div>
         {desktop && editor && <div className="sticky top-8 w-[624px] shrink-0">{editor}</div>}
       </div>
+      {targetOpen && <TargetSheet onClose={() => setTargetOpen(false)} />}
+      {picking && <CategoryGroupSheet category={picking} onClose={() => setPicking(null)} />}
     </>
   )
 }
@@ -126,33 +175,52 @@ function NewButton({ onClick }: { onClick(): void }) {
 function CategoryRow({
   category,
   subs,
+  otherGroup,
   expanded,
   selected,
   first,
   onToggle,
   onEdit,
+  onPick,
 }: {
   category: Category
   subs: { id: string; name: string }[]
+  /** Subcategories in another group than the category's. */
+  otherGroup: number
   expanded: boolean
   selected: boolean
   first: boolean
   onToggle(): void
   onEdit(): void
+  /** No group yet: "Escolher" one. */
+  onPick?(): void
 }) {
   const { t, categoryName } = useI18n()
   const { edit } = useData()
   const [adding, setAdding] = useState(false)
+  const sub = t.categoriesPage.subCount(subs.length) + (otherGroup > 0 ? ` · ${t.spendingBalance.cats.otherGroup(otherGroup)}` : '')
   return (
     <div className={`${first ? '' : 'border-t border-line'} ${selected ? 'bg-accent-faint' : ''}`}>
-      <button type="button" aria-expanded={expanded} onClick={onToggle} className="flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-track">
-        <CategoryBadge category={category} size={40} />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-[15px] leading-5 font-medium text-ink">{categoryName(category)}</span>
-          <span className="text-[13px] leading-[18px] text-muted">{t.categoriesPage.subCount(subs.length)}</span>
-        </span>
-        <Icon name="chevronDown" className={`size-5 shrink-0 text-muted transition-transform ${expanded ? 'rotate-180' : ''}`} />
-      </button>
+      <div className="flex items-center">
+        <button type="button" aria-expanded={expanded} onClick={onToggle} className="flex min-h-16 min-w-0 flex-1 items-center gap-3 py-2.5 pl-4 text-left active:bg-track">
+          <CategoryBadge category={category} size={40} />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-[15px] leading-5 font-medium text-ink">{categoryName(category)}</span>
+            <span className="text-[13px] leading-[18px] text-muted">{onPick ? t.spendingBalance.cats.none : sub}</span>
+          </span>
+          {!onPick && <Icon name="chevronDown" className={`mr-4 size-5 shrink-0 text-muted transition-transform ${expanded ? 'rotate-180' : ''}`} />}
+        </button>
+        {onPick && (
+          <>
+            <button type="button" onClick={onPick} className="h-11 shrink-0 rounded-md border border-line bg-surface px-3 text-sm font-medium text-accent hover:bg-track">
+              {t.spendingBalance.cats.pick}
+            </button>
+            <button type="button" aria-expanded={expanded} aria-label={categoryName(category)} onClick={onToggle} className="flex size-12 shrink-0 items-center justify-center text-muted">
+              <Icon name="chevronDown" className={`size-5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+            </button>
+          </>
+        )}
+      </div>
       {expanded && (
         <div className="flex flex-col gap-3 px-4 pb-4">
           <div className="flex flex-wrap gap-2">
@@ -285,8 +353,11 @@ function CategoryEditor({
 }) {
   const { t } = useI18n()
   const { categories, subcategories, transactions, edit } = useData()
+  const g = t.spendingBalance
   const [name, setName] = useState(category?.name ?? '')
   const [type, setType] = useState<CategoryType>(category?.type ?? defaultType)
+  const [group, setGroup] = useState<SpendingGroup | null>(category?.group ?? null)
+  const [subSheet, setSubSheet] = useState<Subcategory | null>(null)
   const [color, setColor] = useState(category?.color ?? 'blue')
   const [icon, setIcon] = useState(category?.icon ?? 'more')
   const [error, setError] = useState<string | null>(null)
@@ -306,14 +377,18 @@ function CategoryEditor({
     const n = cleanName(name)
     if (!n) return setError(t.categoriesPage.nameRequired)
     if (categories.some((c) => c.id !== category?.id && sameName(c.name, n))) return setError(t.categoriesPage.nameTaken)
+    // The group goes with an expense category only (an income one loses it).
+    const newGroup = type === 'expense' ? group : null
     if (category) {
       edit({ op: 'updateCategory', id: category.id, changes: { name: n, type, color, icon } })
-      onSaved({ ...category, name: n, type, color, icon })
+      if (type === 'expense' && newGroup !== (category.group ?? null)) edit({ op: 'setCategoryGroups', groups: [{ categoryId: category.id, group: newGroup }] })
+      onSaved({ ...category, name: n, type, color, icon, group: newGroup })
     } else {
       const id = newId()
       edit({ op: 'createCategory', category: { id, name: n, type, color, icon } })
+      if (newGroup) edit({ op: 'setCategoryGroups', groups: [{ categoryId: id, group: newGroup }] })
       for (const s of pending) edit({ op: 'createSubcategory', subcategory: { id: newId(), categoryId: id, name: s } })
-      onSaved({ id, name: n, type, color, icon, sortOrder: 0 })
+      onSaved({ id, name: n, type, color, icon, sortOrder: 0, group: newGroup })
     }
   }
 
@@ -366,6 +441,20 @@ function CategoryEditor({
           </div>
         </Section>
 
+        {type === 'expense' && (
+          <Section label={g.cats.field} id="cat-group">
+            <div role="radiogroup" aria-labelledby="cat-group" className="flex gap-1 rounded-md bg-track p-1">
+              {(['essential', 'lifestyle'] as const).map((k) => (
+                <button key={k} type="button" role="radio" aria-checked={group === k} onClick={() => setGroup(k)} className={`${segment(group === k)} gap-1.5`}>
+                  {group === k && <GroupSwatch part={k} size={8} className="rounded-[2px]" />}
+                  {g.groups[k]}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs leading-[17px] text-muted">{group ? g.cats.fieldHelp : g.cats.none}</span>
+          </Section>
+        )}
+
         <Section label={t.categoriesPage.color} id="cat-color">
           <div role="radiogroup" aria-labelledby="cat-color" className="grid grid-cols-6 justify-items-center lg:grid-cols-12">
             {CATEGORY_COLORS.map((c) => (
@@ -417,8 +506,33 @@ function CategoryEditor({
             {subs.map((s, i) => (
               <div key={s.id} className={`flex min-h-12 items-center gap-2.5 pr-1 pl-3.5 ${i > 0 ? 'border-t border-line' : ''}`}>
                 <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: catVar(color) }} />
-                <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{s.name}</span>
-                {category && <span className="tabular shrink-0 text-xs text-muted">{t.categoriesPage.transactionsN(txCount.get(s.id) ?? 0)}</span>}
+                <span className="flex min-w-0 flex-1 flex-col py-1">
+                  <span className="truncate text-[15px] text-ink">{s.name}</span>
+                  {category && (
+                    <span className="flex min-w-0 items-center gap-x-1.5 whitespace-nowrap text-xs text-muted">
+                      <span className="tabular">{t.categoriesPage.transactionsN(txCount.get(s.id) ?? 0)}</span>
+                      {category.type === 'expense' && 'categoryId' in s && (
+                        <button
+                          type="button"
+                          onClick={() => setSubSheet(s as Subcategory)}
+                          aria-label={`${g.cats.subTitle(s.name)}: ${(s as Subcategory).group ? g.groups[(s as Subcategory).group!] : g.cats.followsCategory}`}
+                          className="-my-2 inline-flex h-10 min-w-0 items-center gap-1 rounded-sm px-1 hover:bg-track"
+                        >
+                          <span aria-hidden>·</span>
+                          {(s as Subcategory).group ? (
+                            <span className="inline-flex items-center gap-1 font-medium text-ink">
+                              <GroupSwatch part={(s as Subcategory).group!} size={8} className="rounded-[2px]" />
+                              {g.groups[(s as Subcategory).group!]}
+                            </span>
+                          ) : (
+                            <span className="truncate">{g.cats.followsCategory}</span>
+                          )}
+                          <Icon name="chevronRight" className="size-3.5 shrink-0" />
+                        </button>
+                      )}
+                    </span>
+                  )}
+                </span>
                 <button
                   type="button"
                   aria-label={t.categoriesPage.remove(s.name)}
@@ -433,6 +547,7 @@ function CategoryEditor({
               </div>
             ))}
           </div>
+          {category?.type === 'expense' && subs.length > 0 && <span className="text-xs leading-[17px] text-muted">{g.cats.subNote}</span>}
           <NameField
             placeholder={t.categoriesPage.addSubcategory}
             taken={(n) => subs.some((s) => sameName(s.name, n))}
@@ -479,6 +594,7 @@ function CategoryEditor({
           </button>
         )}
       </div>
+      {subSheet && category && <SubcategoryGroupSheet subcategory={subSheet} category={category} onClose={() => setSubSheet(null)} />}
     </div>
   )
 }

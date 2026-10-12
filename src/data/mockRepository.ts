@@ -25,6 +25,8 @@ interface DemoOwner {
   fgts?: Snapshot['fgts']
   /** The previdência privada plans tracked by hand. */
   pension?: Snapshot['pension']
+  /** The "Equilíbrio do mês" target (app_settings too). */
+  balanceTarget?: Snapshot['balanceTarget']
 }
 
 function read(): DemoOwner | null {
@@ -66,6 +68,7 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
     cardDays: owner.cardDays,
     fgts: owner.fgts,
     pension: owner.pension,
+    balanceTarget: owner.balanceTarget,
     categories: owner.categories,
     subcategories: owner.subcategories,
     incomeFilter: owner.incomeFilter,
@@ -122,6 +125,7 @@ export function createMockRepository(today: Date = new Date()): Repository {
         cardDays: next.cardDays,
         fgts: next.fgts,
         pension: next.pension,
+        balanceTarget: next.balanceTarget,
       })
       return previous && { updated: previous.length, previous }
     },

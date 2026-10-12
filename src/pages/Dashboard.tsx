@@ -5,6 +5,7 @@ import type { Transaction } from '../data/types'
 import { balances, expensesByCategory, inMonth, totals, visible } from '../lib/summary'
 import { incomeAverage, NO_FILTER } from '../data/incomeAverage'
 import { CategoryBadge, catVar } from '../components/CategoryBadge'
+import { BalanceCard } from '../components/balance/BalanceCard'
 import { SyncBar } from '../components/SyncBar'
 import { OutOfTotalGroup } from '../components/OutOfTotal'
 import { BalancesReminder } from '../components/BalancesReminder'
@@ -139,6 +140,9 @@ export function Dashboard() {
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-12 lg:gap-5">
         {/* 1. Net worth today: the accounts' balances minus the open card bills, as the banks report them */}
         <NetWorthCard className="lg:order-1 lg:col-span-8 lg:self-start" />
+
+        {/* Equilíbrio do mês: how the income splits between Essencial, Estilo de vida and Futuro (desktop: above the recurring charges) */}
+        <BalanceCard />
 
         {/* Insights: month-end projection, unusual categories, recurring charges (desktop: right below net worth) */}
         <ProjectionCard projection={insights.projection} />
