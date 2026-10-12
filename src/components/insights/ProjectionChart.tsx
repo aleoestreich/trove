@@ -69,7 +69,9 @@ export function ProjectionChart({ projection, variant, height }: { projection: P
     formatDay(projection.endDate),
   )
   const grid = full ? gridLines(reais(min), reais(max)) : []
-  const ticks = full ? [0, 7, 14, 21, n - 1].filter((i, k, a) => i < n && a.indexOf(i) === k) : []
+  // A tick a week apart (two weeks over two months), and the last day.
+  const step = n > 35 ? 14 : 7
+  const ticks = full ? [...Array.from({ length: Math.ceil((n - 1) / step) }, (_, k) => k * step).filter((i) => n - 1 - i >= step / 2), n - 1] : []
   const clampLabel = (px: number, w: number) => Math.min(Math.max(px - w / 2, 0), W - w)
 
   const onMove = (e: PointerEvent<HTMLDivElement>) => {

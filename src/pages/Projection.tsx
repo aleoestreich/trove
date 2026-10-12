@@ -10,7 +10,7 @@ import { shownName } from '../lib/accountLabel'
 import { DEFAULT_PROJECTION_SETTINGS, projectionAccounts, type Projection as ProjectionData } from '../data/projection'
 import type { Account, Institution } from '../data/types'
 import { ProjectionChart, ProjectionLegend, Waterfall } from '../components/insights/ProjectionChart'
-import { useLowNote, useProjectionLines } from '../components/insights/cards'
+import { useLowNote, useProjectionLines, useProjectionTitle } from '../components/insights/cards'
 import { DetailHeader, Sheet, SwitchRow, capitalize } from '../components/insights/parts'
 import { SelectBox } from '../components/SelectBox'
 
@@ -24,9 +24,12 @@ export function Projection() {
   const { t } = useI18n()
   const p = t.insights.projection
   const projection = insights.projection
+  const title = useProjectionTitle(projection)
   return (
     <>
-      <DetailHeader title={p.title} subtitle={p.subtitle(capitalize(formatMonthName(today.slice(0, 7))), formatDay(today))} />
+      <DetailHeader title={title} subtitle={p.subtitle(capitalize(formatMonthName(today.slice(0, 7))), formatDay(today))}>
+        <HorizonSwitch />
+      </DetailHeader>
       {projection ? (
         <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5">
           <div className="flex flex-col gap-3 lg:gap-5">
@@ -47,6 +50,31 @@ export function Projection() {
         </div>
       )}
     </>
+  )
+}
+
+/** "Este mês · Próximo mês": how far the projection looks (saved with its settings). */
+function HorizonSwitch() {
+  const { t } = useI18n()
+  const { projectionSettings, saveProjectionSettings } = useData()
+  const h = t.insights.projection.horizon
+  const settings = projectionSettings ?? DEFAULT_PROJECTION_SETTINGS
+  const value = settings.horizon ?? 'month'
+  return (
+    <div role="radiogroup" aria-label={h.label} className="mt-2 flex rounded-md bg-track p-1 lg:mt-0 lg:w-[300px]">
+      {(['month', 'nextMonth'] as const).map((k) => (
+        <button
+          key={k}
+          type="button"
+          role="radio"
+          aria-checked={value === k}
+          onClick={() => value !== k && saveProjectionSettings({ ...settings, horizon: k })}
+          className={`h-10 flex-1 rounded-[10px] px-3 text-sm whitespace-nowrap ${value === k ? 'bg-surface font-medium text-ink shadow-sm' : 'text-ink-2 hover:text-ink'}`}
+        >
+          {h[k]}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -93,8 +121,8 @@ function HowCard({ projection }: { projection: ProjectionData }) {
         : p.notes.receitasNone,
     faturas: bills.length
       ? p.notes.faturas(joinList(bills.map((e) => (e.kind === 'bill' ? accountName(e.accountId, accounts, institutions) : ''))), formatMoney(b.parcelasDentroDasFaturas))
-      : p.notes.faturasNone,
-    recorrentes: recurring.length ? p.notes.recorrentes(shortList(recurring.map((e) => describeEvent(e, accounts, institutions).name), p.andMore)) : p.notes.recorrentesNone,
+      : p.notes.faturasNone(formatDay(projection.endDate)),
+    recorrentes: recurring.length ? p.notes.recorrentes(shortList(recurring.map((e) => describeEvent(e, accounts, institutions).name), p.andMore)) : p.notes.recorrentesNone(formatDay(projection.endDate)),
     diaADia: projection.settings.includeDaily ? p.notes.diaADia(formatMoney(projection.dailyAverage)) : p.notes.diaADiaOff,
   }
   return (
@@ -145,7 +173,7 @@ function EventsCard({ projection }: { projection: ProjectionData }) {
   return (
     <Card className="flex flex-col !pb-1">
       <h2 className="mb-1 text-base leading-[22px] font-medium text-ink">{p.nextTitle}</h2>
-      {projection.events.length === 0 && <p className="pb-3 text-sm text-muted">{p.nextNone}</p>}
+      {projection.events.length === 0 && <p className="pb-3 text-sm text-muted">{p.nextNone(formatDay(projection.endDate))}</p>}
       <ul>
         {projection.events.map((e, i) => {
           const d = describeEvent(e, accounts, institutions)

@@ -37,7 +37,7 @@ export function describeEvent(e: ProjectionEvent, accounts: Account[], instituti
     case 'bill':
       return {
         name: p.event.bill(accountName(e.accountId, accounts, institutions)),
-        meta: e.installments > 0 ? p.event.billMetaInstallments(formatMoney(e.installments)) : p.event.billMeta,
+        meta: e.estimated ? p.event.billEstimated : e.installments > 0 ? p.event.billMetaInstallments(formatMoney(e.installments)) : p.event.billMeta,
       }
     case 'recurring':
       return { name: e.name, meta: p.event.recurringMeta(p.methods[e.paymentMethod]) }

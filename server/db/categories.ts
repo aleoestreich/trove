@@ -114,6 +114,7 @@ export async function readProjectionSettings(db: Db): Promise<ProjectionSettings
     accountIds: Array.isArray(v?.accountIds) ? v.accountIds : DEFAULT_PROJECTION_SETTINGS.accountIds,
     includeDaily: typeof v?.includeDaily === 'boolean' ? v.includeDaily : DEFAULT_PROJECTION_SETTINGS.includeDaily,
     includeFreelance: typeof v?.includeFreelance === 'boolean' ? v.includeFreelance : DEFAULT_PROJECTION_SETTINGS.includeFreelance,
+    horizon: v?.horizon === 'nextMonth' ? 'nextMonth' : 'month',
   }
 }
 

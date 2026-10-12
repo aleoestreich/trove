@@ -773,6 +773,8 @@ export interface Messages {
     back: string
     projection: {
       title: string
+      titleUntil: (month: string) => string
+      horizon: { label: string; month: string; nextMonth: string }
       today: (date: string) => string
       shouldRemain: (date: string) => string
       range: (min: string, max: string) => string
@@ -797,17 +799,18 @@ export interface Messages {
         receitas: (days: number[], freelance: boolean) => string
         receitasNone: string
         faturas: (cards: string, installments: string) => string
-        faturasNone: string
+        faturasNone: (end: string) => string
         recorrentes: (names: string) => string
-        recorrentesNone: string
+        recorrentesNone: (end: string) => string
         diaADia: (perDay: string) => string
         diaADiaOff: string
       }
       nextTitle: string
-      nextNone: string
+      nextNone: (end: string) => string
       event: {
         bill: (bank: string) => string
         billMeta: string
+        billEstimated: string
         billMetaInstallments: (amount: string) => string
         recurringMeta: (method: string) => string
         salary: string
@@ -1715,6 +1718,8 @@ export const messages: Messages = {
     back: 'Visão geral',
     projection: {
       title: 'Previsão do fim do mês',
+      titleUntil: (month) => `Previsão até o fim de ${month}`,
+      horizon: { label: 'Até quando prever', month: 'Este mês', nextMonth: 'Próximo mês' },
       today: (date) => `hoje, ${date}`,
       shouldRemain: (date) => `Deve sobrar em ${date}`,
       range: (min, max) => `Entre ${min} e ${max}, conforme a renda e os gastos`,
@@ -1750,17 +1755,18 @@ export const messages: Messages = {
           }`,
         receitasNone: 'O salário deste mês já entrou',
         faturas: (cards, installments) => `${cards} · já incluem ${installments} em parcelas`,
-        faturasNone: 'Nenhuma fatura vence até o fim do mês',
+        faturasNone: (end) => `Nenhuma fatura vence até ${end}`,
         recorrentes: (names) => `${names} · as do cartão já estão nas faturas`,
-        recorrentesNone: 'Nenhuma até o fim do mês · as do cartão já estão nas faturas',
+        recorrentesNone: (end) => `Nenhuma até ${end} · as do cartão já estão nas faturas`,
         diaADia: (perDay) => `${perDay} por dia no débito e Pix, média de 3 meses`,
         diaADiaOff: 'Fora do cálculo',
       },
       nextTitle: 'Próximos lançamentos',
-      nextNone: 'Nada previsto até o fim do mês.',
+      nextNone: (end) => `Nada previsto até ${end}.`,
       event: {
         bill: (bank) => `Fatura ${bank}`,
         billMeta: 'Cartão de crédito',
+        billEstimated: 'Cartão de crédito · fatura aberta, pela média das últimas',
         billMetaInstallments: (amount) => `Cartão de crédito · inclui ${amount} em parcelas`,
         recurringMeta: (method) => `Recorrente · ${method}`,
         salary: 'Salário',

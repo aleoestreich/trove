@@ -32,6 +32,13 @@ export function useProjectionLines(p: Projection) {
   ]
 }
 
+/** "Previsão do fim do mês", or "Previsão até o fim de novembro" over two months. */
+export function useProjectionTitle(p: Projection | null): string {
+  const { t } = useI18n()
+  const x = t.insights.projection
+  return p?.settings.horizon === 'nextMonth' ? x.titleUntil(formatMonthName(p.endDate.slice(0, 7))) : x.title
+}
+
 /** "Ponto mais baixo: R$ 17,6 mil em 19 out., antes do salário". */
 export function useLowNote(p: Projection) {
   const { t } = useI18n()
@@ -46,10 +53,11 @@ function LowRing() {
 export function ProjectionCard({ projection }: { projection: Projection | null }) {
   const { t } = useI18n()
   const p = t.insights.projection
+  const title = useProjectionTitle(projection)
   if (!projection)
     return (
       <Card className="flex flex-col gap-2 lg:order-3 lg:col-span-7">
-        <h2 className="text-base leading-[22px] font-medium text-ink">{p.title}</h2>
+        <h2 className="text-base leading-[22px] font-medium text-ink">{title}</h2>
         <p className="text-sm leading-5 text-ink-2">{p.empty}</p>
       </Card>
     )
@@ -62,6 +70,7 @@ function ProjectionCardBody({ projection }: { projection: Projection }) {
   const p = t.insights.projection
   const lines = useProjectionLines(projection)
   const lowNote = useLowNote(projection)
+  const title = useProjectionTitle(projection)
   const tiles = [
     { label: p.tiles.saldoHoje, value: lines[0].value, income: false },
     { label: p.tiles.receitas, value: lines[1].value, income: lines[1].income },
@@ -75,7 +84,7 @@ function ProjectionCardBody({ projection }: { projection: Projection }) {
       {/* Phones */}
       <div className="flex flex-col lg:hidden">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-base leading-[22px] font-medium text-ink">{p.title}</h2>
+          <h2 className="text-base leading-[22px] font-medium text-ink">{title}</h2>
           <span className="text-xs whitespace-nowrap text-muted">{p.today(formatDay(today))}</span>
         </div>
         <p className="mt-2 text-[13px] leading-[18px] text-muted">{p.shouldRemain(formatDay(projection.endDate))}</p>
@@ -108,7 +117,7 @@ function ProjectionCardBody({ projection }: { projection: Projection }) {
       {/* Desktop */}
       <div className="hidden items-start justify-between gap-4 lg:flex">
         <div className="flex flex-col gap-0.5">
-          <h2 className="text-base leading-[22px] font-medium text-ink">{p.title}</h2>
+          <h2 className="text-base leading-[22px] font-medium text-ink">{title}</h2>
           <span className="text-[13px] text-muted">
             {p.shouldRemain(formatDay(projection.endDate))} · {p.today(formatDay(today))}
           </span>
@@ -139,7 +148,7 @@ function ProjectionCardBody({ projection }: { projection: Projection }) {
       </div>
       <div className="hidden flex-col border-t border-line lg:flex">
         <span className="label-caps pt-3 pb-1">{p.nextTitle}</span>
-        {projection.events.length === 0 && <p className="py-2 text-[13px] text-muted">{p.nextNone}</p>}
+        {projection.events.length === 0 && <p className="py-2 text-[13px] text-muted">{p.nextNone(formatDay(projection.endDate))}</p>}
         {projection.events.slice(0, 4).map((e, i) => (
           <div key={i} className="grid min-h-9 grid-cols-[64px_minmax(0,1fr)_120px] items-center gap-3 text-[13px]">
             <span className="tabular text-muted">{formatDay(e.date)}</span>

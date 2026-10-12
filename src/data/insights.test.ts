@@ -294,6 +294,28 @@ describe('month-end projection', () => {
     expect(project(undefined, list).events.filter((e) => e.kind === 'salary').map((e) => e.date)).toEqual(['2026-10-09'])
   })
 
+  it('looks to the end of next month when asked: its bills, paydays and recurring charges too', () => {
+    const p = project({ accountIds: null, includeDaily: true, includeFreelance: false, horizon: 'nextMonth' })
+    expect(p.endDate).toBe('2026-11-30')
+    expect(p.daily).toHaveLength(61)
+    expect(p.events.map((e) => [e.date, e.kind, e.amount])).toEqual([
+      ['2026-10-10', 'bill', -844_90],
+      ['2026-10-10', 'recurring', -3_000_00],
+      ['2026-10-20', 'salary', 10_000_00],
+      // Next month's bill: the installment due in its cycle (more than the card's recent bills).
+      ['2026-11-10', 'bill', -300_00],
+      ['2026-11-10', 'recurring', -3_000_00],
+      // 20 November is Black Consciousness Day: the working day before.
+      ['2026-11-19', 'salary', 10_000_00],
+    ])
+    // R$ 30 a day from today to 30 November: 55 days.
+    expect(p.breakdown.diaADia).toBe(1_650_00)
+    expect(p.end).toBe(10_000_00 + 20_000_00 - 1_144_90 - 6_000_00 - 1_650_00)
+    expect(p.daily[60]).toMatchObject({ day: '2026-11-30', value: p.end })
+    // The default still stops at the end of this month.
+    expect(project().endDate).toBe('2026-10-31')
+  })
+
   it('needs 2 months of salary', () => {
     expect(project(undefined, txs.filter((t) => t.categoryId !== 'salary' || t.date >= '2026-09'))).toBeNull()
   })
@@ -309,7 +331,8 @@ describe('insight edits', () => {
     expect(() => validateEdit({ op: 'setProjectionSettings', settings: { accountIds: [], includeDaily: true, includeFreelance: false } })).toThrow()
     expect(() => validateEdit({ op: 'setProjectionSettings', settings: { accountIds: null, includeDaily: 'yes', includeFreelance: false } })).toThrow()
     const e = validateEdit({ op: 'setProjectionSettings', settings: { accountIds: ['chk', 'chk'], includeDaily: false, includeFreelance: true } })
-    expect(applyEdit({} as Snapshot, e).projectionSettings).toEqual({ accountIds: ['chk'], includeDaily: false, includeFreelance: true })
+    expect(applyEdit({} as Snapshot, e).projectionSettings).toEqual({ accountIds: ['chk'], includeDaily: false, includeFreelance: true, horizon: 'month' })
+    expect(() => validateEdit({ op: 'setProjectionSettings', settings: { accountIds: null, includeDaily: true, includeFreelance: false, horizon: 'year' } })).toThrow()
   })
 
   it('validates recurring actions', () => {
