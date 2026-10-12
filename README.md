@@ -129,6 +129,13 @@ between accounts, and card bill payments.
   salary in the months with vacation days, already paid in advance. Amounts
   are estimates from the net monthly salary (the projection's median month,
   or one typed in). A card on the Overview lists the next payments.
+- **Fechamento do mês** (`#/month-close`): the summary of a month once it
+  ends: what came in, went out and was kept (and its share of the income),
+  compared with the month before and the average of the 6 before it; the
+  categories that moved most; the biggest categories and purchases; the
+  unusual categories against their own average; and the Equilíbrio do mês
+  against its target. A card on the Overview shows the month just closed
+  from the 1st to the 10th; the page goes back to any loaded month.
 - **A receber** (`#/receivables`): a purchase or Pix paid on someone
   else's behalf is marked in its details ("Paguei por alguém": who, and how
   much of it; several people can share one), then tracked until it's paid

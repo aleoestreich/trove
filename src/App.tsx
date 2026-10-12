@@ -15,6 +15,7 @@ import { Recurring } from './pages/Recurring'
 import { SpendingBalance } from './pages/SpendingBalance'
 import { ExtraPay } from './pages/ExtraPay'
 import { Receivables } from './pages/Receivables'
+import { MonthClose } from './pages/MonthClose'
 import { BalanceOrganize } from './pages/BalanceOrganize'
 import { Debug } from './pages/Debug'
 import { Snackbar, SyncBar } from './components/SyncBar'
@@ -32,7 +33,7 @@ const repository = isDeployed() ? withDemoFallback(createApiRepository(), create
 /** The insight pages open from the Overview, so its tab stays current there. */
 function useOverviewDetail(): boolean {
   const { pathname } = useLocation()
-  return pathname.startsWith('/insights') || pathname === '/recurring' || pathname.startsWith('/balance') || pathname === '/receivables'
+  return pathname.startsWith('/insights') || pathname === '/recurring' || pathname.startsWith('/balance') || pathname === '/receivables' || pathname === '/month-close'
 }
 
 const tabs: { to: string; label: keyof Messages['nav']; icon: IconName }[] = [
@@ -134,6 +135,7 @@ function Shell() {
                     <Route path="/balance" element={<SpendingBalance />} />
                     <Route path="/extra-pay" element={<ExtraPay />} />
                     <Route path="/receivables" element={<Receivables />} />
+                    <Route path="/month-close" element={<MonthClose />} />
                     <Route path="/balance/organize" element={<BalanceOrganize />} />
                     {/* TEMPORARY: Pluggy's raw responses. */}
                     <Route path="/debug" element={<Debug />} />

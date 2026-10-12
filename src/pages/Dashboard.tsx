@@ -7,6 +7,8 @@ import { fillRows, isDefaultLayout, shownSections } from '../data/overviewLayout
 import { CustomizeButton, OverviewLayoutSheet } from '../components/OverviewLayout'
 import { ExtraPayCard } from '../components/ExtraPay'
 import { ReceivablesCard } from '../components/Receivables'
+import { MonthCloseCard, useMonthClose } from '../components/MonthClose'
+import { closedMonth, showsClose } from '../data/monthClose'
 import { owedTotal } from '../data/receivables'
 import { balances, expensesByCategory, inMonth, totals, visible } from '../lib/summary'
 import { incomeAverage, NO_FILTER } from '../data/incomeAverage'
@@ -40,6 +42,7 @@ const TOP_CATEGORIES = 5
 const DESKTOP_SPAN: Record<OverviewSection | 'trend', number> = {
   netWorth: 8,
   comingUp: 4,
+  monthClose: 12,
   projection: 7,
   extraPay: 12,
   receivables: 12,
@@ -73,6 +76,9 @@ export function Dashboard() {
   useEffect(() => setHeaderSlot(document.getElementById('header-actions')), [])
 
   const bal = balances(accounts)
+  // The month just closed: on the Visão geral in the first days of the next one.
+  const today = toISO(new Date())
+  const close = useMonthClose(closedMonth(today))
 
   // Where the money is.
   const institutionNames = new Map([...institutionsById].map(([id, i]) => [id, i.name]))
@@ -161,6 +167,8 @@ export function Dashboard() {
   const sections: Record<OverviewSection, ReactNode> = {
     // Net worth today: the accounts' balances minus the open card bills, as the banks report them
     netWorth: <NetWorthCard className="lg:order-1 lg:col-span-8 lg:self-start" />,
+    // Fechamento do mês: the month just closed, in the first 10 days of the next one
+    monthClose: close && <MonthCloseCard close={close} />,
     // How the income splits between Essencial, Estilo de vida and Futuro (desktop: above the recurring charges)
     balance: <BalanceCard />,
     // Insights: month-end projection, unusual categories, recurring charges (desktop: right below net worth)
@@ -430,7 +438,7 @@ export function Dashboard() {
     </>
   )
   // Cards with nothing to show yet (no comparison, no complete month of income) take no place.
-  const shown = shownSections(overviewLayout).filter((x) => (x === 'unusual' ? !!insights.unusual : x === 'averageIncome' ? !!avgIncome : x === 'extraPay' ? extraPay.enabled : x === 'receivables' ? owedTotal(receivables) > 0 : true))
+  const shown = shownSections(overviewLayout).filter((x) => (x === 'unusual' ? !!insights.unusual : x === 'averageIncome' ? !!avgIncome : x === 'extraPay' ? extraPay.enabled : x === 'receivables' ? owedTotal(receivables) > 0 : x === 'monthClose' ? !!close && showsClose(today) : true))
   const firstTrend = shown.find((x) => x === 'incomeVsExpenses' || x === 'spendingByCategory')
   // A custom layout on desktop: the cards (and the period above the charts) in its order, rows filled.
   const custom = !isDefaultLayout(overviewLayout)

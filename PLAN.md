@@ -116,6 +116,9 @@ No backend, no auth. It runs in the browser on hardcoded data.
   owes what, and a card on Visão geral. Totals are unchanged.
   - Open question: leave the owed part out of spending (and the payments
     back out of income), which changes every total, chart and average.
+- ✅ Fechamento do mês: a summary of each month once it ends (kept, what
+  changed, biggest spending, unusual categories, the Equilíbrio's target),
+  a page per closed month and a card on Visão geral in the first 10 days.
 - Next: use the stored card bills for the current bill (PR #23 reads them live).
 
 ## Phase 3 — Authentication & security

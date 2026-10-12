@@ -298,6 +298,8 @@ export interface Messages {
       extraPayOff: string
       /** Under "A receber" while nobody owes anything. */
       receivablesNone: string
+      /** Under "Fechamento do mês" after the 10th. */
+      monthCloseOff: string
       shownCount: (n: number, total: number) => string
       reset: string
       cancel: string
@@ -539,6 +541,44 @@ export interface Messages {
     panelNote: string
   }
   /** Server errors, by the code the API returns (never its text, which is English and technical). */
+  /** "Fechamento do mês": the summary of a month once it ends (src/data/monthClose.ts). */
+  monthClose: {
+    title: (month: string) => string
+    sub: string
+    cardTitle: (month: string) => string
+    kept: (amount: string) => string
+    overspent: (amount: string) => string
+    keptPct: (pct: string) => string
+    noIncome: string
+    income: string
+    expenses: string
+    net: string
+    changedTitle: string
+    vsPrevious: (month: string) => string
+    vsAverageShort: string
+    changedSub: (previous: string | null, months: number | null) => string
+    noPrevious: string
+    movers: string
+    moverWas: (before: string) => string
+    biggestTitle: string
+    byCategory: string
+    share: (pct: string) => string
+    largest: string
+    unusualTitle: string
+    unusualRow: (pct: string, above: boolean, avg: string) => string
+    unusualNone: string
+    unusualNoHistory: string
+    goalsTitle: string
+    goalsTarget: (pct: string) => string
+    goalsOpen: string
+    goalsNone: string
+    goalsOrganize: string
+    empty: (month: string) => string
+    open: string
+    biggestCategory: (name: string, amount: string) => string
+    unusualCount: (n: number) => string
+    count: (n: number) => string
+  }
   /** "A receber": money paid on someone else's behalf, until it's paid back (src/data/receivables.ts). */
   receivables: {
     title: string
@@ -1367,6 +1407,7 @@ export const messages: Messages = {
       sub: 'Ordem e cartões visíveis. Vale em todos os aparelhos.',
       sections: {
         netWorth: 'Patrimônio líquido',
+        monthClose: 'Fechamento do mês',
         balance: 'Equilíbrio do mês',
         projection: 'Previsão do fim do mês',
         unusual: 'Fora do padrão',
@@ -1386,6 +1427,7 @@ export const messages: Messages = {
       hiddenTag: 'Oculto',
       extraPayOff: 'Aparece quando 13º e férias está ligado',
       receivablesNone: 'Aparece quando alguém te deve',
+      monthCloseOff: 'Aparece nos 10 primeiros dias do mês',
       shownCount: (n, total) => `${n} de ${total} visíveis`,
       reset: 'Restaurar padrão',
       cancel: 'Cancelar',
@@ -1613,6 +1655,44 @@ export const messages: Messages = {
     undone: 'Alteração desfeita',
     undoFailed: 'Não foi possível desfazer. Tente de novo.',
     panelNote: 'Shift + clique seleciona um intervalo. Transferências entre suas contas não podem ser selecionadas.',
+  },
+  monthClose: {
+    title: (month) => `Fechamento de ${month}`,
+    sub: 'O resumo do mês que terminou',
+    cardTitle: (month) => `${month[0].toUpperCase()}${month.slice(1)} fechou`,
+    kept: (amount) => `Você guardou ${amount}`,
+    overspent: (amount) => `Você gastou ${amount} a mais do que entrou`,
+    keptPct: (pct) => `${pct} da renda`,
+    noIncome: 'Nenhuma renda entrou no mês',
+    income: 'Entrou',
+    expenses: 'Saiu',
+    net: 'Sobrou',
+    changedTitle: 'O que mudou',
+    vsPrevious: (month) => `vs. ${month}`,
+    vsAverageShort: 'vs. média',
+    changedSub: (previous, months) =>
+      [previous && `Comparado a ${previous}`, months && `média ${months === 1 ? 'do mês anterior' : `dos ${months} meses anteriores`}`].filter(Boolean).join(' e à '),
+    noPrevious: 'Ainda não há um mês anterior para comparar.',
+    movers: 'Categorias que mais mudaram',
+    moverWas: (before) => `era ${before}`,
+    biggestTitle: 'Maiores gastos',
+    byCategory: 'Por categoria',
+    share: (pct) => `${pct} dos gastos`,
+    largest: 'Maiores compras',
+    unusualTitle: 'Fora do padrão',
+    unusualRow: (pct, above, avg) => `${pct} ${above ? 'acima' : 'abaixo'} da média · média ${avg}`,
+    unusualNone: 'Todas as categorias ficaram dentro do normal.',
+    unusualNoHistory: 'Ainda não há meses suficientes para comparar.',
+    goalsTitle: 'Meta · Equilíbrio do mês',
+    goalsTarget: (pct) => `meta ${pct}`,
+    goalsOpen: 'Ver equilíbrio do mês',
+    goalsNone: 'Coloque as categorias em Essencial ou Estilo de vida para acompanhar a meta de cada mês.',
+    goalsOrganize: 'Organizar categorias',
+    empty: (month) => `Nenhuma transação em ${month}.`,
+    open: 'Ver fechamento',
+    biggestCategory: (name, amount) => `Maior gasto: ${name}, ${amount}`,
+    unusualCount: (n) => (n === 1 ? '1 categoria fora do padrão' : `${n} categorias fora do padrão`),
+    count: (n) => (n === 1 ? '1 transação' : `${n} transações`),
   },
   receivables: {
     title: 'A receber',

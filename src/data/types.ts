@@ -128,6 +128,7 @@ export interface ExtraPay {
 /** A card of the Visão geral. */
 export type OverviewSection =
   | 'netWorth'
+  | 'monthClose'
   | 'balance'
   | 'projection'
   | 'extraPay'
