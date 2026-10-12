@@ -13,6 +13,7 @@ import { Projection } from './pages/Projection'
 import { UnusualAll, UnusualCategory } from './pages/UnusualCategory'
 import { Recurring } from './pages/Recurring'
 import { SpendingBalance } from './pages/SpendingBalance'
+import { ExtraPay } from './pages/ExtraPay'
 import { BalanceOrganize } from './pages/BalanceOrganize'
 import { Debug } from './pages/Debug'
 import { Snackbar, SyncBar } from './components/SyncBar'
@@ -130,6 +131,7 @@ function Shell() {
                     <Route path="/insights/unusual/:categoryId" element={<UnusualCategory />} />
                     <Route path="/recurring" element={<Recurring />} />
                     <Route path="/balance" element={<SpendingBalance />} />
+                    <Route path="/extra-pay" element={<ExtraPay />} />
                     <Route path="/balance/organize" element={<BalanceOrganize />} />
                     {/* TEMPORARY: Pluggy's raw responses. */}
                     <Route path="/debug" element={<Debug />} />

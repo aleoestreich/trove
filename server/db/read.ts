@@ -6,7 +6,7 @@
 import { MONTHS_OF_ANALYSIS, MONTHS_OF_HISTORY, type Snapshot, type SyncInfo, type Transaction, type TransferOverride } from '../../src/data/types.js'
 import { toSnapshot } from '../pluggy/map.js'
 import type { PluggyAccount, PluggyItem, PluggyTransaction } from '../pluggy/types.js'
-import { readBalanceTarget, readOverviewLayout, readCategories, readFgts, readIncomeFilter, readPension, readProjectionSettings, readRecurringOverrides } from './categories.js'
+import { readBalanceTarget, readExtraPay, readOverviewLayout, readCategories, readFgts, readIncomeFilter, readPension, readProjectionSettings, readRecurringOverrides } from './categories.js'
 import { withAccountNames } from '../../src/data/edits.js'
 import type { Db } from './connection.js'
 import { HISTORY_START } from './sync.js'
@@ -98,6 +98,7 @@ export async function readSnapshot(db: Db, itemIds: string[], from: string, to: 
     pension: await readPension(db),
     balanceTarget: await readBalanceTarget(db),
     overviewLayout: await readOverviewLayout(db),
+    extraPay: await readExtraPay(db),
   })
 }
 

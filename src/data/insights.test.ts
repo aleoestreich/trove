@@ -259,6 +259,38 @@ describe('month-end projection', () => {
     expect(project({ accountIds: ['sav'], includeDaily: true, includeFreelance: false })).toBeNull()
   })
 
+  it('with 13º e férias on, expects the vacation pay and the 13º, and a smaller salary in the vacation months', () => {
+    const recurring = detectRecurring(txs, accounts, categories, {}, TODAY)
+    const settings: ProjectionSettings = { accountIds: null, includeDaily: true, includeFreelance: false, horizon: 'nextMonth' }
+    const extraPay = { enabled: true, salary: null, firstPart: 11, vacations: [{ id: 'v1', start: '2026-10-19', days: 15, sold: false }] }
+    const p = monthEndProjection({ accounts, transactions: txs, categories, settings, recurring: [...recurring.active, ...recurring.stopped], extraPay, today: TODAY })!
+    expect(p.extraPaySalary).toBe(10_000_00)
+    expect(p.events.filter((e) => ['salary', 'vacation', 'thirteenth'].includes(e.kind)).map((e) => [e.date, e.kind, e.amount])).toEqual([
+      // Paid 2 days before: the 17th is a Saturday. 15 days plus a third.
+      ['2026-10-16', 'vacation', 6_666_67],
+      // 13 vacation days in October, 2 in November, already paid.
+      ['2026-10-20', 'salary', 5_666_67],
+      // 20 November (Consciência Negra) is a holiday.
+      ['2026-11-19', 'salary', 9_333_33],
+      ['2026-11-30', 'thirteenth', 5_000_00],
+    ])
+    expect(p.breakdown.receitasPrevistas).toBe(6_666_67 + 5_666_67 + 9_333_33 + 5_000_00)
+    // Off: as before.
+    const off = monthEndProjection({ accounts, transactions: txs, categories, settings, recurring: [...recurring.active, ...recurring.stopped], extraPay: { ...extraPay, enabled: false }, today: TODAY })!
+    expect(off.events.filter((e) => e.kind === 'vacation' || e.kind === 'thirteenth')).toEqual([])
+    expect(off.extraPaySalary).toBeNull()
+  })
+
+  it('with 13º e férias on, a month with extra pay in the history doesn\'t raise the salary', () => {
+    const recurring = detectRecurring(txs, accounts, categories, {}, TODAY)
+    const withBonus = [...txs, tx('2026-07-10', 13_333_33, { description: 'FERIAS EXEMPLO', categoryId: 'salary' })]
+    const extraPay = { enabled: true, salary: null, firstPart: 11, vacations: [] }
+    const run = (on: boolean) =>
+      monthEndProjection({ accounts, transactions: withBonus, categories, recurring: [...recurring.active, ...recurring.stopped], extraPay: { ...extraPay, enabled: on }, today: TODAY })!.salary.average
+    expect(run(true)).toBe(10_000_00)
+    expect(run(false)).toBeGreaterThan(10_000_00)
+  })
+
   it('expects a salary paid in two parts on each of its days, the last one on the month\'s last business day', () => {
     const lastDay: Record<string, string> = { '2026-04': '30', '2026-05': '29', '2026-06': '30', '2026-07': '31', '2026-08': '31', '2026-09': '30' }
     const split = [

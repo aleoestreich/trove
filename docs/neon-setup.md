@@ -425,6 +425,22 @@ Previdência privada plans are tracked by hand too (`src/data/pension.ts`):
 - A plan's balance is due for an update when it has none, or its latest is
   more than a month old; Visão geral reminds about those plans.
 
+## 13º e férias
+
+The extra pay of a CLT job (`src/data/extraPay.ts`), off by default:
+
+- Stored in `app_settings` `extra_pay`
+  (`{ "enabled": false, "salary": null, "firstPart": 11, "vacations": [] }`;
+  `salary` in cents or null for the projection's median month, `firstPart`
+  a month from 2 to 11 or `"vacation"`, each vacation `{ id, start, days,
+  sold }` with 5–30 days, at most 20 when 10 are sold). Anything stored
+  that isn't valid reads as off. No migration: `app_settings` already exists.
+- Edit, through `POST /api/edits`: `setExtraPay` (`extraPay`, complete).
+  Read with the snapshot (`extraPay`). Syncs never touch it.
+- The month-end projection (app and `GET /api/insights/projection`) adds
+  the 13º's parts and the vacation pay due before its end, and lowers each
+  month's salary by its vacation days.
+
 ## Visão geral layout
 
 The order of the Visão geral's cards and the hidden ones ("Personalizar",
