@@ -127,7 +127,8 @@ between accounts, and card bill payments.
 - **Previsão do fim do mês** (Overview, then its detail page) projects what
   is left in the chosen accounts (checking accounts in BRL by default) on the
   last day of the month: today's balance + the salary still expected (its
-  6-month average, on its usual day) − card bills due this month − recurring
+  6-month average, on its usual paydays: a salary paid in parts is expected
+  in parts) − card bills due this month − recurring
   charges paid by debit, Pix or boleto − the usual day-to-day spending. Each
   value is counted once: card installments and subscriptions are inside the
   bills. The accounts, day-to-day spending and freelance income are settings

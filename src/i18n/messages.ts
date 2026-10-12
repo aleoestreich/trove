@@ -794,7 +794,7 @@ export interface Messages {
       waterfallChart: (saldo: string, receitas: string, faturas: string, recorrentes: string, diaADia: string, end: string) => string
       notes: {
         saldo: (accounts: string) => string
-        receitas: (day: number | null, freelance: boolean) => string
+        receitas: (days: number[], freelance: boolean) => string
         receitasNone: string
         faturas: (cards: string, installments: string) => string
         faturasNone: string
@@ -1744,8 +1744,10 @@ export const messages: Messages = {
         `Saldo hoje ${saldo}, mais receitas ${receitas}, menos faturas ${faturas}, menos recorrentes ${recorrentes}, menos dia a dia ${diaADia}, igual a ${end}`,
       notes: {
         saldo: (accounts) => `Contas: ${accounts}`,
-        receitas: (day, freelance) =>
-          `${freelance ? 'Salário e freelance' : 'Salário'}, média de 6 meses${day ? ` · cai por volta do dia ${day}` : ''}`,
+        receitas: (days, freelance) =>
+          `${freelance ? 'Salário e freelance' : 'Salário'}, média de 6 meses${
+            days.length === 0 ? '' : days.length === 1 ? ` · cai por volta do dia ${days[0]}` : ` · cai por volta dos dias ${days.slice(0, -1).join(', ')} e ${days.at(-1)}`
+          }`,
         receitasNone: 'O salário deste mês já entrou',
         faturas: (cards, installments) => `${cards} · já incluem ${installments} em parcelas`,
         faturasNone: 'Nenhuma fatura vence até o fim do mês',

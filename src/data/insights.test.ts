@@ -259,6 +259,29 @@ describe('month-end projection', () => {
     expect(project({ accountIds: ['sav'], includeDaily: true, includeFreelance: false })).toBeNull()
   })
 
+  it('expects a salary paid in two parts on each of its days, the last one on the month\'s last business day', () => {
+    const lastDay: Record<string, string> = { '2026-04': '30', '2026-05': '29', '2026-06': '30', '2026-07': '31', '2026-08': '31', '2026-09': '30' }
+    const split = [
+      ...monthly(months, '15', 4_000_00, { description: 'ADIANTAMENTO EXEMPLO', categoryId: 'salary' }),
+      // Paid on the month's last day (a business day earlier in May).
+      ...months.map((m) => tx(`${m}-${lastDay[m]}`, 6_000_00, { description: 'SALARIO EXEMPLO', categoryId: 'salary' })),
+    ]
+    const list = [...split, ...rent, ...daily, ...cardTxs, ...october]
+    const p = project(undefined, list)
+    // 31 October 2026 is a Saturday: Friday the 30th.
+    expect(p.events.filter((e) => e.kind === 'salary').map((e) => [e.date, e.amount])).toEqual([
+      ['2026-10-15', 4_000_00],
+      ['2026-10-30', 6_000_00],
+    ])
+    expect(p.salary.days).toEqual([15, 30])
+    expect(p.breakdown.receitasPrevistas).toBe(10_000_00)
+    // The balance rises mid-month too, not only at the end.
+    expect(p.daily[14].value).toBeGreaterThan(p.daily[13].value)
+    // What already came in covers the first part.
+    const early = project(undefined, [...list, tx('2026-10-03', 4_000_00, { description: 'ADIANTAMENTO EXEMPLO', categoryId: 'salary' })])
+    expect(early.events.filter((e) => e.kind === 'salary').map((e) => [e.date, e.amount])).toEqual([['2026-10-30', 6_000_00]])
+  })
+
   it('needs 2 months of salary', () => {
     expect(project(undefined, txs.filter((t) => t.categoryId !== 'salary' || t.date >= '2026-09'))).toBeNull()
   })

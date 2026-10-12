@@ -6,9 +6,14 @@
 //
 // - Saldo hoje: the chosen accounts' balances (default: checking accounts in BRL).
 // - Receitas previstas: the salary's monthly average over the last 6
-//   complete months, minus what came in this month, on the day it usually
-//   arrives (the last 3 months). Freelance the same way, when turned on.
-//   Only income into the chosen accounts counts.
+//   complete months, minus what came in this month. It is expected on its
+//   pay schedule, learnt from the last 3 months: each payment's usual day
+//   (counted from the end of the month when it comes in its last days, then
+//   on the last business day when that's a weekend) and
+//   its share of the month, so a salary paid in two parts (e.g. on the 15th
+//   and the last day) is expected in two parts. What already came in this
+//   month covers the earliest parts first. Freelance the same way, when
+//   turned on. Only income into the chosen accounts counts.
 // - Faturas: card bills due from today to the end of the month, not paid
 //   yet. They already hold the card's installments and subscriptions, so
 //   those are never subtracted again.
@@ -77,8 +82,8 @@ export interface Projection {
   accountIds: string[]
   /** Average spent per day (day-to-day), and over how many months. */
   dailyAverage: Cents
-  /** The salary's monthly average and the day it usually comes in. */
-  salary: { average: Cents; day: number | null }
+  /** The salary's monthly average and the days it usually comes in, in this month (one per payment). */
+  salary: { average: Cents; days: number[] }
   settings: ProjectionSettings
 }
 
@@ -118,32 +123,116 @@ const stdDev = (xs: number[]) => {
   return Math.sqrt(xs.reduce((s, x) => s + (x - mean) ** 2, 0) / xs.length)
 }
 
+/** One payment of a pay schedule: its day and its share of the month. */
+interface Payday {
+  /** Day of the month, or days before its last day when `fromEnd`. */
+  day: number
+  fromEnd: boolean
+  share: number
+}
+
 interface Expected {
   average: Cents
-  /** What is still to come this month. */
-  remaining: Cents
-  day: number | null
+  /** Its payments, earliest first; empty without any. */
+  schedule: Payday[]
   /** Monthly totals over the average's months. */
   totals: Cents[]
   /** Months with any of it. */
   monthsWith: number
+  /** What already came in this month. */
+  received: Cents
 }
 
-/** A category's income into the chosen accounts: average, still to come and usual day. */
+/** Payments a few days apart are one payment (split transfers, a weekend in between). */
+const SAME_PAYMENT_DAYS = 3
+/** A payment in the last days of its month is "on the last day" (it moves with the month's length). */
+const MONTH_END_DAYS = 3
+/** Smaller payments than this share of the month don't make a payday of their own. */
+const MIN_PAYMENT_SHARE = 0.1
+
+/** A month's payments: transactions a few days apart merged, small ones left out. */
+function paymentsOf(month: Transaction[]): { day: number; amount: Cents }[] {
+  const sorted = [...month].sort((a, b) => a.date.localeCompare(b.date))
+  const out: { day: number; amount: Cents }[] = []
+  for (const t of sorted) {
+    const day = Number(t.date.slice(8, 10))
+    const last = out[out.length - 1]
+    if (last && day - last.day <= SAME_PAYMENT_DAYS) last.amount += t.amount
+    else out.push({ day, amount: t.amount })
+  }
+  const total = out.reduce((s, p) => s + p.amount, 0)
+  return out.filter((p) => p.amount >= total * MIN_PAYMENT_SHARE)
+}
+
+/**
+ * The pay schedule over `months` (most recent last): how many payments a
+ * month usually has (ties: the most recent), then each one's median day and
+ * share, from the months with that many.
+ */
+function paySchedule(byMonth: Map<string, Transaction[]>, months: string[]): Payday[] {
+  const seen = months.filter((m) => byMonth.has(m)).map((m) => ({ month: m, payments: paymentsOf(byMonth.get(m)!) }))
+  if (!seen.length) return []
+  const counts = new Map<number, number>()
+  for (const s of seen) counts.set(s.payments.length, (counts.get(s.payments.length) ?? 0) + 1)
+  const best = Math.max(...counts.values())
+  const n = [...seen].reverse().find((s) => counts.get(s.payments.length) === best)!.payments.length
+  const like = seen.filter((s) => s.payments.length === n)
+  const schedule = Array.from({ length: n }, (_, i) => {
+    const slot = like.map((s) => ({ day: s.payments[i].day, last: daysInMonth(s.month), share: s.payments[i].amount / s.payments.reduce((t, p) => t + p.amount, 0) }))
+    const fromEnd = slot.every((x) => x.last - x.day < MONTH_END_DAYS)
+    return {
+      day: median(slot.map((x) => (fromEnd ? x.last - x.day : x.day)))!,
+      fromEnd,
+      share: median(slot.map((x) => x.share))!,
+    }
+  })
+  const sum = schedule.reduce((t, p) => t + p.share, 0)
+  return schedule.map((p) => ({ ...p, share: p.share / sum }))
+}
+
+/** A payday's date in `month` (YYYY-MM). One at the month's end falls back to Friday when that day is a weekend (the last business day). */
+const paydayIn = (p: Payday, month: string) => {
+  const last = daysInMonth(month)
+  let day = p.fromEnd ? last - p.day : Math.min(p.day, last)
+  if (p.fromEnd) {
+    const weekday = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, day)).getUTCDay()
+    day -= weekday === 6 ? 1 : weekday === 0 ? 2 : 0
+  }
+  return `${month}-${String(day).padStart(2, '0')}`
+}
+
+/** A category's income into the chosen accounts: average, pay schedule, and what came in this month. */
 function expectedIncome(txs: Transaction[], categoryId: string | undefined, accounts: Set<string>, months: string[], current: string): Expected {
   const mine = categoryId ? txs.filter((t) => t.categoryId === categoryId && t.amount > 0 && !t.hidden && !t.transfer && accounts.has(t.accountId)) : []
-  const byMonth = new Map<string, Cents>()
-  const biggest = new Map<string, Transaction>()
+  const byMonth = new Map<string, Transaction[]>()
   for (const t of mine) {
     const m = monthKey(t.date)
-    byMonth.set(m, (byMonth.get(m) ?? 0) + t.amount)
-    if (!biggest.has(m) || biggest.get(m)!.amount < t.amount) biggest.set(m, t)
+    byMonth.set(m, [...(byMonth.get(m) ?? []), t])
   }
-  const totals = months.map((m) => byMonth.get(m) ?? 0)
+  const total = (m: string) => (byMonth.get(m) ?? []).reduce((s, t) => s + t.amount, 0)
+  const totals = months.map(total)
   const average = totals.length ? Math.round(totals.reduce((s, x) => s + x, 0) / totals.length) : 0
   const withIt = months.filter((m) => byMonth.has(m))
-  const day = median(withIt.slice(-SALARY_DAY_MONTHS).map((m) => Number(biggest.get(m)!.date.slice(8, 10))))
-  return { average, remaining: Math.max(0, average - (byMonth.get(current) ?? 0)), day, totals, monthsWith: withIt.length }
+  return { average, schedule: paySchedule(byMonth, withIt.slice(-SALARY_DAY_MONTHS)), totals, monthsWith: withIt.length, received: total(current) }
+}
+
+/**
+ * Each payment still to come this month: the average split by the schedule's
+ * shares (the last takes the rounding), with what already came in covering
+ * the earliest payments first.
+ */
+function expectedPayments(e: Expected, current: string): { date: string; amount: Cents }[] {
+  let left = e.received
+  let given = 0
+  return e.schedule
+    .map((p, i) => {
+      const amount = i === e.schedule.length - 1 ? e.average - given : Math.round(e.average * p.share)
+      given += amount
+      const covered = Math.min(Math.max(0, left), amount)
+      left -= covered
+      return { date: paydayIn(p, current), amount: amount - covered }
+    })
+    .filter((p) => p.amount > 0)
 }
 
 /**
@@ -187,9 +276,8 @@ export function monthEndProjection(input: {
   const events: ProjectionEvent[] = []
   const incomeEvent = (kind: 'salary' | 'freelance', e: Expected) => {
     // Nothing more comes in once the month is over.
-    if (e.remaining <= 0 || daysLeft === 0 || e.day === null) return
-    const day = `${current}-${String(Math.min(e.day, daysInMonth(today))).padStart(2, '0')}`
-    events.push({ date: onOrAfterTomorrow(day), kind, amount: e.remaining })
+    if (daysLeft === 0) return
+    for (const p of expectedPayments(e, current)) events.push({ date: onOrAfterTomorrow(p.date), kind, amount: p.amount })
   }
   incomeEvent('salary', salary)
   if (freelance) incomeEvent('freelance', freelance)
@@ -284,7 +372,7 @@ export function monthEndProjection(input: {
     events,
     accountIds,
     dailyAverage,
-    salary: { average: salary.average, day: salary.day },
+    salary: { average: salary.average, days: salary.schedule.map((p) => Number(paydayIn(p, current).slice(8, 10))) },
     settings,
   }
 }
