@@ -554,6 +554,7 @@ export interface Messages {
     noIncome: string
     includesUngrouped: (amount: string) => string
     includesExpected: (amount: string) => string
+    includesReserve: (amount: string) => string
     classifyAmount: (amount: string) => string
     target: (pct: number) => string
     barAria: (e: number, l: number, f: number, te: number, tl: number, tf: number) => string
@@ -579,6 +580,10 @@ export interface Messages {
       points: (n: number) => string
       soFarTag: string
       withExpectedTag: string
+      legendReserve: string
+      rowReserved: (amount: string) => string
+      reserveNote: (parts: string) => string
+      reservePart: (group: string, amount: string) => string
       expectedSpendNote: (amount: string) => string
       itemExpected: (amount: string) => string
       insideFuture: (amount: string) => string
@@ -1450,6 +1455,7 @@ export const messages: Messages = {
     noIncome: 'Nenhuma renda entrou ainda, então mostramos só os valores.',
     includesUngrouped: (amount) => `Inclui ${amount} sem grupo`,
     includesExpected: (amount) => `Inclui ${amount} previstos: parcelas e recorrentes do mês`,
+    includesReserve: (amount) => `${amount} reservados até a meta de cada grupo, fora do Futuro`,
     classifyAmount: (amount) => `Classificar ${amount}`,
     target: (pct) => `meta ${pct}%`,
     barAria: (e, l, f, te, tl, tf) => `Essencial ${e}%, Estilo de vida ${l}%, Futuro ${f}% da renda. Meta ${te}, ${tl} e ${tf}.`,
@@ -1475,6 +1481,10 @@ export const messages: Messages = {
       points: (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)} ${Math.abs(n) === 1 ? 'ponto' : 'pontos'}`,
       soFarTag: 'até agora',
       withExpectedTag: 'com o previsto',
+      legendReserve: 'Reservado até a meta',
+      rowReserved: (amount) => `+ ${amount} reservado`,
+      reserveNote: (parts) => `Até o fim do mês, o que falta para cada grupo chegar à meta fica reservado (${parts}). O Futuro é o que sobra além disso.`,
+      reservePart: (group, amount) => `${amount} no ${group}`,
       expectedSpendNote: (amount) => `Os gastos incluem ${amount} previstos até o fim do mês: parcelas e recorrentes que ainda vão cair.`,
       itemExpected: (amount) => `inclui ${amount} previsto`,
       insideFuture: (amount) => `${amount} · dentro do Futuro`,

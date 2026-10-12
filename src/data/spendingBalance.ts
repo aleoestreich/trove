@@ -23,6 +23,10 @@
 //   (expectedCharges): installments to be charged and recurring charges not
 //   charged yet, each in its category's group, so the split shows where the
 //   month is heading, the same way its income is the income expected.
+// - Until the month is over, a group that hasn't reached its target yet
+//   keeps the rest of it in reserve (withReserve): spending can still grow
+//   that far, so Futuro is only what's left beyond the targets, not all the
+//   income not spent yet.
 
 import { kindOf } from './categories.js'
 import { incomeByMonth } from './incomeAverage.js'
@@ -140,6 +144,11 @@ export interface MonthBalance {
   overIncome: Cents
   /** The month in progress: the charges still expected in it, included above. */
   expectedSpending: Cents
+  /**
+   * The month in progress (withReserve): what each group can still spend up
+   * to its target, kept out of the Futuro. Zero otherwise.
+   */
+  reserved: { essential: Cents; lifestyle: Cents }
   /** Each group's rows, largest first (rows that add up to nothing or less are left out). */
   items: Record<Bucket, BalanceItem[]>
 }
@@ -250,9 +259,23 @@ export function monthBalances(
       future: income - essential - lifestyle,
       overIncome: Math.max(0, essential + lifestyle + ungrouped - Math.max(0, income)),
       expectedSpending: month === current ? expectedIn.reduce((t, e) => t + e.amount, 0) : 0,
+      reserved: { essential: 0, lifestyle: 0 },
       items: { essential: list('essential'), lifestyle: list('lifestyle'), ungrouped: list('ungrouped') },
     }
   })
+}
+
+/**
+ * The month in progress with each group's reserve: what it can still spend
+ * up to its target share of the income (nothing once it's past it), taken
+ * out of the Futuro. Other months, or a month without income, are returned
+ * as they are.
+ */
+export function withReserve(b: MonthBalance, target: BalanceTarget): MonthBalance {
+  if (b.expected === null || b.income <= 0) return b
+  const room = (group: SpendingGroup) => Math.max(0, Math.round((b.income * target[group]) / 100) - b[group])
+  const reserved = { essential: room('essential'), lifestyle: room('lifestyle') }
+  return { ...b, reserved, future: b.future - reserved.essential - reserved.lifestyle }
 }
 
 /** Each group's share of the income, in percent (unrounded); null without income. */
@@ -262,13 +285,20 @@ export function shares(b: MonthBalance): BalanceTarget | null {
   return { essential: pct(b.essential), lifestyle: pct(b.lifestyle), future: pct(b.future) }
 }
 
-/** Rounded shares that still add up to 100 (Futuro takes the rounding). */
+/** Rounded shares that, with the reserves, still add up to 100 (Futuro takes the rounding). */
 export function roundedShares(b: MonthBalance): BalanceTarget | null {
   const s = shares(b)
   if (!s) return null
   const essential = Math.round(s.essential)
   const lifestyle = Math.round(s.lifestyle)
-  return { essential, lifestyle, future: 100 - essential - lifestyle }
+  const r = reservedShares(b)
+  return { essential, lifestyle, future: 100 - essential - lifestyle - r.essential - r.lifestyle }
+}
+
+/** Each group's reserve as a rounded share of the income (zero outside the month in progress). */
+export function reservedShares(b: MonthBalance): { essential: number; lifestyle: number } {
+  const pct = (v: Cents) => (b.income > 0 ? Math.round((v / b.income) * 100) : 0)
+  return { essential: pct(b.reserved.essential), lifestyle: pct(b.reserved.lifestyle) }
 }
 
 /** The group furthest from its target, in points (positive: above for spending, below for Futuro). */

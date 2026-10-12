@@ -174,11 +174,23 @@ function SummaryCard({
       {shares ? (
         <>
           <SplitBar balance={balance} target={target} height={28} />
-          <BarLegend target={target} over={balance.overIncome > 0} onEditTarget={onEditTarget} />
+          <BarLegend target={target} over={balance.overIncome > 0} reserve={balance.reserved.essential + balance.reserved.lifestyle > 0} onEditTarget={onEditTarget} />
           <IncomeBase balance={balance} />
           <div className="flex flex-col">
-            <ShareRow part="essential" name={b.groups.essential} note={d.rowShare(pct(shares.essential), target.essential)} amount={balance.essential} tag={soFar ? soFarTag : points(shares.essential - target.essential)} />
-            <ShareRow part="lifestyle" name={b.groups.lifestyle} note={d.rowShare(pct(shares.lifestyle), target.lifestyle)} amount={balance.lifestyle} tag={soFar ? soFarTag : points(shares.lifestyle - target.lifestyle)} />
+            <ShareRow
+              part="essential"
+              name={b.groups.essential}
+              note={d.rowShare(pct(shares.essential), target.essential)}
+              amount={balance.essential}
+              tag={balance.reserved.essential > 0 ? d.rowReserved(formatMoney(balance.reserved.essential)) : soFar ? soFarTag : points(shares.essential - target.essential)}
+            />
+            <ShareRow
+              part="lifestyle"
+              name={b.groups.lifestyle}
+              note={d.rowShare(pct(shares.lifestyle), target.lifestyle)}
+              amount={balance.lifestyle}
+              tag={balance.reserved.lifestyle > 0 ? d.rowReserved(formatMoney(balance.reserved.lifestyle)) : soFar ? soFarTag : points(shares.lifestyle - target.lifestyle)}
+            />
             <ShareRow
               part="future"
               name={b.groups.future}
@@ -189,6 +201,16 @@ function SummaryCard({
             />
             {balance.ungrouped > 0 && <UngroupedRow amount={balance.ungrouped} />}
           </div>
+          {balance.reserved.essential + balance.reserved.lifestyle > 0 && (
+            <p className="tabular text-xs leading-4 text-muted">
+              {d.reserveNote(
+                joinNames(
+                  (['essential', 'lifestyle'] as const).filter((g) => balance.reserved[g] > 0).map((g) => d.reservePart(b.groups[g], formatMoney(balance.reserved[g]))),
+                  t.overview.avgIncome.filter.and,
+                ),
+              )}
+            </p>
+          )}
           {balance.expectedSpending > 0 && <p className="tabular text-xs leading-4 text-muted">{d.expectedSpendNote(formatMoney(balance.expectedSpending))}</p>}
         </>
       ) : (

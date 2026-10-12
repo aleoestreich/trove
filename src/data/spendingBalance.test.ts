@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit, defaultCategories, EditError, validateEdit } from './edits'
 import { NO_FILTER } from './incomeAverage'
-import { DEFAULT_TARGET, expectedCharges, expectedIncome, balanceStatus, hasGroups, isTarget, monthBalance, monthBalances, roundedShares, suggestGroup, worstDeviation } from './spendingBalance'
+import { DEFAULT_TARGET, reservedShares, withReserve, expectedCharges, expectedIncome, balanceStatus, hasGroups, isTarget, monthBalance, monthBalances, roundedShares, suggestGroup, worstDeviation } from './spendingBalance'
 import type { Category, Snapshot, Subcategory, Transaction } from './types'
 import type { InstallmentPlan } from '../lib/installments'
 import type { RecurringItem } from './recurring'
@@ -160,6 +160,26 @@ describe('Equilíbrio do mês', () => {
     ])
     // Only the month in progress counts them.
     expect(monthBalance(october, categories, subcategories, NO_FILTER, '2026-09', today, expected).expectedSpending).toBe(0)
+  })
+
+  it('keeps, until the month is over, each group\'s room up to its target out of the Futuro', () => {
+    // Expected income R$ 10.000; so far Essencial 41% and Estilo de vida 49% (above its 30%).
+    const history = [
+      ...['2026-07', '2026-08', '2026-09'].map((m) => tx(`sal-${m}`, `${m}-30`, 10_000_00, { categoryId: 'salary' })),
+      tx('oct-rent', '2026-10-06', -4_100_00, { categoryId: 'home' }),
+      tx('oct-dinner', '2026-10-07', -4_900_00, { categoryId: 'restaurants' }),
+    ]
+    const raw = monthBalance(history, categories, subcategories, NO_FILTER, '2026-10', '2026-10-16')
+    expect(roundedShares(raw)).toEqual({ essential: 41, lifestyle: 49, future: 10 })
+    const b = withReserve(raw, DEFAULT_TARGET)
+    // Essencial can still spend R$ 900 up to its 50%; Estilo de vida is past its target: no reserve.
+    expect(b.reserved).toEqual({ essential: 900_00, lifestyle: 0 })
+    expect(b.future).toBe(100_00)
+    expect(roundedShares(b)).toEqual({ essential: 41, lifestyle: 49, future: 1 })
+    expect(reservedShares(b)).toEqual({ essential: 9, lifestyle: 0 })
+    // Closed months keep no reserve.
+    const september = monthBalance(history, categories, subcategories, NO_FILTER, '2026-09', '2026-10-16')
+    expect(withReserve(september, DEFAULT_TARGET)).toEqual(september)
   })
 
   it('tells each state apart', () => {
