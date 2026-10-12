@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditError, applyEdit, applyReceivableEdit, defaultCategories, validateEdit, type ReceivableEdit } from './edits'
 import { createMockRepository } from './mockRepository'
-import { knownPeople, owedByPerson, owedTotal, remaining, repaymentCandidates, type Receivable } from './receivables'
+import { knownPeople, owedByPerson, owedTotal, remaining, repaymentCandidates, withReceivables, type Receivable } from './receivables'
+import { countedAmount } from './categories'
+import { expensesByCategory, totals } from '../lib/summary'
 import type { Snapshot, Transaction } from './types'
 
 // Made-up data only.
@@ -97,6 +99,33 @@ describe('receivables: rules', () => {
     const byId = new Map(snapshot().transactions.map((t) => [t.id, t]))
     applyReceivableEdit(list, pay('r1', 'p1', 10_00), (id) => byId.get(id))
     expect(list[0].payments).toEqual([])
+  })
+})
+
+describe('receivables: totals count only your part', () => {
+  const categoriesById = new Map(categories.map((c) => [c.id, c]))
+
+  it('leaves the part others owe out of spending, and the money paid back out of income', () => {
+    const s = apply(snapshot(), owe('r1', 'Ana', 75_00), owe('r2', 'Bruno', 25_00), pay('r1', 'p1', 50_00, 'pix-in'))
+    const byId = new Map(s.transactions.map((t) => [t.id, t]))
+    expect(byId.get('dinner')).toMatchObject({ amount: -150_00, shared: 100_00 })
+    expect(byId.get('pix-in')).toMatchObject({ amount: 50_00, repaid: 50_00 })
+    expect(countedAmount(byId.get('dinner')!)).toBe(-50_00)
+    // The month: R$ 5.000 salary and R$ 50 of dinner (the rest is others'); the R$ 50 paid back isn't income; the other R$ 100 that came in is.
+    const october = s.transactions.filter((t) => !t.transfer)
+    expect(totals(october, categoriesById)).toEqual({ income: 5100_00, expenses: 50_00, net: 5050_00 })
+    expect(expensesByCategory(october, categoriesById).find((c) => c.category?.id === 'restaurants')!.amount).toBe(50_00)
+  })
+
+  it('clears the marks when a receivable or payment goes, and never takes more than the transaction', () => {
+    let s = apply(snapshot(), owe('r1', 'Ana', 150_00), pay('r1', 'p1', 50_00, 'pix-in'))
+    s = applyEdit(s, { op: 'deleteReceivablePayment', receivableId: 'r1', id: 'p1' })
+    expect(s.transactions.find((t) => t.id === 'pix-in')!.repaid).toBeUndefined()
+    s = applyEdit(s, { op: 'deleteReceivable', id: 'r1' })
+    expect(s.transactions.find((t) => t.id === 'dinner')!.shared).toBeUndefined()
+    // The expense shrank (a new exchange rate): what's owed is capped at it.
+    const shrunk = withReceivables({ ...apply(snapshot(), owe('r1', 'Ana', 150_00)), transactions: snapshot().transactions.map((t) => (t.id === 'dinner' ? { ...t, amount: -120_00 } : t)) })
+    expect(shrunk.transactions.find((t) => t.id === 'dinner')!.shared).toBe(120_00)
   })
 })
 

@@ -77,13 +77,14 @@ describe('average income with a category filter', () => {
     expect(options.categories.map((c) => [c.id, c.average])).toEqual([
       ['salary', 12_500_00],
       ['freelance', 3_000_00],
+      ['yields', 0],
     ])
     expect(options.uncategorized.average).toBe(100_00)
     for (const f of [
       NO_FILTER,
       filter({ excludedCategoryIds: ['freelance'] }),
       filter({ excludedSubcategoryIds: [salarySubs[0].id], excludeUncategorized: true }),
-      filter({ excludedCategoryIds: ['salary', 'freelance'] }),
+      filter({ excludedCategoryIds: ['salary', 'freelance', 'yields'] }),
     ])
       expect(previewAverage(options, f)).toBe(avg(f).average)
   })
@@ -94,10 +95,10 @@ describe('average income with a category filter', () => {
       const s = summarizeIncomeFilter(f, categories, subcategories, 'Sem categoria')
       return `${filterLabel(s, words)} · ${s.included.length} de ${s.total}`
     }
-    expect(label(NO_FILTER)).toBe('Todas as receitas · 3 de 3')
-    expect(label(filter({ excludeUncategorized: true }))).toBe('Salário, Freelance · 2 de 3')
-    expect(label(filter({ excludedSubcategoryIds: [salarySubs[1].id], excludedCategoryIds: ['freelance'], excludeUncategorized: true }))).toBe(
-      'Salário (parcial) · 1 de 3',
+    expect(label(NO_FILTER)).toBe('Todas as receitas · 4 de 4')
+    expect(label(filter({ excludeUncategorized: true }))).toBe('Salário, Freelance, Rendimentos · 3 de 4')
+    expect(label(filter({ excludedSubcategoryIds: [salarySubs[1].id], excludedCategoryIds: ['freelance', 'yields'], excludeUncategorized: true }))).toBe(
+      'Salário (parcial) · 1 de 4',
     )
   })
 })
@@ -114,10 +115,10 @@ describe('saving the filter (setIncomeFilter)', () => {
   }
 
   it('refuses a filter that leaves nothing selected, or that names expense categories', () => {
-    const none = filter({ excludedCategoryIds: ['salary', 'freelance'], excludeUncategorized: true })
+    const none = filter({ excludedCategoryIds: ['salary', 'freelance', 'yields'], excludeUncategorized: true })
     expect(reason(() => applyEdit(snapshot(), { op: 'setIncomeFilter', filter: none }))).toBe('nothing_selected')
     // Every subcategory of every category unticked is the same as nothing.
-    const allSubs = filter({ excludedSubcategoryIds: subcategories.filter((s) => ['salary', 'freelance'].includes(s.categoryId)).map((s) => s.id), excludeUncategorized: true })
+    const allSubs = filter({ excludedSubcategoryIds: subcategories.filter((s) => ['salary', 'freelance', 'yields'].includes(s.categoryId)).map((s) => s.id), excludeUncategorized: true })
     expect(reason(() => applyEdit(snapshot(), { op: 'setIncomeFilter', filter: allSubs }))).toBe('nothing_selected')
     expect(reason(() => applyEdit(snapshot(), { op: 'setIncomeFilter', filter: filter({ excludedCategoryIds: ['groceries'] }) }))).toBe('not_income')
   })

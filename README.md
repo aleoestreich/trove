@@ -109,6 +109,19 @@ between accounts, and card bill payments.
   debit with the card credit; any transaction can also be marked (or
   unmarked) as one in its details, or as a transfer between own accounts
   (e.g. money moved in from an account that isn't connected).
+- **Money moved into or out of an investment is neither income nor an
+  expense** either: an aplicação, a resgate, a caixinha or a CDB is a
+  transfer ("Investimento · aplicação ou resgate"), recognised by Pluggy's
+  investment categories or the bank's wording, and can be marked or
+  unmarked by hand ("Marcar como investimento"). What an investment pays
+  (rendimentos, juros, dividendos) is income, under "Rendimentos"; interest
+  charged on a card or overdraft is an expense, under "Impostos e tarifas".
+- **Default categories:** Moradia, Mercado, Restaurantes, Transporte,
+  Compras, Assinaturas, Saúde, Viagem, Educação, Lazer and Impostos e
+  tarifas (expenses), Salário, Freelance and Rendimentos (income). A
+  database seeded before a default existed gets it once (a deleted one is
+  never brought back), and an uncategorized transaction that was never
+  edited shows today's guess, so it lands in a new default at once.
 - A transaction counts as income or an expense by its category's type;
   uncategorized ones count by sign.
 - **Bulk categorization:** many transactions can get one category and
@@ -120,7 +133,10 @@ between accounts, and card bill payments.
   guesses a category for them again.
 - **Average income** (Overview) averages the last 6 complete months of
   income in the categories chosen on its card (all by default; the choice is
-  saved in the database and shared between devices).
+  saved in the database and shared between devices). It is the app's one
+  reference income: the Equilíbrio do mês measures the month in progress
+  against it too. The month-end projection forecasts the salary itself (its
+  usual paydays and amount), since it needs to know when money comes in.
 - **13º e férias** (`#/extra-pay`, off by default, only for CLT jobs):
   when turned on, the month-end projection expects the 13º in two parts
   (the 1st by 30 November, an earlier month or with the vacation pay; the
@@ -143,8 +159,12 @@ between accounts, and card bill payments.
   devolução" in its details, or the receivable's suggestions, the matching
   amounts first) or typed in by hand. The page lists who owes what, most
   owed first, and the ones already paid back; a card on the Overview shows
-  the total while someone owes something. Totals don't change: the expense
-  and the money that came back count as the banks report them.
+  the total while someone owes something. Only your part counts: what
+  others owe is left out of spending (every total, chart, average and the
+  Equilíbrio), and the money they pay back is left out of income; the
+  transaction's details show "Sua parte". Balances, bills, the transaction
+  list and the month-end projection (a cash forecast) keep the bank's
+  amounts.
 - **Overview layout:** "Personalizar" (the sliders icon in the phone
   header, a button next to the desktop title) moves each card up or down
   and hides the ones not wanted; "Restaurar padrão" brings back the default.

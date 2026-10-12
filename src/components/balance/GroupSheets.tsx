@@ -6,6 +6,7 @@ import { InfoNote, RadioRow } from './TargetSheet'
 import type { Category, SpendingGroup, Subcategory } from '../../data/types'
 import { formatMonthName, lastMonths, monthKey } from '../../lib/dates'
 import { formatMoney } from '../../lib/money'
+import { countedAmount } from '../../data/categories'
 
 /** Cancelar and Salvar, with the failure above them. */
 function Buttons({ saving, failed, disabled, onCancel, onSave }: { saving: boolean; failed: string | null; disabled: boolean; onCancel(): void; onSave(): void }) {
@@ -88,7 +89,7 @@ export function SubcategoryGroupSheet({ subcategory, category, onClose }: { subc
   const [saving, failed, save] = useSave(() => saveSubcategoryGroup(subcategory.id, group), onClose)
   const lastMonth = lastMonths(monthKey(today), 2)[0]
   const spent = useMemo(
-    () => allTransactions.filter((x) => !x.hidden && !x.transfer && x.subcategoryId === subcategory.id && monthKey(x.date) === lastMonth).reduce((s, x) => s - x.amount, 0),
+    () => allTransactions.filter((x) => !x.hidden && !x.transfer && x.subcategoryId === subcategory.id && monthKey(x.date) === lastMonth).reduce((s, x) => s - countedAmount(x), 0),
     [allTransactions, subcategory.id, lastMonth],
   )
   return (

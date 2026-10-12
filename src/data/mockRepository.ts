@@ -2,6 +2,7 @@ import type { Repository } from './repository'
 import { DEMO_SUBCATEGORIES, buildSeed } from './seed'
 import { applyEdit, checkBulk, defaultCategories, withAccountNames } from './edits'
 import { filterTransactions } from './transactionFilter'
+import { withReceivables } from './receivables'
 import { DEFAULT_CATEGORIES } from './categoryCatalog'
 import type { Category, IncomeFilter, ProjectionSettings, RecurringOverride, Snapshot, Subcategory, TransferOverride } from './types'
 
@@ -33,6 +34,29 @@ interface DemoOwner {
   extraPay?: Snapshot['extraPay']
   /** "A receber" (its own tables). */
   receivables?: Snapshot['receivables']
+  /** The default categories already offered (each is added once; absent: the first version's). */
+  defaultsOffered?: string[]
+}
+
+/** The defaults of the first version (as on the server, server/db/categories.ts). */
+const FIRST_DEFAULTS = ['home', 'groceries', 'restaurants', 'transport', 'shopping', 'subscriptions', 'health', 'travel', 'salary', 'freelance']
+
+/** Adds the defaults this demo hasn't been offered yet, after its categories (a taken ID or name is skipped). */
+function withNewDefaults(owner: DemoOwner): DemoOwner {
+  const offered = new Set(owner.defaultsOffered ?? FIRST_DEFAULTS)
+  const all = defaultCategories((c, i) => `${c}-${i}`)
+  const missing = all.categories.filter((c) => !offered.has(c.id))
+  if (missing.length === 0 && owner.defaultsOffered) return owner
+  const taken = (c: Category) => owner.categories.some((x) => x.id === c.id || x.name.localeCompare(c.name, undefined, { sensitivity: 'base' }) === 0)
+  const added = missing.filter((c) => !taken(c))
+  const next = owner.categories.reduce((m, c) => Math.max(m, c.sortOrder), -1) + 1
+  const ids = new Set(added.map((c) => c.id))
+  return {
+    ...owner,
+    categories: [...owner.categories, ...added.map((c, i) => ({ ...c, sortOrder: next + i }))],
+    subcategories: [...owner.subcategories, ...all.subcategories.filter((x) => ids.has(x.categoryId))],
+    defaultsOffered: all.categories.map((c) => c.id),
+  }
 }
 
 function read(): DemoOwner | null {
@@ -68,7 +92,7 @@ function initialOwner(seed: Snapshot): DemoOwner {
 /** The seed with the stored categories; guesses only point at categories that still exist. */
 function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
   const known = new Set(owner.categories.map((c) => c.id))
-  return withAccountNames({
+  return withReceivables(withAccountNames({
     ...seed,
     accountNames: owner.accountNames,
     cardDays: owner.cardDays,
@@ -86,7 +110,7 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
     transactions: seed.transactions.map((t) => {
       const s = owner.stored[t.id]
       // A hand-set answer wins over the seed's own transfers.
-      if (s?.transferOverride === 'own' || s?.transferOverride === 'card-payment')
+      if (s?.transferOverride && s.transferOverride !== 'none')
         return { ...t, transfer: s.transferOverride, categoryId: null, subcategoryId: null, hidden: s.hidden || undefined, transferOverride: s.transferOverride }
       if (s?.transferOverride === 'none') {
         const { transfer: _seedTransfer, ...rest } = t
@@ -96,7 +120,7 @@ function withOwner(seed: Snapshot, owner: DemoOwner): Snapshot {
       if (s) return { ...t, categoryId: s.categoryId, subcategoryId: s.subcategoryId, hidden: s.hidden || undefined }
       return t.categoryId && !known.has(t.categoryId) ? { ...t, categoryId: null } : t
     }),
-  })
+  }))
 }
 
 /** Demo data. Categories and edits are kept in this browser's localStorage. */
@@ -105,7 +129,10 @@ export function createMockRepository(today: Date = new Date()): Repository {
     const seed = buildSeed(today)
     let owner = read()
     if (!owner) {
-      owner = initialOwner(seed)
+      owner = { ...initialOwner(seed), defaultsOffered: DEFAULT_CATEGORIES.map((c) => c.id) }
+      write(owner)
+    } else if (!owner.defaultsOffered || DEFAULT_CATEGORIES.some((c) => !owner!.defaultsOffered!.includes(c.id))) {
+      owner = withNewDefaults(owner)
       write(owner)
     }
     return withOwner(seed, owner)
@@ -138,6 +165,7 @@ export function createMockRepository(today: Date = new Date()): Repository {
         overviewLayout: next.overviewLayout,
         extraPay: next.extraPay,
         receivables: next.receivables,
+        defaultsOffered: read()?.defaultsOffered,
       })
       return previous && { updated: previous.length, previous }
     },

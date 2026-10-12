@@ -113,9 +113,12 @@ No backend, no auth. It runs in the browser on hardcoded data.
 - ✅ A receber: a purchase or Pix paid on someone else's behalf, marked in
   its details (who, and how much of it), tracked until it's paid back, with
   payments back from money that came in or typed in by hand. Page with who
-  owes what, and a card on Visão geral. Totals are unchanged.
-  - Open question: leave the owed part out of spending (and the payments
-    back out of income), which changes every total, chart and average.
+  owes what, and a card on Visão geral. Only the owner's part counts in
+  spending, and the money paid back isn't income.
+- ✅ Accurate totals: investment moves are transfers; Educação, Lazer,
+  Impostos e tarifas and Rendimentos are defaults; the Equilíbrio expects
+  Renda média (one reference income).
+- Next: read investment balances from Meu Pluggy into net worth.
 - ✅ Fechamento do mês: a summary of each month once it ends (kept, what
   changed, biggest spending, unusual categories, the Equilíbrio's target),
   a page per closed month and a card on Visão geral in the first 10 days.

@@ -134,7 +134,7 @@ export function buildSeed(today: Date = new Date()): Snapshot {
     add({ accountId: 'inter-checking', date: day(12), description: 'Enel Distribuição SP', amount: -between(180, 290), categoryId: 'utilities' })
     add({ accountId: 'inter-checking', date: day(15), description: 'Vivo Fibra', amount: -119_90, categoryId: 'utilities' })
     add({ accountId: 'inter-checking', date: day(11), description: 'Wizard Idiomas', amount: -460_00, categoryId: 'education' })
-    add({ accountId: 'inter-checking', date: day(28), description: 'Rendimento CDB Inter', amount: between(38, 72), categoryId: 'investments' })
+    add({ accountId: 'inter-checking', date: day(28), description: 'Rendimento CDB Inter', amount: between(38, 72), categoryId: 'investment-income' })
 
     // Nubank checking: Pix to people.
     add({ accountId: 'nubank-checking', date: day(3 + Math.floor(random() * 20)), description: 'Pix enviado - Mariana Costa', amount: -between(80, 350), categoryId: 'other-expense' })

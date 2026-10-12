@@ -176,7 +176,6 @@ const CATEGORY_RULES: [RegExp, string][] = [
   [/same person|mesma titularidade|own account|entre contas/i, 'transfer'],
   [/credit card payment|card payment|pagamento de (fatura|cart)/i, 'card-payment'],
   [/salar|wage|payroll|sal[aá]rio/i, 'salary'],
-  [/investment|interest|yield|dividend|rendimento|juros/i, 'investments'],
   [/grocer|supermarket|supermercado|mercado/i, 'groceries'],
   [/restaurant|food|delivery|bakery|coffee|bar\b|aliment|restaurante/i, 'food'],
   [/taxi|ride|uber|transport|fuel|gas station|parking|toll|vehicle|automotive|combust|estacionamento|ped[aá]gio/i, 'transport'],
@@ -238,9 +237,28 @@ const GENERIC_TRANSFER = /transfer|pix|ted\b|doc\b|transfer[eê]ncia/i
  */
 export const MERCADO_LIVRE = /\bmercado\s*livre\b|\bmercadolivre/i
 
+/**
+ * What an investment pays (interest, yield, dividends): income when it comes
+ * in; charged on a bill or an overdraft (money out), a fee.
+ */
+const YIELD = /interest|yield|dividend|proceeds|rendimento|juros|proventos/i
+/**
+ * Money moved into or out of an investment ("aplicação", "resgate", a
+ * caixinha, a CDB): neither spending nor income, by Pluggy's category or
+ * the bank's wording.
+ */
+const INVESTMENT_CATEGORY = /^investments?$|automatic investment|fixed income|variable income|mutual funds|investimento|aplica[cç][aãõ]|renda (fixa|vari[aá]vel)|fundos? de investimento/i
+const INVESTMENT_TEXT = /\baplica[cç][aã]o\b|\baplic\b|\bresgate\b|caixinha|cofrinho|\bRDB\b|\bCDB\b|\bLC[IA]\b|tesouro direto|poupan[cç]a/i
+
 export function categoryFor(tx: Pick<PluggyTransaction, 'category' | 'type'> & Partial<Pick<PluggyTransaction, 'description' | 'descriptionRaw' | 'merchant'>>): string {
   const name = tx.category ?? ''
+  const text = [tx.description, tx.descriptionRaw].filter(Boolean).join(' ')
   const rule = CATEGORY_RULES.find(([re]) => re.test(name))?.[1]
+  // Own transfers and bill payments first; then what an investment pays, then money moved into or out of one.
+  if (rule !== 'transfer' && rule !== 'card-payment') {
+    if (YIELD.test(name) || (tx.type === 'CREDIT' && /\brendimentos?\b|\bjuros\b|dividendos?|proventos/i.test(text))) return tx.type === 'CREDIT' ? 'investment-income' : 'taxes'
+    if (INVESTMENT_CATEGORY.test(name) || INVESTMENT_TEXT.test(text)) return 'investment'
+  }
   if (rule === 'groceries') {
     const text = [tx.description, tx.descriptionRaw, tx.merchant?.name, tx.merchant?.businessName].filter(Boolean).join(' ')
     if (MERCADO_LIVRE.test(text)) return 'shopping'
@@ -355,14 +373,15 @@ export function toSnapshot(input: PluggyData): Snapshot {
         ...fromGuess(guess, known),
         status: t.status === 'PENDING' ? 'PENDING' : 'POSTED',
       }
-      // What's stored wins over the guess (it's the guess from the first sync, or a later edit).
+      // What's stored wins over the guess (it's the guess from the first sync, or a later edit), but an empty guess doesn't.
       // An edited category wins over transfer detection too; a hand-set answer wins over both.
       const stored = data.owner?.stored.get(t.id)
       const override = stored?.transferOverride ?? undefined
       const detect = !override && !stored?.edited
       if (detect && !tx.transfer && looksLikeBillPayment(t, accountType.get(t.accountId))) Object.assign(tx, { categoryId: null, transfer: 'card-payment' })
       if (stored?.edited || override === 'none') delete tx.transfer
-      if (stored && !tx.transfer) Object.assign(tx, { categoryId: stored.categoryId, subcategoryId: stored.subcategoryId })
+      // An uncategorized one that was never edited takes today's guess (e.g. a default category added later).
+      if (stored && !tx.transfer && (stored.categoryId || stored.edited)) Object.assign(tx, { categoryId: stored.categoryId, subcategoryId: stored.subcategoryId })
       if (override && override !== 'none') Object.assign(tx, { categoryId: null, subcategoryId: null, transfer: override })
       if (override) tx.transferOverride = override
       if (detect && !tx.transfer) {

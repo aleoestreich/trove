@@ -6,6 +6,7 @@ import { newId } from '../data/edits'
 import { addMonths, formatDayHeading, formatMonthYear } from '../lib/dates'
 import { formatMoney, formatRate } from '../lib/money'
 import { kindOf } from '../lib/summary'
+import { countedAmount } from '../data/categories'
 import { Icon } from './Icon'
 import { CategoryBadge, TransactionBadge, catInk, catTint, catVar } from './CategoryBadge'
 import { useAccountLabel } from './TransactionRow'
@@ -33,7 +34,9 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
   const kindLabel =
     current.transfer === 'card-payment'
       ? t.transactions.cardPaymentRow
-      : kind === 'income'
+      : current.transfer === 'investment'
+        ? t.transactions.investmentRow
+        : kind === 'income'
         ? t.transactions.kindIncome
         : kind === 'transfer'
           ? t.transactions.kindTransfer
@@ -57,6 +60,9 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
     details.push({ label: t.transactions.purchaseTotal, value: formatMoney(inst.totalAmount) })
   }
   if (current.status === 'PENDING') details.push({ label: t.transactions.status, value: t.pending })
+  // "A receber": only your part counts in spending; money paid back doesn't count as income.
+  if (current.shared) details.push({ label: t.transactions.yourShare, value: formatMoney(-countedAmount(current)) })
+  if (current.repaid) details.push({ label: t.transactions.countsAsIncome, value: formatMoney(countedAmount(current)) })
 
   // Categories of the transaction's type (money in: income; out: expense), plus its own if it's of the other type.
   const type = current.amount > 0 ? 'income' : 'expense'
@@ -132,6 +138,18 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
             {t.transactions.notCardPayment}
           </button>
         </>
+      ) : current.transfer === 'investment' ? (
+        <>
+          <p className="mt-3 text-[13px] leading-[18px] text-muted">{t.transactions.investmentNote}</p>
+          <button
+            type="button"
+            onClick={() => edit({ op: 'setTransferOverride', transactionId: current.id, value: 'none' })}
+            className="mt-2 inline-flex h-12 items-center gap-2 self-start rounded-md px-3 -ml-3 text-sm font-medium text-accent hover:bg-accent-faint active:bg-track"
+          >
+            <Icon name="close" className="size-[18px]" strokeWidth={2} />
+            {t.transactions.notInvestment}
+          </button>
+        </>
       ) : current.transfer ? (
         <>
           <p className="mt-3 text-[13px] leading-[18px] text-muted">{t.transactions.transferNote}</p>
@@ -193,13 +211,14 @@ function TransactionDetails({ tx, onClose, variant }: { tx: Transaction; onClose
         </>
       )}
 
-      {/* Neither income nor an expense: mark it as a transfer (own accounts, or a card bill payment). */}
+      {/* Neither income nor an expense: mark it as a transfer (own accounts, a card bill payment, or an investment). */}
       {!current.transfer && (
         <div className="mt-4 divide-y divide-line overflow-hidden rounded-md border border-line">
           {(
             [
               ['own', 'transfer', t.transactions.markOwnTransfer, t.transactions.markOwnTransferNote],
               ['card-payment', 'card', t.transactions.markCardPayment, t.transactions.markCardPaymentNote],
+              ['investment', 'investments', t.transactions.markInvestment, t.transactions.markInvestmentNote],
             ] as const
           ).map(([value, icon, label, note]) => (
             <button

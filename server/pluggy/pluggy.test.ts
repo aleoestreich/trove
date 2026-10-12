@@ -374,6 +374,36 @@ describe('mapping to Trove', () => {
     for (const [category, type, expected] of cases) expect(categoryFor({ category, type }), String(category)).toBe(expected)
   })
 
+  it('tells money moved into or out of an investment from what it pays', () => {
+    const cases: [string | null, 'DEBIT' | 'CREDIT', string, string][] = [
+      ['Investments', 'DEBIT', 'APLICACAO RDB', 'investment'],
+      ['Fixed income', 'CREDIT', 'RESGATE CDB', 'investment'],
+      ['Automatic investment', 'DEBIT', 'x', 'investment'],
+      [null, 'DEBIT', 'Dinheiro guardado na caixinha', 'investment'],
+      [null, 'CREDIT', 'Resgate Caixinha Exemplo', 'investment'],
+      ['Transfer - PIX', 'DEBIT', 'Aplicação Tesouro Direto', 'investment'],
+      ['Proceeds interests and dividends', 'CREDIT', 'x', 'investment-income'],
+      [null, 'CREDIT', 'Rendimento CDB', 'investment-income'],
+      ['Investments', 'CREDIT', 'Rendimentos da caixinha', 'investment-income'],
+      // Interest charged is a fee, not income.
+      ['Interests charged', 'DEBIT', 'JUROS ROTATIVO', 'taxes'],
+      // An own transfer stays one, whatever the wording.
+      ['Same person transfer', 'DEBIT', 'Caixinha', 'transfer'],
+      // Plain wording isn't enough: "aplicativo" isn't an aplicação.
+      [null, 'DEBIT', 'APLICATIVO EXEMPLO', 'other-expense'],
+    ]
+    for (const [category, type, description, expected] of cases) expect(categoryFor({ category, type, description }), description).toBe(expected)
+  })
+
+  it('reads an investment move as a transfer, unless its category was edited', () => {
+    const move = tx({ id: 'inv', description: 'APLICACAO RDB', amount: -500 })
+    const kept = tx({ id: 'kept', description: 'APLICACAO RDB', amount: -500 })
+    const stored = new Map([['kept', { categoryId: 'home', subcategoryId: null, hidden: false, edited: true, transferOverride: null }]])
+    const s = toSnapshot({ ...data([move, kept]), owner: { categories: [], subcategories: [], stored } })
+    expect(s.transactions.find((t) => t.id === 'inv')).toMatchObject({ transfer: 'investment', categoryId: null })
+    expect(s.transactions.find((t) => t.id === 'kept')!.transfer).toBeUndefined()
+  })
+
   it('never files Mercado Livre under groceries, whatever "mercado" in its name suggests', () => {
     const groceries = { category: 'Groceries', type: 'DEBIT' as const }
     expect(categoryFor({ ...groceries, description: 'MERCADOLIVRE*LOJAEXEMPLO' })).toBe('shopping')

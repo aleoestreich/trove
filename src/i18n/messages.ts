@@ -363,6 +363,9 @@ export interface Messages {
     installment: string
     installmentEnds: (n: number, total: number, month: string) => string
     purchaseTotal: string
+    /** "A receber": what a shared expense or a repayment counts for in the totals. */
+    yourShare: string
+    countsAsIncome: string
     status: string
     transferNote: string
     /** Row line 2 for a transaction without a category. */
@@ -370,6 +373,7 @@ export interface Messages {
     uncategorized: string
     transferRow: string
     cardPaymentRow: string
+    investmentRow: string
     /** Text button next to the result count. */
     hiddenLink: (n: number) => string
     hiddenTitle: string
@@ -389,6 +393,10 @@ export interface Messages {
     markCardPayment: string
     markCardPaymentNote: string
     notCardPayment: string
+    markInvestment: string
+    markInvestmentNote: string
+    notInvestment: string
+    investmentNote: string
     /** Clears the category and subcategory. */
     removeCategory: string
     uncategorizedNote: string
@@ -1492,12 +1500,15 @@ export const messages: Messages = {
     installment: 'Parcela',
     installmentEnds: (n, total, month) => `${n} de ${total} · termina ${month}`,
     purchaseTotal: 'Total da compra',
+    yourShare: 'Sua parte (conta nos gastos)',
+    countsAsIncome: 'Conta como receita',
     status: 'Situação',
     transferNote: 'Transferências não contam como receita nem despesa.',
     uncategorizedTap: 'Sem categoria · toque para escolher',
     uncategorized: 'Sem categoria',
     transferRow: 'Transferência entre suas contas',
     cardPaymentRow: 'Pagamento de fatura',
+    investmentRow: 'Investimento · aplicação ou resgate',
     hiddenLink: (n) => `Ocultas (${n})`,
     hiddenTitle: 'Transações ocultas',
     hiddenNote: 'Transações ocultas ficam fora de todos os totais, gráficos e médias. Reexiba uma para ela voltar a contar.',
@@ -1516,6 +1527,10 @@ export const messages: Messages = {
     markCardPayment: 'Marcar como pagamento de fatura',
     markCardPaymentNote: 'Não conta como despesa: as compras do cartão já contam.',
     notCardPayment: 'Não é pagamento de fatura',
+    markInvestment: 'Marcar como investimento',
+    markInvestmentNote: 'Aplicação ou resgate: não conta como receita nem despesa, o dinheiro continua seu.',
+    notInvestment: 'Não é investimento',
+    investmentNote: 'Aplicações e resgates não contam como receita nem despesa: o dinheiro só mudou de lugar. Continua no saldo da conta.',
     removeCategory: 'Remover categoria',
     uncategorizedNote: 'Esta transação está sem categoria. Escolha uma acima quando quiser.',
     categoryRemoved: 'Categoria removida',
@@ -1713,10 +1728,10 @@ export const messages: Messages = {
     sheet: {
       section: 'A receber',
       add: 'Paguei por alguém',
-      addNote: 'Acompanhe até a pessoa te devolver. Os totais não mudam.',
+      addNote: 'Acompanhe até a pessoa te devolver. Só a sua parte conta nos gastos.',
       addMore: 'Mais alguém vai devolver',
       repay: 'É uma devolução',
-      repayNote: 'Abate do que alguém te deve',
+      repayNote: 'Abate do que alguém te deve e não conta como receita',
       repaidBy: (person) => `Devolução de ${person}`,
     },
     form: {
@@ -1901,7 +1916,7 @@ export const messages: Messages = {
       legendOver: 'Acima da renda',
       base: (income) => `Sobre ${income} de renda`,
       baseExpected: (income) => `Sobre ${income} de renda prevista`,
-      expectedNote: (received) => `Média dos últimos 3 meses; já entraram ${received}.`,
+      expectedNote: (received) => `Sua renda média (últimos 6 meses); já entraram ${received}.`,
       baseAll: 'Toda a renda do mês.',
       baseNote: (included, excluded) => (excluded ? `${included}. ${excluded} ficam fora.` : `${included}.`),
       change: 'Alterar',
