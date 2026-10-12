@@ -4,9 +4,10 @@ import { useData } from '../../state'
 import { useI18n } from '../../i18n/I18nProvider'
 import { Icon, type IconName } from '../Icon'
 import { NO_FILTER } from '../../data/incomeAverage'
-import { balanceStatus, monthBalance, roundedShares, type BalanceStatus, type Bucket, type MonthBalance } from '../../data/spendingBalance'
+import { balanceStatus, expectedCharges, monthBalance, roundedShares, type BalanceStatus, type Bucket, type MonthBalance } from '../../data/spendingBalance'
 import type { BalanceTarget } from '../../data/types'
-import { formatMonthName, monthKey } from '../../lib/dates'
+import { formatMonthName, fromISO, monthKey } from '../../lib/dates'
+import { installmentPlans } from '../../lib/installments'
 import { formatMoney, formatPercent, isMoneyMasked } from '../../lib/money'
 import { capitalize } from '../insights/parts'
 
@@ -48,13 +49,18 @@ export function defaultBalanceMonth(today: string, hasIncome: (month: string) =>
 
 /** A month's split, its verdict and the target, from the loaded data. */
 export function useMonthBalance(month?: string): { balance: MonthBalance; status: BalanceStatus; target: BalanceTarget; month: string } {
-  const { allTransactions, categories, subcategories, incomeFilter, balanceTarget, today } = useData()
+  const { allTransactions, categories, subcategories, incomeFilter, balanceTarget, today, insights } = useData()
+  // This month's installments and recurring charges still to come.
+  const expected = useMemo(
+    () => expectedCharges(installmentPlans(allTransactions, fromISO(today)), insights.recurring.active, allTransactions, today),
+    [allTransactions, insights, today],
+  )
   return useMemo(() => {
-    const of = (m: string) => monthBalance(allTransactions, categories, subcategories, incomeFilter ?? NO_FILTER, m, today)
+    const of = (m: string) => monthBalance(allTransactions, categories, subcategories, incomeFilter ?? NO_FILTER, m, today, expected)
     const shown = month ?? defaultBalanceMonth(today, (m) => of(m).income > 0)
     const balance = of(shown)
     return { balance, status: balanceStatus(balance, balanceTarget, today), target: balanceTarget, month: shown }
-  }, [allTransactions, categories, subcategories, incomeFilter, balanceTarget, today, month])
+  }, [allTransactions, categories, subcategories, incomeFilter, balanceTarget, today, month, expected])
 }
 
 const PILL: Record<BalanceStatus['kind'], { icon: IconName; className: string }> = {

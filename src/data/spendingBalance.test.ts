@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit, defaultCategories, EditError, validateEdit } from './edits'
 import { NO_FILTER } from './incomeAverage'
-import { DEFAULT_TARGET, expectedIncome, balanceStatus, hasGroups, isTarget, monthBalance, monthBalances, roundedShares, suggestGroup, worstDeviation } from './spendingBalance'
+import { DEFAULT_TARGET, expectedCharges, expectedIncome, balanceStatus, hasGroups, isTarget, monthBalance, monthBalances, roundedShares, suggestGroup, worstDeviation } from './spendingBalance'
 import type { Category, Snapshot, Subcategory, Transaction } from './types'
+import type { InstallmentPlan } from '../lib/installments'
+import type { RecurringItem } from './recurring'
 
 const defaults = defaultCategories((c, i) => `${c}-${i}`)
 // Moradia and Mercado are Essencial, Restaurantes and Transporte's "Apps de corrida" Estilo de vida; the rest has no group.
@@ -115,6 +117,49 @@ describe('Equilíbrio do mês', () => {
     // What came in this month is filtered the same way.
     const october = [...history, tx('oct-free', '2026-10-05', 3_000_00, { categoryId: 'freelance' })]
     expect(monthBalance(october, categories, subcategories, filter, '2026-10', '2026-10-16')).toMatchObject({ income: 10_000_00, received: 0, expected: 10_000_00 })
+  })
+
+  it('counts the charges still expected in the month in progress, each in its group', () => {
+    const today = '2026-10-16'
+    const plan = {
+      description: 'LOJA PARCELADA',
+      categoryId: 'restaurants',
+      upcoming: [
+        { number: 3, date: '2026-10-10', month: '2026-10', amount: 100_00 }, // before today: already charged or late
+        { number: 4, date: '2026-10-20', month: '2026-10', amount: 100_00 },
+        { number: 5, date: '2026-11-20', month: '2026-11', amount: 100_00 }, // next month
+      ],
+    } as unknown as InstallmentPlan
+    const item = (over: Partial<RecurringItem>) =>
+      ({ merchant: 'STREAMING EXEMPLO', status: 'active', categoryId: 'subscriptions', amount: 40_00, lastDate: '2026-09-25', nextDate: '2026-10-25', charges: [{ transactionId: 'sub-sep', date: '2026-09-25', amount: 40_00 }], ...over }) as unknown as RecurringItem
+    const recurring = [
+      item({}),
+      item({ merchant: 'JA COBRADO', lastDate: '2026-10-05', nextDate: '2026-11-05' }), // charged this month
+      item({ merchant: 'PAROU', status: 'stopped' }),
+      item({ merchant: 'MES QUE VEM', nextDate: '2026-11-02' }),
+      item({ merchant: 'ALUGUEL EXEMPLO', categoryId: 'home', amount: 4_000_00, nextDate: '2026-10-10', charges: [{ transactionId: 'rent-sep', date: '2026-09-10', amount: 4_000_00 }] }), // late, still expected
+    ]
+    const history = [
+      ...september,
+      tx('sub-sep', '2026-09-25', -40_00, { categoryId: 'subscriptions' }),
+      tx('rent-sep', '2026-09-10', -4_000_00, { categoryId: 'home', subcategoryId: 'home-0' }),
+    ]
+    const expected = expectedCharges([plan], recurring, history, today)
+    expect(expected.map((e) => [e.kind, e.date, e.amount, e.categoryId, e.subcategoryId])).toEqual([
+      ['recurring', '2026-10-16', 4_000_00, 'home', 'home-0'],
+      ['installment', '2026-10-20', 100_00, 'restaurants', null],
+      ['recurring', '2026-10-25', 40_00, 'subscriptions', null],
+    ])
+    const october = [...history, tx('oct-salary', '2026-10-05', 10_000_00, { categoryId: 'salary' }), tx('oct-market', '2026-10-06', -500_00, { categoryId: 'groceries' })]
+    const b = monthBalance(october, categories, subcategories, NO_FILTER, '2026-10', today, expected)
+    // Mercado 500 spent + rent 4.000 expected; restaurants 100 expected; subscriptions (no group) 40 expected.
+    expect(b).toMatchObject({ essential: 4_500_00, lifestyle: 100_00, ungrouped: 40_00, expectedSpending: 4_140_00 })
+    expect(b.items.essential.map((i) => [i.categoryId, i.amount, i.expected, i.count])).toEqual([
+      ['home', 4_000_00, 4_000_00, 0],
+      ['groceries', 500_00, 0, 1],
+    ])
+    // Only the month in progress counts them.
+    expect(monthBalance(october, categories, subcategories, NO_FILTER, '2026-09', today, expected).expectedSpending).toBe(0)
   })
 
   it('tells each state apart', () => {

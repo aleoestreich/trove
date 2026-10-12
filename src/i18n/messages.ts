@@ -553,6 +553,7 @@ export interface Messages {
     incomplete: (amount: string) => string
     noIncome: string
     includesUngrouped: (amount: string) => string
+    includesExpected: (amount: string) => string
     classifyAmount: (amount: string) => string
     target: (pct: number) => string
     barAria: (e: number, l: number, f: number, te: number, tl: number, tf: number) => string
@@ -577,6 +578,9 @@ export interface Messages {
       span: (from: string, to: string) => string
       points: (n: number) => string
       soFarTag: string
+      withExpectedTag: string
+      expectedSpendNote: (amount: string) => string
+      itemExpected: (amount: string) => string
       insideFuture: (amount: string) => string
       classify: string
       overTarget: (amount: string) => string
@@ -1445,6 +1449,7 @@ export const messages: Messages = {
     incomplete: (amount) => `${amount} ainda sem grupo. Classifique para ver o equilíbrio real.`,
     noIncome: 'Nenhuma renda entrou ainda, então mostramos só os valores.',
     includesUngrouped: (amount) => `Inclui ${amount} sem grupo`,
+    includesExpected: (amount) => `Inclui ${amount} previstos: parcelas e recorrentes do mês`,
     classifyAmount: (amount) => `Classificar ${amount}`,
     target: (pct) => `meta ${pct}%`,
     barAria: (e, l, f, te, tl, tf) => `Essencial ${e}%, Estilo de vida ${l}%, Futuro ${f}% da renda. Meta ${te}, ${tl} e ${tf}.`,
@@ -1469,6 +1474,9 @@ export const messages: Messages = {
       span: (from, to) => `${from} a ${to}`,
       points: (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)} ${Math.abs(n) === 1 ? 'ponto' : 'pontos'}`,
       soFarTag: 'até agora',
+      withExpectedTag: 'com o previsto',
+      expectedSpendNote: (amount) => `Os gastos incluem ${amount} previstos até o fim do mês: parcelas e recorrentes que ainda vão cair.`,
+      itemExpected: (amount) => `inclui ${amount} previsto`,
       insideFuture: (amount) => `${amount} · dentro do Futuro`,
       classify: 'Classificar',
       overTarget: (amount) => `${amount} acima da meta`,
