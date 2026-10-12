@@ -83,12 +83,13 @@ function HowCard({ projection }: { projection: ProjectionData }) {
   const b = projection.breakdown
   const bills = projection.events.filter((e) => e.kind === 'bill')
   const recurring = projection.events.filter((e) => e.kind === 'recurring')
-  const salary = projection.events.find((e) => e.kind === 'salary')
+  // The days still to come this month, else the usual ones.
+  const upcoming = projection.events.filter((e) => e.kind === 'salary').map((e) => Number(e.date.slice(8, 10)))
   const notes: Record<string, string> = {
     saldo: p.notes.saldo(joinList(projection.accountIds.map((id) => accountLabel(id, accounts, institutions)))),
     receitas:
       b.receitasPrevistas > 0
-        ? p.notes.receitas(salary ? Number(salary.date.slice(8, 10)) : projection.salary.day, projection.settings.includeFreelance)
+        ? p.notes.receitas(upcoming.length ? upcoming : projection.salary.days, projection.settings.includeFreelance)
         : p.notes.receitasNone,
     faturas: bills.length
       ? p.notes.faturas(joinList(bills.map((e) => (e.kind === 'bill' ? accountName(e.accountId, accounts, institutions) : ''))), formatMoney(b.parcelasDentroDasFaturas))
